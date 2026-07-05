@@ -49,6 +49,19 @@ export function rgbString({ r, g, b }: Rgb): string {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
+export function hslToRgb(h: number, s: number, l: number): Rgb {
+  const sn = s / 100;
+  const ln = l / 100;
+  const k = (n: number) => (n + h / 30) % 12;
+  const a = sn * Math.min(ln, 1 - ln);
+  const f = (n: number) => ln - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+  return {
+    r: Math.round(f(0) * 255),
+    g: Math.round(f(8) * 255),
+    b: Math.round(f(4) * 255),
+  };
+}
+
 function clamp255(v: number): number {
   return Math.min(255, Math.max(0, v));
 }

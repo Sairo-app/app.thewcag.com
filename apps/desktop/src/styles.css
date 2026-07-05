@@ -1,7 +1,95 @@
 @import "tailwindcss";
 
+/*
+ * Brand tokens mirrored from Accessibility.build (app/globals.css on the
+ * site). Light-first with automatic dark mode, same HSL variables.
+ */
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-2: 210 40% 98%;
+  --primary: 221.2 83.2% 53.3%;
+  --primary-foreground: 210 40% 98%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --border: 214.3 31.8% 91.4%;
+  --ring: 221.2 83.2% 53.3%;
+  --teal: 181 76% 40%;
+  --coral: 9 88% 62%;
+  --yellow: 45 95% 58%;
+  --ok: 160 84% 30%;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 60% 7.5%;
+    --card-2: 217.2 32.6% 12%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --border: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 94.1%;
+    --teal: 181 82% 46%;
+    --coral: 9 94% 70%;
+    --yellow: 45 98% 68%;
+    --ok: 160 74% 45%;
+  }
+}
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-2: hsl(var(--card-2));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-border: hsl(var(--border));
+  --color-ring: hsl(var(--ring));
+  --color-teal: hsl(var(--teal));
+  --color-coral: hsl(var(--coral));
+  --color-yellow: hsl(var(--yellow));
+  --color-ok: hsl(var(--ok));
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+}
+
 body {
   -webkit-user-select: none;
   user-select: none;
   cursor: default;
+  background: transparent;
+}
+
+/* subtle brand wash behind the main window */
+.app-bg {
+  background:
+    radial-gradient(1200px 500px at 85% -10%, hsl(var(--primary) / 0.10), transparent 60%),
+    radial-gradient(900px 400px at -20% 110%, hsl(var(--teal) / 0.08), transparent 60%),
+    hsl(var(--background));
+}
+
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise {
+  animation: rise 0.25s ease-out both;
 }

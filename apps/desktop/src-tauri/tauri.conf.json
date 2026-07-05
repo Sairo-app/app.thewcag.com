@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Accessibility Build",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "identifier": "build.accessibility.desktop",
   "build": {
     "beforeDevCommand": "pnpm dev:vite",
@@ -14,9 +14,11 @@
       {
         "label": "main",
         "title": "Accessibility.build",
-        "width": 440,
-        "height": 640,
-        "resizable": false,
+        "width": 460,
+        "height": 700,
+        "minWidth": 420,
+        "minHeight": 560,
+        "resizable": true,
         "maximizable": false,
         "visible": true
       }

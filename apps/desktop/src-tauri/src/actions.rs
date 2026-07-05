@@ -9,19 +9,9 @@ pub fn show_main(app: &AppHandle) {
     }
 }
 
-pub fn pick_color(app: &AppHandle) {
-    match capture::color_at_cursor() {
-        Ok(color) => {
-            let _ = app.emit("color-picked", color);
-        }
-        Err(message) => {
-            let _ = app.emit("capture-error", message);
-        }
-    }
-    show_main(app);
-}
-
-pub fn screenshot(app: &AppHandle) {
+/// Full-screen capture straight to the Desktop (tray shortcut; region
+/// capture goes through the overlay instead).
+pub fn full_screenshot(app: &AppHandle) {
     match capture::fullscreen_to_desktop(app) {
         Ok(path) => {
             let _ = app.emit("screenshot-taken", path);

@@ -6,6 +6,11 @@ extern "C" {
 }
 
 /// True if Screen Recording access is granted (always true off-macOS).
+pub fn granted() -> bool {
+    screen_permission_status()
+}
+
+/// True if Screen Recording access is granted (always true off-macOS).
 #[tauri::command]
 pub fn screen_permission_status() -> bool {
     #[cfg(target_os = "macos")]

@@ -1,4 +1,4 @@
-import type { Rgb } from "./formats";
+import { hslToRgb, rgbToHsl, type Rgb } from "./formats";
 
 /** WCAG 2.x relative luminance (sRGB). */
 export function relativeLuminance({ r, g, b }: Rgb): number {
@@ -27,6 +27,37 @@ export interface WcagVerdict {
   largeAAA: boolean;
   /** Non-text UI components & graphical objects (WCAG 1.4.11): >= 3 */
   uiAA: boolean;
+}
+
+export interface Suggestion {
+  color: Rgb;
+  ratio: number;
+  direction: "darker" | "lighter";
+}
+
+/**
+ * Nearest variants of `adjust` (keeping hue/saturation, walking lightness)
+ * that reach `target` contrast against `against`. Returns up to one result
+ * per direction, nearest-first.
+ */
+export function suggestAccessible(adjust: Rgb, against: Rgb, target = 4.5): Suggestion[] {
+  const { h, s, l } = rgbToHsl(adjust);
+  const found: Suggestion[] = [];
+  for (const direction of ["darker", "lighter"] as const) {
+    const step = direction === "darker" ? -1 : 1;
+    for (let li = l + step; li >= 0 && li <= 100; li += step) {
+      const candidate = hslToRgb(h, s, li);
+      const ratio = contrastRatio(candidate, against);
+      if (ratio >= target) {
+        found.push({ color: candidate, ratio: Math.round(ratio * 100) / 100, direction });
+        break;
+      }
+    }
+  }
+  return found.sort(
+    (a, b) => Math.abs(a.color.r - adjust.r) + Math.abs(a.color.g - adjust.g) + Math.abs(a.color.b - adjust.b)
+      - (Math.abs(b.color.r - adjust.r) + Math.abs(b.color.g - adjust.g) + Math.abs(b.color.b - adjust.b)),
+  );
 }
 
 export function wcagVerdict(fg: Rgb, bg: Rgb): WcagVerdict {

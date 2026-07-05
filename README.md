@@ -5,7 +5,11 @@ anywhere on screen and get WCAG/APCA contrast verdicts, capture and annotate
 screenshots of issues, and view any part of the screen through a
 color-blindness lens.
 
-See [PLAN.md](PLAN.md) for the full roadmap. Current milestone: **M0**.
+See [PLAN.md](PLAN.md) for the roadmap and [CHANGELOG.md](CHANGELOG.md) for
+releases. Current version: **v1.0.0** (contrast checker, capture + annotate,
+colorblind lens).
+
+Default hotkeys: ⌥⌘P check contrast · ⌥⌘S capture & annotate · ⌥⌘L lens.
 
 ## Development
 
@@ -17,8 +21,6 @@ pnpm dev          # runs `tauri dev` (Vite + Rust)
 pnpm test         # a11y-core unit tests
 pnpm build        # signed .app + .dmg (requires signing identity)
 ```
-
-Default hotkeys: ⌥⌘P pick color · ⌥⌘S screenshot.
 
 ## Layout
 

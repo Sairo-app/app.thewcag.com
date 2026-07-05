@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { contrastRatio, wcagVerdict } from "./contrast";
+import { contrastRatio, suggestAccessible, wcagVerdict } from "./contrast";
 import { apcaLc } from "./apca";
-import { hexToRgb, rgbToHex } from "./formats";
+import { hexToRgb, hslToRgb, rgbToHex, rgbToHsl } from "./formats";
 import { simulateRgb } from "./colorblind";
 
 const WHITE = { r: 255, g: 255, b: 255 };
@@ -27,6 +27,34 @@ describe("contrast", () => {
   it("#777777 on white fails AA normal (4.48:1)", () => {
     const grey = hexToRgb("#777777")!;
     expect(wcagVerdict(grey, WHITE).normalAA).toBe(false);
+  });
+});
+
+describe("suggestAccessible", () => {
+  it("suggests passing variants for a failing pair", () => {
+    const grey = hexToRgb("#999999")!; // 2.85:1 on white — fails AA
+    const suggestions = suggestAccessible(grey, WHITE, 4.5);
+    expect(suggestions.length).toBeGreaterThan(0);
+    for (const s of suggestions) {
+      expect(contrastRatio(s.color, WHITE)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("returns nothing to fix when target is unreachable in a direction", () => {
+    // near-black against black: only "lighter" can pass
+    const suggestions = suggestAccessible({ r: 10, g: 10, b: 10 }, BLACK, 4.5);
+    expect(suggestions.every((s) => s.direction === "lighter")).toBe(true);
+  });
+});
+
+describe("hsl round trip", () => {
+  it("hslToRgb inverts rgbToHsl approximately", () => {
+    const original = { r: 37, g: 99, b: 235 }; // brand blue
+    const { h, s, l } = rgbToHsl(original);
+    const back = hslToRgb(h, s, l);
+    expect(Math.abs(back.r - original.r)).toBeLessThan(6);
+    expect(Math.abs(back.g - original.g)).toBeLessThan(6);
+    expect(Math.abs(back.b - original.b)).toBeLessThan(6);
   });
 });
 
