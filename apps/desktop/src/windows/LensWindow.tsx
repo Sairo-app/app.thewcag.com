@@ -3,6 +3,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { COLORBLIND_MATRICES, type ColorblindType } from "@accessibility-build/a11y-core";
 import { GlFilter, IDENTITY_MATRIX } from "../lib/glfilter";
 import { ipc } from "../lib/ipc";
+import { CloseIcon, FreezeIcon, SaveIcon, SplitIcon } from "../lib/icons";
 
 const FRAME_MS = 80; // ~12.5fps
 
@@ -148,34 +149,34 @@ export default function LensWindow() {
           <button
             onClick={() => setSplit((s) => !s)}
             title="Split view: left original, right filtered (D)"
-            className={`rounded-md px-2 py-1 text-[11px] ${
+            className={`rounded-md p-1.5 ${
               split ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"
             }`}
           >
-            ◧
+            <SplitIcon />
           </button>
           <button
             onClick={() => setFrozen((f) => !f)}
             title={frozen ? "Resume (Space)" : "Freeze frame (Space)"}
-            className={`rounded-md px-2 py-1 text-[11px] ${
+            className={`rounded-md p-1.5 ${
               frozen ? "bg-yellow/20 text-yellow" : "text-muted-foreground hover:bg-muted hover:text-foreground"
             }`}
           >
-            ❄
+            <FreezeIcon />
           </button>
           <button
             onClick={() => void saveShot()}
             title="Save what the lens sees"
-            className="rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
           >
-            ⤓
+            <SaveIcon />
           </button>
           <button
             onClick={() => void getCurrentWebviewWindow().close()}
             title="Close lens"
-            className="rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:bg-coral/20 hover:text-coral"
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-coral/20 hover:text-coral"
           >
-            ✕
+            <CloseIcon />
           </button>
         </div>
       </header>

@@ -142,6 +142,9 @@ button:active:not(:disabled) {
   background: hsl(var(--muted) / 0.7);
 }
 .seg > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border-radius: 6px;
   padding: 4px 10px;
   font-size: 11px;

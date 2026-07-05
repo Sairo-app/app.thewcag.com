@@ -1,5 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ipc } from "../lib/ipc";
+import {
+  ArrowIcon,
+  BoxIcon,
+  CursorIcon,
+  IssueIcon,
+  RedactIcon,
+  RedoIcon,
+  RulerIcon,
+  TypeIcon,
+  UndoIcon,
+} from "../lib/icons";
 
 type Tool = "select" | "arrow" | "rect" | "blur" | "text" | "badge" | "measure";
 
@@ -405,17 +416,23 @@ export default function AnnotateWindow() {
           <div className="seg">
             {(
               [
-                ["select", "Select", "V"],
-                ["badge", "① Issue", "I"],
-                ["arrow", "↗", "A"],
-                ["rect", "▢", "R"],
-                ["measure", "⤢ 24px", "M"],
-                ["blur", "▦", "X"],
-                ["text", "T", "T"],
-              ] as [Tool, string, string][]
-            ).map(([t, label, key]) => (
-              <button key={t} data-active={tool === t} onClick={() => setTool(t)} title={`${t} (${key})`}>
-                {label}
+                ["select", <CursorIcon key="i" />, "Select", "V"],
+                ["badge", <IssueIcon key="i" />, "Issue", "I"],
+                ["arrow", <ArrowIcon key="i" />, "", "A"],
+                ["rect", <BoxIcon key="i" />, "", "R"],
+                ["measure", <RulerIcon key="i" />, "24px", "M"],
+                ["blur", <RedactIcon key="i" />, "", "X"],
+                ["text", <TypeIcon key="i" />, "", "T"],
+              ] as [Tool, ReactNode, string, string][]
+            ).map(([t, icon, label, key]) => (
+              <button
+                key={t}
+                data-active={tool === t}
+                onClick={() => setTool(t)}
+                title={`${t} (${key})`}
+              >
+                {icon}
+                {label && <span>{label}</span>}
               </button>
             ))}
           </div>
@@ -432,11 +449,11 @@ export default function AnnotateWindow() {
             />
           ))}
           <span className="h-5 w-px bg-border" />
-          <button onClick={undo} title="Undo (⌘Z)" className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">
-            ↩
+          <button onClick={undo} title="Undo (⌘Z)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+            <UndoIcon />
           </button>
-          <button onClick={redo} title="Redo (⇧⌘Z)" className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">
-            ↪
+          <button onClick={redo} title="Redo (⇧⌘Z)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+            <RedoIcon />
           </button>
         </div>
         <div className="flex items-center gap-1.5">

@@ -11,6 +11,7 @@ import {
   type Rgb,
 } from "@accessibility-build/a11y-core";
 import { displayShortcut, events, ipc, type Shortcuts } from "../lib/ipc";
+import { CheckIcon, CopyIcon, FolderIcon, SwapIcon, TimerIcon } from "../lib/icons";
 
 const SITE = "https://accessibility.build";
 const HISTORY_KEY = "contrast-history-v1";
@@ -239,8 +240,9 @@ export default function MainWindow() {
           </p>
           <button
             onClick={() => void ipc.revealPath(screenshot)}
-            className="shrink-0 rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted"
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted"
           >
+            <FolderIcon size={12} />
             Reveal
           </button>
         </section>
@@ -445,10 +447,10 @@ function ContrastPanel(props: {
         <Swatch label="Text" hex={props.fg} onChange={props.onFg} pickMode="fg" />
         <button
           onClick={props.onSwap}
-          title="Swap"
-          className="mt-4 rounded-md border border-border px-1.5 py-1 text-xs text-muted-foreground hover:bg-muted"
+          title="Swap text and background"
+          className="mt-4 rounded-md border border-border p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
         >
-          ⇄
+          <SwapIcon />
         </button>
         <Swatch label="Background" hex={props.bg} onChange={props.onBg} pickMode="bg" />
       </div>
@@ -627,9 +629,11 @@ function Swatch(props: {
             setTimeout(() => setCopied(false), 1200);
           }}
           title="Copy hex"
-          className="shrink-0 rounded-md border border-border px-1.5 py-1.5 text-[10px] text-muted-foreground hover:bg-muted"
+          className={`shrink-0 rounded-md border border-border p-1.5 hover:bg-muted ${
+            copied ? "text-ok" : "text-muted-foreground hover:text-foreground"
+          }`}
         >
-          {copied ? "✓" : "⧉"}
+          {copied ? <CheckIcon size={12} /> : <CopyIcon size={12} />}
         </button>
       </div>
     </div>
@@ -662,8 +666,9 @@ function ToolCard(props: {
         <button
           onClick={props.onDelayed}
           title="Start after a 3s delay — time to open hover states and menus"
-          className="absolute bottom-2 right-2 rounded-md border border-border px-1.5 py-0.5 text-[9px] text-muted-foreground opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
+          className="absolute bottom-2 right-2 flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[9px] text-muted-foreground opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
         >
+          <TimerIcon size={10} />
           3s
         </button>
       )}
