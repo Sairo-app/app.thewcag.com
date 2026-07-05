@@ -6,15 +6,16 @@ use xcap::Monitor;
 use crate::permissions;
 use crate::state::{AppState, OverlayPayload};
 
-/// Freeze the screen under the cursor and open a fullscreen overlay window
-/// on that monitor. `mode` is "pair" | "fg" | "bg" | "shot". If the main
-/// window is focused we hide it first so it isn't part of the frozen frame.
+/// Freeze every monitor and open one fullscreen overlay window per display.
+/// `mode` is "pair" | "fg" | "bg" | "shot". If the main window is focused we
+/// hide it first so it isn't part of the frozen frame.
 pub fn begin(app: &AppHandle, mode: &str) {
     begin_delayed(app, mode, 0);
 }
 
 /// `extra_delay_ms` lets auditors arrange hover states, open menus and
-/// tooltips before the frame freezes ("capture in 3s").
+/// tooltips before the frame freezes; a countdown HUD shows the timer and
+/// closes itself right before capture so it never appears in the frame.
 pub fn begin_delayed(app: &AppHandle, mode: &str, extra_delay_ms: u64) {
     if !permissions::granted() {
         crate::actions::show_main(app);
@@ -30,11 +31,20 @@ pub fn begin_delayed(app: &AppHandle, mode: &str, extra_delay_ms: u64) {
         }
     }
 
+    if extra_delay_ms >= 1000 {
+        show_countdown(app, extra_delay_ms);
+    }
+
     let app = app.clone();
     let mode = mode.to_string();
     std::thread::spawn(move || {
         if delay_ms > 0 {
             std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+        }
+        // remove the HUD, give the compositor a beat, then capture
+        if let Some(hud) = app.get_webview_window("countdown") {
+            let _ = hud.close();
+            std::thread::sleep(std::time::Duration::from_millis(150));
         }
         if let Err(message) = capture_and_open(&app, &mode) {
             let _ = app.emit("capture-error", message);
@@ -43,56 +53,113 @@ pub fn begin_delayed(app: &AppHandle, mode: &str, extra_delay_ms: u64) {
     });
 }
 
-fn capture_and_open(app: &AppHandle, mode: &str) -> Result<(), String> {
+fn show_countdown(app: &AppHandle, duration_ms: u64) {
     use mouse_position::mouse_position::Mouse;
     let (cx, cy) = match Mouse::get_mouse_position() {
         Mouse::Position { x, y } => (x, y),
         Mouse::Error => (0, 0),
     };
-    let monitor = Monitor::from_point(cx, cy).map_err(|e| e.to_string())?;
-    let image = monitor.capture_image().map_err(|e| e.to_string())?;
-    let scale = monitor.scale_factor().map_err(|e| e.to_string())?;
-    let mon_x = monitor.x().map_err(|e| e.to_string())? as f64;
-    let mon_y = monitor.y().map_err(|e| e.to_string())? as f64;
-    let logical_w = image.width() as f64 / scale as f64;
-    let logical_h = image.height() as f64 / scale as f64;
-
-    let mut png = Vec::new();
-    image::DynamicImage::ImageRgba8(image)
-        .write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png)
-        .map_err(|e| e.to_string())?;
-
-    let state: State<AppState> = app.state();
-    *state.overlay.lock().unwrap() = Some(OverlayPayload {
-        png,
-        mode: mode.to_string(),
-        scale,
+    let (mx, my) = Monitor::from_point(cx, cy)
+        .ok()
+        .and_then(|m| Some((m.x().ok()? as f64, m.y().ok()? as f64)))
+        .unwrap_or((0.0, 0.0));
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        if let Some(existing) = handle.get_webview_window("countdown") {
+            let _ = existing.close();
+        }
+        let _ = WebviewWindowBuilder::new(&handle, "countdown", WebviewUrl::App(Default::default()))
+            .title("Countdown")
+            .position(mx + 24.0, my + 48.0)
+            .inner_size(148.0, 56.0)
+            .decorations(false)
+            .resizable(false)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .shadow(true)
+            .focused(false)
+            .initialization_script(&format!("window.__COUNTDOWN_MS = {duration_ms};"))
+            .build();
     });
+}
+
+fn capture_and_open(app: &AppHandle, mode: &str) -> Result<(), String> {
+    let monitors = Monitor::all().map_err(|e| e.to_string())?;
+    if monitors.is_empty() {
+        return Err("no monitors found".into());
+    }
+
+    struct Prepared {
+        label: String,
+        x: f64,
+        y: f64,
+        w: f64,
+        h: f64,
+    }
+    let mut prepared = Vec::new();
+
+    {
+        let state: State<AppState> = app.state();
+        let mut overlays = state.overlays.lock().unwrap();
+        overlays.clear();
+        for (index, monitor) in monitors.into_iter().enumerate() {
+            let image = monitor.capture_image().map_err(|e| e.to_string())?;
+            let scale = monitor.scale_factor().map_err(|e| e.to_string())?;
+            let x = monitor.x().map_err(|e| e.to_string())? as f64;
+            let y = monitor.y().map_err(|e| e.to_string())? as f64;
+            let w = image.width() as f64 / scale as f64;
+            let h = image.height() as f64 / scale as f64;
+
+            let mut png = Vec::new();
+            image::DynamicImage::ImageRgba8(image)
+                .write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png)
+                .map_err(|e| e.to_string())?;
+
+            let label = format!("overlay-{index}");
+            overlays.insert(
+                label.clone(),
+                OverlayPayload {
+                    png,
+                    mode: mode.to_string(),
+                    scale,
+                },
+            );
+            prepared.push(Prepared { label, x, y, w, h });
+        }
+    }
 
     let handle = app.clone();
     app.run_on_main_thread(move || {
-        if let Some(existing) = handle.get_webview_window("overlay") {
-            let _ = existing.close();
-        }
-        let result = WebviewWindowBuilder::new(&handle, "overlay", WebviewUrl::App(Default::default()))
-            .title("Capture")
-            .position(mon_x, mon_y)
-            .inner_size(logical_w, logical_h)
-            .decorations(false)
-            .resizable(false)
-            .maximizable(false)
-            .always_on_top(true)
-            .skip_taskbar(true)
-            .shadow(false)
-            .accept_first_mouse(true)
-            .focused(true)
-            .build();
-        if let Err(e) = result {
-            let _ = handle.emit("capture-error", e.to_string());
+        close_all_overlays(&handle);
+        for p in prepared {
+            let result = WebviewWindowBuilder::new(&handle, &p.label, WebviewUrl::App(Default::default()))
+                .title("Capture")
+                .position(p.x, p.y)
+                .inner_size(p.w, p.h)
+                .decorations(false)
+                .resizable(false)
+                .maximizable(false)
+                .always_on_top(true)
+                .skip_taskbar(true)
+                .shadow(false)
+                .accept_first_mouse(true)
+                .focused(true)
+                .build();
+            if let Err(e) = result {
+                let _ = handle.emit("capture-error", e.to_string());
+            }
         }
     })
     .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+fn close_all_overlays(app: &AppHandle) {
+    for (label, window) in app.webview_windows() {
+        if label.starts_with("overlay-") {
+            let _ = window.close();
+        }
+    }
 }
 
 /// Frontend entry point (main-window buttons); tray/hotkeys call begin().
@@ -102,30 +169,34 @@ pub fn begin_overlay(app: AppHandle, mode: String, delay_ms: Option<u64>) {
 }
 
 #[tauri::command]
-pub fn overlay_meta(state: State<AppState>) -> Result<serde_json::Value, String> {
-    let guard = state.overlay.lock().unwrap();
-    let payload = guard.as_ref().ok_or("no overlay payload")?;
+pub fn overlay_meta(
+    window: tauri::WebviewWindow,
+    state: State<AppState>,
+) -> Result<serde_json::Value, String> {
+    let overlays = state.overlays.lock().unwrap();
+    let payload = overlays.get(window.label()).ok_or("no overlay payload")?;
     Ok(serde_json::json!({ "mode": payload.mode, "scale": payload.scale }))
 }
 
 #[tauri::command]
-pub fn overlay_png(state: State<AppState>) -> Result<tauri::ipc::Response, String> {
-    let guard = state.overlay.lock().unwrap();
-    let payload = guard.as_ref().ok_or("no overlay payload")?;
+pub fn overlay_png(
+    window: tauri::WebviewWindow,
+    state: State<AppState>,
+) -> Result<tauri::ipc::Response, String> {
+    let overlays = state.overlays.lock().unwrap();
+    let payload = overlays.get(window.label()).ok_or("no overlay payload")?;
     Ok(tauri::ipc::Response::new(payload.png.clone()))
 }
 
 #[tauri::command]
 pub fn close_overlay(app: AppHandle, reopen_main: bool) {
-    if let Some(window) = app.get_webview_window("overlay") {
-        let _ = window.close();
-    }
+    close_all_overlays(&app);
     if reopen_main {
         crate::actions::show_main(&app);
     }
 }
 
-/// Receives the cropped region PNG from the overlay and opens the editor.
+/// Receives the cropped region PNG from an overlay and opens the editor.
 #[tauri::command]
 pub fn store_annotation(app: AppHandle, request: tauri::ipc::Request) -> Result<(), String> {
     let bytes = match request.body() {
@@ -135,9 +206,7 @@ pub fn store_annotation(app: AppHandle, request: tauri::ipc::Request) -> Result<
     let state: State<AppState> = app.state();
     *state.annotation.lock().unwrap() = Some(bytes);
 
-    if let Some(overlay) = app.get_webview_window("overlay") {
-        let _ = overlay.close();
-    }
+    close_all_overlays(&app);
     if let Some(existing) = app.get_webview_window("annotate") {
         let _ = existing.close();
     }

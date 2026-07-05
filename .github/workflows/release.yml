@@ -35,7 +35,18 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: pnpm tauri build
+
+      - name: Updater manifest
+        run: node scripts/make-latest-json.mjs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: updater
+          path: |
+            dist-updater/latest.json
+            apps/desktop/src-tauri/target/release/bundle/macos/*.app.tar.gz*
 
       - uses: actions/upload-artifact@v4
         with:

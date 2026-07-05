@@ -21,6 +21,7 @@ export const ipc = {
   screenPermissionStatus: () => invoke<boolean>("screen_permission_status"),
   requestScreenPermission: () => invoke<boolean>("request_screen_permission"),
   openScreenRecordingSettings: () => invoke<void>("open_screen_recording_settings"),
+  restartApp: () => invoke<void>("restart_app"),
   captureFullscreen: () => invoke<string>("capture_fullscreen"),
   beginOverlay: (mode: OverlayMode, delayMs?: number) =>
     invoke<void>("begin_overlay", { mode, delayMs }),
@@ -39,6 +40,12 @@ export const ipc = {
   openSite: (url: string) => invoke<void>("open_site", { url }),
   autostartEnabled: () => invoke<boolean>("autostart_enabled"),
   setAutostart: (enabled: boolean) => invoke<void>("set_autostart", { enabled }),
+  saveText: (text: string, name: string) =>
+    invoke<string | null>("save_text", new TextEncoder().encode(text), {
+      headers: { "x-name": name },
+    }),
+  checkUpdate: () => invoke<{ version: string; notes: string | null } | null>("check_update"),
+  installUpdate: () => invoke<void>("install_update"),
   getShortcuts: () => invoke<Shortcuts>("get_shortcuts"),
   setShortcut: (action: keyof Shortcuts, shortcut: string) =>
     invoke<void>("set_shortcut", { action, shortcut }),
@@ -103,4 +110,6 @@ export const events = {
     listen<string>("capture-error", (e) => cb(e.payload)),
   onPermissionNeeded: (cb: () => void): Promise<UnlistenFn> =>
     listen("permission-needed", () => cb()),
+  onAnnotateExported: (cb: (issues: string[]) => void): Promise<UnlistenFn> =>
+    listen<string[]>("annotate-exported", (e) => cb(e.payload)),
 };

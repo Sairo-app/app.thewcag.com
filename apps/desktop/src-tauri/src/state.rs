@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Mutex;
 
 pub struct OverlayPayload {
@@ -10,6 +11,7 @@ pub struct OverlayPayload {
 
 #[derive(Default)]
 pub struct AppState {
-    pub overlay: Mutex<Option<OverlayPayload>>,
+    /// one frozen frame per overlay window, keyed by window label
+    pub overlays: Mutex<HashMap<String, OverlayPayload>>,
     pub annotation: Mutex<Option<Vec<u8>>>,
 }

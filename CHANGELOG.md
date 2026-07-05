@@ -1,5 +1,37 @@
 # Changelog
 
+## v1.3.0 — 2026-07-06
+
+The launch-readiness release.
+
+**Distribution**
+- Auto-updater: signed update artifacts, in-app "Update & restart" banner,
+  manifest generator (`scripts/make-latest-json.mjs`), CI uploads updater
+  artifacts; endpoint https://accessibility.build/downloads/desktop/latest.json
+- Developer ID signing + notarization fully wired in CI and documented in
+  docs/RELEASING.md — activates the moment Apple credentials are added
+- New app icon (brand-blue squircle, split contrast disc) and a proper
+  monochrome template tray icon that adapts to menu-bar light/dark
+- /desktop download page added to the Accessibility.build site (branch
+  `feat/desktop-app-page` in the site repo)
+
+**Tools**
+- Multi-monitor: every display gets a frozen overlay; a text-color pick on
+  one screen carries to the others for cross-display pairs
+- Countdown HUD during delayed capture — closes itself right before the
+  frame freezes so it never appears in the shot
+- Session log: every checked pair, capture and annotated export accumulates
+  into a card in the main window; copy or save the whole session as a
+  Markdown audit summary
+- Annotate: resize handles on arrows, boxes, redactions and measures;
+  double-click text labels to edit them
+- First-run onboarding tour (three steps + permission prompt)
+
+**Docs**
+- docs/SCK-MIGRATION.md: concrete plan for moving the lens from the
+  deprecated CGWindowListCreateImage to ScreenCaptureKit (needed for the
+  Mac App Store build; current API works through macOS 15)
+
 ## v1.2.0 — 2026-07-06
 
 Apple-grade UI, two overlay bug fixes, and the auditor feature set.

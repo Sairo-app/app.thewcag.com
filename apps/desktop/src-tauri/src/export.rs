@@ -48,6 +48,31 @@ pub async fn save_png(app: AppHandle, request: tauri::ipc::Request<'_>) -> Resul
 }
 
 #[tauri::command]
+pub async fn save_text(app: AppHandle, request: tauri::ipc::Request<'_>) -> Result<Option<String>, String> {
+    let bytes = raw_body(&request)?;
+    let suggested = request
+        .headers()
+        .get("x-name")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("export.md")
+        .to_string();
+    let picked = app
+        .dialog()
+        .file()
+        .set_file_name(&suggested)
+        .add_filter("Markdown", &["md"])
+        .blocking_save_file();
+    match picked {
+        Some(path) => {
+            let path = path.into_path().map_err(|e| e.to_string())?;
+            std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+            Ok(Some(path.to_string_lossy().into_owned()))
+        }
+        None => Ok(None),
+    }
+}
+
+#[tauri::command]
 pub fn copy_text(app: AppHandle, text: String) -> Result<(), String> {
     app.clipboard().write_text(text).map_err(|e| e.to_string())
 }

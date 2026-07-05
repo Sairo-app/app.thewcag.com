@@ -43,6 +43,22 @@ function loadHistory(): Pair[] {
   }
 }
 
+const LOG_KEY = "session-log-v1";
+
+interface LogEntry {
+  ts: number;
+  kind: "pair" | "capture" | "annotate";
+  text: string;
+}
+
+function loadLog(): LogEntry[] {
+  try {
+    return JSON.parse(localStorage.getItem(LOG_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
 export default function MainWindow() {
   const [permission, setPermission] = useState<boolean | null>(null);
   const [fg, setFg] = useState("#1E293B");
@@ -53,11 +69,25 @@ export default function MainWindow() {
   const [error, setError] = useState<string | null>(null);
   const [autostart, setAutostartState] = useState(false);
   const [shortcuts, setShortcuts] = useState<Shortcuts | null>(null);
+  const [log, setLog] = useState<LogEntry[]>(loadLog);
+  const [update, setUpdate] = useState<{ version: string } | null>(null);
+  const [installing, setInstalling] = useState(false);
+  const [onboarding, setOnboarding] = useState(() => !localStorage.getItem("onboarded-v1"));
+
+  function appendLog(kind: LogEntry["kind"], text: string) {
+    setLog((prev) => {
+      const next = [...prev, { ts: Date.now(), kind, text }].slice(-200);
+      localStorage.setItem(LOG_KEY, JSON.stringify(next));
+      return next;
+    });
+  }
 
   useEffect(() => {
     void refreshPermission();
     void ipc.autostartEnabled().then(setAutostartState).catch(() => {});
     void ipc.getShortcuts().then(setShortcuts).catch(() => {});
+    // silent: dev builds have no manifest yet; failures are expected offline
+    void ipc.checkUpdate().then(setUpdate).catch(() => {});
     const unlisteners = [
       events.onPicked((p) => {
         setError(null);
@@ -73,9 +103,18 @@ export default function MainWindow() {
       events.onScreenshotTaken((path) => {
         setScreenshot(path);
         setError(null);
+        appendLog("capture", `Full-screen capture saved: ${path.split("/").pop()}`);
       }),
       events.onCaptureError((message) => setError(message)),
       events.onPermissionNeeded(() => void refreshPermission()),
+      events.onAnnotateExported((issues) => {
+        appendLog(
+          "annotate",
+          issues.length > 0
+            ? `Annotated capture exported with ${issues.length} issue${issues.length === 1 ? "" : "s"}:\n${issues.map((i) => `    - ${i}`).join("\n")}`
+            : "Annotated capture exported",
+        );
+      }),
     ];
     const onFocus = () => void refreshPermission();
     window.addEventListener("focus", onFocus);
@@ -89,6 +128,15 @@ export default function MainWindow() {
   function applyPair(newFg: string, newBg: string) {
     setFg(newFg);
     setBg(newBg);
+    const a = hexToRgb(newFg);
+    const b = hexToRgb(newBg);
+    if (a && b) {
+      const v = wcagVerdict(a, b);
+      appendLog(
+        "pair",
+        `${newFg} on ${newBg} — ${v.ratio.toFixed(2)}:1 — ${v.normalAA ? "passes" : "fails"} WCAG 1.4.3 AA (normal text)`,
+      );
+    }
     setHistory((prev) => {
       const next = [
         { fg: newFg, bg: newBg },
@@ -136,6 +184,27 @@ export default function MainWindow() {
       {error && (
         <div className="rise mb-3 rounded-xl border border-coral/40 bg-coral/10 px-3 py-2 text-xs text-coral">
           {error}
+        </div>
+      )}
+
+      {update && (
+        <div className="rise mb-3 flex items-center justify-between rounded-xl border border-primary/40 bg-primary/10 px-3 py-2">
+          <span className="text-xs">
+            Version <strong>{update.version}</strong> is available
+          </span>
+          <button
+            disabled={installing}
+            onClick={() => {
+              setInstalling(true);
+              void ipc.installUpdate().catch((e) => {
+                setError(String(e));
+                setInstalling(false);
+              });
+            }}
+            className="rounded-md bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60"
+          >
+            {installing ? "Installing…" : "Update & restart"}
+          </button>
         </div>
       )}
 
@@ -229,6 +298,11 @@ export default function MainWindow() {
         </section>
       )}
 
+      {log.length > 0 && <SessionLogCard log={log} onClear={() => {
+        setLog([]);
+        localStorage.removeItem(LOG_KEY);
+      }} />}
+
       {shortcuts && (
         <ShortcutsCard shortcuts={shortcuts} onChanged={setShortcuts} onError={setError} />
       )}
@@ -263,8 +337,142 @@ export default function MainWindow() {
           />
           Launch at login
         </label>
-        <span className="text-[10px] text-muted-foreground">v1.2.0</span>
+        <span className="text-[10px] text-muted-foreground">v1.3.0</span>
       </footer>
+
+      {onboarding && (
+        <Onboarding
+          shortcuts={shortcuts}
+          permission={permission}
+          onGrant={() => void grantPermission()}
+          onDone={() => {
+            localStorage.setItem("onboarded-v1", "1");
+            setOnboarding(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function SessionLogCard(props: { log: LogEntry[]; onClear: () => void }) {
+  const [copied, setCopied] = useState(false);
+
+  function toMarkdown(): string {
+    const day = new Date().toISOString().slice(0, 10);
+    const lines = props.log.map((e) => {
+      const time = new Date(e.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      return `- **${time}** ${e.text}`;
+    });
+    return [
+      `# Accessibility audit session — ${day}`,
+      "",
+      ...lines,
+      "",
+      "Generated with [Accessibility.build](https://accessibility.build) desktop.",
+    ].join("\n");
+  }
+
+  return (
+    <section className="card mb-3 p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Session log ({props.log.length})
+        </h2>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              void ipc.copyText(toMarkdown());
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            }}
+            className="text-[10px] text-muted-foreground hover:text-foreground"
+          >
+            {copied ? "Copied" : "Copy Markdown"}
+          </button>
+          <button
+            onClick={() =>
+              void ipc.saveText(toMarkdown(), `a11y-session-${new Date().toISOString().slice(0, 10)}.md`)
+            }
+            className="text-[10px] text-muted-foreground hover:text-foreground"
+          >
+            Save…
+          </button>
+          <button onClick={props.onClear} className="text-[10px] text-muted-foreground hover:text-coral">
+            Clear
+          </button>
+        </div>
+      </div>
+      <div className="max-h-32 space-y-1 overflow-y-auto">
+        {[...props.log].reverse().map((e) => (
+          <p key={e.ts + e.text} className="truncate font-mono text-[10px] text-muted-foreground" title={e.text}>
+            <span className="text-foreground/70">
+              {new Date(e.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </span>{" "}
+            {e.text.split("\n")[0]}
+          </p>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function Onboarding(props: {
+  shortcuts: Shortcuts | null;
+  permission: boolean | null;
+  onGrant: () => void;
+  onDone: () => void;
+}) {
+  const [step, setStep] = useState(0);
+  const s = props.shortcuts;
+  const steps = [
+    {
+      title: "Check contrast anywhere",
+      body: `Press ${s ? displayShortcut(s.pick) : "the pick shortcut"} — the screen freezes with a magnified loupe. Click the text color, then the background. Drag across gradients to find the worst-case pixel.`,
+    },
+    {
+      title: "Capture and annotate issues",
+      body: `Press ${s ? displayShortcut(s.shot) : "the capture shortcut"} and drag a region. Drop numbered issue badges mapped to WCAG criteria, measure target sizes, then copy a GitHub or Jira-ready list.`,
+    },
+    {
+      title: "See through different eyes",
+      body: `Press ${s ? displayShortcut(s.lens) : "the lens shortcut"} for a floating lens that simulates color-blindness and low vision over anything on screen. Press D for a before/after split.`,
+    },
+  ];
+  const last = step === steps.length - 1;
+  return (
+    <div className="fade fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-6 backdrop-blur-sm">
+      <div className="rise card w-full max-w-sm p-5">
+        <div className="mb-3 flex gap-1">
+          {steps.map((_, i) => (
+            <span
+              key={i}
+              className={`h-1 flex-1 rounded-full ${i <= step ? "bg-primary" : "bg-muted"}`}
+            />
+          ))}
+        </div>
+        <h2 className="mb-1 text-sm font-bold">{steps[step].title}</h2>
+        <p className="mb-4 text-xs leading-relaxed text-muted-foreground">{steps[step].body}</p>
+        {last && props.permission === false && (
+          <button
+            onClick={props.onGrant}
+            className="mb-3 w-full rounded-lg border border-yellow/50 bg-yellow/10 px-3 py-2 text-xs font-medium text-foreground hover:bg-yellow/20"
+          >
+            Grant Screen Recording first — everything needs it
+          </button>
+        )}
+        <div className="flex items-center justify-between">
+          <button onClick={props.onDone} className="text-[11px] text-muted-foreground hover:text-foreground">
+            Skip
+          </button>
+          <button
+            onClick={() => (last ? props.onDone() : setStep(step + 1))}
+            className="rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90"
+          >
+            {last ? "Get started" : "Next"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -374,7 +582,7 @@ function PermissionCard(props: { onGrant: () => void; onOpenSettings: () => void
         The color picker, screenshots and lens read your screen locally.
         Nothing ever leaves your Mac.
       </p>
-      <div className="mt-3 flex gap-2">
+      <div className="mt-3 flex flex-wrap gap-2">
         <button
           onClick={props.onGrant}
           className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90"
@@ -387,7 +595,20 @@ function PermissionCard(props: { onGrant: () => void; onOpenSettings: () => void
         >
           Open System Settings
         </button>
+        <button
+          onClick={() => void ipc.restartApp()}
+          className="rounded-lg border border-border px-3 py-1.5 text-xs hover:bg-muted"
+          title="macOS applies the permission when the app relaunches"
+        >
+          Already granted? Restart app
+        </button>
       </div>
+      <p className="mt-2 text-[10px] text-muted-foreground">
+        macOS applies this permission only when the app relaunches — if the
+        toggle is already on in System Settings, use Restart. If it still
+        asks after restarting, remove the stale entry in System Settings
+        with the − button and grant again.
+      </p>
     </section>
   );
 }

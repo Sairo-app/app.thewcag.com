@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { emit } from "@tauri-apps/api/event";
 import { ipc } from "../lib/ipc";
 import {
   ArrowIcon,
@@ -56,10 +57,16 @@ export default function AnnotateWindow() {
   const [color, setColor] = useState(PALETTE[0]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [draft, setDraft] = useState<Shape | null>(null);
-  const [textEntry, setTextEntry] = useState<{ x: number; y: number; value: string } | null>(null);
+  const [textEntry, setTextEntry] = useState<{
+    x: number;
+    y: number;
+    value: string;
+    editId?: number;
+  } | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const dragRef = useRef<{ id: number; dx: number; dy: number } | null>(null);
+  const resizeRef = useRef<{ id: number; handle: string } | null>(null);
   const pastRef = useRef<Shape[][]>([]);
   const futureRef = useRef<Shape[][]>([]);
 
@@ -203,6 +210,16 @@ export default function AnnotateWindow() {
           if (s.kind === "badge") ctx.strokeRect(s.x1 - 24, s.y1 - 24, 48, 48);
           else ctx.strokeRect(x - 6, y - 6, w + 12, h + 12);
           ctx.setLineDash([]);
+          // resize handles
+          for (const hd of handlesFor(s)) {
+            ctx.fillStyle = "#FFFFFF";
+            ctx.strokeStyle = "#2563EB";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(hd.x, hd.y, 7, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+          }
         }
       }
     },
@@ -244,6 +261,20 @@ export default function AnnotateWindow() {
   function onMouseDown(e: React.MouseEvent) {
     const p = canvasPoint(e);
     if (tool === "select") {
+      // handles first: resizing the selected shape wins over re-selecting
+      const selected = shapes.find((s) => s.id === selectedId);
+      if (selected) {
+        const canvas = canvasRef.current!;
+        const rect = canvas.getBoundingClientRect();
+        const threshold = 10 * (canvas.width / rect.width);
+        const handle = handlesFor(selected).find((hd) => Math.hypot(p.x - hd.x, p.y - hd.y) <= threshold);
+        if (handle) {
+          pastRef.current.push(shapes);
+          futureRef.current = [];
+          resizeRef.current = { id: selected.id, handle: handle.key };
+          return;
+        }
+      }
       const hit = hitTest(p.x, p.y);
       setSelectedId(hit?.id ?? null);
       if (hit) {
@@ -280,6 +311,30 @@ export default function AnnotateWindow() {
 
   function onMouseMove(e: React.MouseEvent) {
     const p = canvasPoint(e);
+    if (resizeRef.current) {
+      const { id, handle } = resizeRef.current;
+      setShapes((prev) =>
+        prev.map((s) => {
+          if (s.id !== id) return s;
+          const next = { ...s };
+          if (handle === "start" || handle === "p11") {
+            next.x1 = p.x;
+            next.y1 = p.y;
+          } else if (handle === "end" || handle === "p22") {
+            next.x2 = p.x;
+            next.y2 = p.y;
+          } else if (handle === "p12") {
+            next.x1 = p.x;
+            next.y2 = p.y;
+          } else if (handle === "p21") {
+            next.x2 = p.x;
+            next.y1 = p.y;
+          }
+          return next;
+        }),
+      );
+      return;
+    }
     if (dragRef.current) {
       const { id, dx, dy } = dragRef.current;
       setShapes((prev) =>
@@ -295,8 +350,24 @@ export default function AnnotateWindow() {
     if (draft) setDraft({ ...draft, x2: p.x, y2: p.y });
   }
 
+  function onDoubleClick(e: React.MouseEvent) {
+    const p = canvasPoint(e);
+    const hit = hitTest(p.x, p.y);
+    if (hit?.kind === "text") {
+      const canvas = canvasRef.current!;
+      const rect = canvas.getBoundingClientRect();
+      setTextEntry({
+        x: (hit.x1 / canvas.width) * rect.width,
+        y: (hit.y1 / canvas.height) * rect.height,
+        value: hit.text ?? "",
+        editId: hit.id,
+      });
+    }
+  }
+
   function onMouseUp() {
     dragRef.current = null;
+    resizeRef.current = null;
     if (draft) {
       if (Math.abs(draft.x2 - draft.x1) > 6 || Math.abs(draft.y2 - draft.y1) > 6) {
         const committed = draft;
@@ -355,15 +426,26 @@ export default function AnnotateWindow() {
     setTimeout(() => setStatus(null), 2200);
   }
 
+  function issueSummaries(): string[] {
+    return badges.map((b) => {
+      const { type, severity, note } = issueMeta(b);
+      return `${type.sc ? `[WCAG ${type.sc}] ` : ""}${type.label} (${severity}) — ${note}`;
+    });
+  }
+
   async function onSave() {
     const name = `a11y-annotated-${new Date().toISOString().slice(0, 10)}.png`;
     const path = await ipc.savePng(await exportPng(), name);
-    if (path) flash(`Saved ${path.split("/").pop()}`);
+    if (path) {
+      flash(`Saved ${path.split("/").pop()}`);
+      void emit("annotate-exported", issueSummaries());
+    }
   }
 
   async function onCopy() {
     await ipc.copyPng(await exportPng());
     flash("Image copied to clipboard");
+    void emit("annotate-exported", issueSummaries());
   }
 
   function issueMeta(b: Shape) {
@@ -494,6 +576,7 @@ export default function AnnotateWindow() {
               onMouseDown={onMouseDown}
               onMouseMove={onMouseMove}
               onMouseUp={onMouseUp}
+              onDoubleClick={onDoubleClick}
               className="max-h-[calc(100vh-120px)] max-w-full rounded-lg border border-border shadow-xl"
               style={{ cursor: tool === "select" ? "default" : "crosshair" }}
             />
@@ -504,19 +587,25 @@ export default function AnnotateWindow() {
                 onChange={(e) => setTextEntry({ ...textEntry, value: e.target.value })}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && textEntry.value.trim()) {
-                    const canvas = canvasRef.current!;
-                    const rect = canvas.getBoundingClientRect();
-                    const shape: Shape = {
-                      id: nextId++,
-                      kind: "text",
-                      x1: (textEntry.x / rect.width) * canvas.width,
-                      y1: (textEntry.y / rect.height) * canvas.height,
-                      x2: 0,
-                      y2: 0,
-                      color,
-                      text: textEntry.value.trim(),
-                    };
-                    commit((prev) => [...prev, shape]);
+                    const value = textEntry.value.trim();
+                    if (textEntry.editId !== undefined) {
+                      const editId = textEntry.editId;
+                      commit((prev) => prev.map((s) => (s.id === editId ? { ...s, text: value } : s)));
+                    } else {
+                      const canvas = canvasRef.current!;
+                      const rect = canvas.getBoundingClientRect();
+                      const shape: Shape = {
+                        id: nextId++,
+                        kind: "text",
+                        x1: (textEntry.x / rect.width) * canvas.width,
+                        y1: (textEntry.y / rect.height) * canvas.height,
+                        x2: 0,
+                        y2: 0,
+                        color,
+                        text: value,
+                      };
+                      commit((prev) => [...prev, shape]);
+                    }
                     setTextEntry(null);
                   }
                   if (e.key === "Escape") setTextEntry(null);
@@ -606,6 +695,23 @@ export default function AnnotateWindow() {
       </div>
     </div>
   );
+}
+
+/** Resize handle positions for a shape (none for badges and text). */
+function handlesFor(s: Shape): { key: string; x: number; y: number }[] {
+  if (s.kind === "badge" || s.kind === "text") return [];
+  if (s.kind === "arrow") {
+    return [
+      { key: "start", x: s.x1, y: s.y1 },
+      { key: "end", x: s.x2, y: s.y2 },
+    ];
+  }
+  return [
+    { key: "p11", x: s.x1, y: s.y1 },
+    { key: "p22", x: s.x2, y: s.y2 },
+    { key: "p12", x: s.x1, y: s.y2 },
+    { key: "p21", x: s.x2, y: s.y1 },
+  ];
 }
 
 function isLight(hex: string): boolean {

@@ -5,18 +5,19 @@ import MainWindow from "./windows/MainWindow";
 import OverlayWindow from "./windows/OverlayWindow";
 import AnnotateWindow from "./windows/AnnotateWindow";
 import LensWindow from "./windows/LensWindow";
+import CountdownWindow from "./windows/CountdownWindow";
 import "./styles.css";
 
-// One bundle, four windows: route by the Tauri window label.
+// One bundle, many windows: route by the Tauri window label.
+// Overlays are per-monitor: overlay-0, overlay-1, …
+const label = getCurrentWebviewWindow().label;
 const views: Record<string, React.ComponentType> = {
   main: MainWindow,
-  overlay: OverlayWindow,
   annotate: AnnotateWindow,
   lens: LensWindow,
+  countdown: CountdownWindow,
 };
-
-const label = getCurrentWebviewWindow().label;
-const View = views[label] ?? MainWindow;
+const View = label.startsWith("overlay-") ? OverlayWindow : (views[label] ?? MainWindow);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

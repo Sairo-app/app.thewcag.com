@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { emit } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 import { contrastRatio, type Rgb } from "@accessibility-build/a11y-core";
 import { ipc, type OverlayMeta, type PickedColor } from "../lib/ipc";
 
@@ -52,8 +52,12 @@ export default function OverlayWindow() {
       img.src = url;
     })().catch(() => void ipc.closeOverlay(false));
 
+    // multi-monitor: a first pick on any display syncs to every overlay
+    const unlisten = listen<PickedColor>("overlay-first-pick", (e) => setFirstPick(e.payload));
+
     return () => {
       if (revoke) URL.revokeObjectURL(revoke);
+      void unlisten.then((un) => un());
     };
   }, []);
 
@@ -213,6 +217,7 @@ export default function OverlayWindow() {
     } else if (meta.mode === "pair") {
       if (!firstPick) {
         setFirstPick(color);
+        void emit("overlay-first-pick", color);
       } else {
         doneRef.current = true;
         await emit("overlay-picked", { mode: "pair", colors: [firstPick, color] });

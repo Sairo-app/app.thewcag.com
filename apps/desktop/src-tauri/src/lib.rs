@@ -8,6 +8,7 @@ mod settings;
 mod shortcuts;
 mod state;
 mod tray;
+mod update;
 
 use tauri::Manager;
 
@@ -23,10 +24,12 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             permissions::screen_permission_status,
             permissions::request_screen_permission,
             permissions::open_screen_recording_settings,
+            permissions::restart_app,
             capture::pick_color_at_cursor,
             capture::capture_fullscreen,
             overlay::overlay_meta,
@@ -39,7 +42,10 @@ pub fn run() {
             lens::lens_frame,
             export::copy_png,
             export::save_png,
+            export::save_text,
             export::copy_text,
+            update::check_update,
+            update::install_update,
             export::reveal_path,
             export::open_site,
             export::autostart_enabled,

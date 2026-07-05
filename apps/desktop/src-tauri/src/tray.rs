@@ -70,9 +70,11 @@ pub fn refresh(app: &AppHandle) {
 
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let menu = build_menu(app)?;
+    let tray_icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))
+        .expect("valid tray template icon");
     TrayIconBuilder::with_id("main")
-        .icon(app.default_window_icon().expect("bundled icon").clone())
-        .icon_as_template(false)
+        .icon(tray_icon)
+        .icon_as_template(true)
         .tooltip("Accessibility.build")
         .menu(&menu)
         .show_menu_on_left_click(true)

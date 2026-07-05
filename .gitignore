@@ -4,3 +4,4 @@ target/
 .DS_Store
 *.local
 apps/desktop/src-tauri/gen/
+dist-updater/

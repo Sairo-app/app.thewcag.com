@@ -34,6 +34,14 @@ pub fn request_screen_permission() -> bool {
     true
 }
 
+/// macOS only applies a Screen Recording grant to NEW processes — the
+/// running app keeps seeing "denied" until it relaunches. The permission
+/// card offers this after the user returns from System Settings.
+#[tauri::command]
+pub fn restart_app(app: tauri::AppHandle) {
+    app.restart();
+}
+
 #[tauri::command]
 pub fn open_screen_recording_settings() -> Result<(), String> {
     #[cfg(target_os = "macos")]
