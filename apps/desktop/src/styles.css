@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+body {
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}

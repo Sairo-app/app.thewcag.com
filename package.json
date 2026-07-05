@@ -1,0 +1,11 @@
+{
+  "name": "accessibility-build-app",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "pnpm --filter @accessibility-build/desktop dev",
+    "build": "pnpm --filter @accessibility-build/desktop build",
+    "test": "pnpm --filter @accessibility-build/a11y-core test"
+  },
+  "packageManager": "pnpm@9.15.4"
+}
