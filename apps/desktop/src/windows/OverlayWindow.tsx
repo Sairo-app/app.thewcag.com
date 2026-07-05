@@ -43,15 +43,55 @@ export default function OverlayWindow() {
       img.src = url;
     })().catch(() => void ipc.closeOverlay(false));
 
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") void ipc.closeOverlay(false);
-    };
-    window.addEventListener("keydown", onKey);
     return () => {
-      window.removeEventListener("keydown", onKey);
       if (revoke) URL.revokeObjectURL(revoke);
     };
   }, []);
+
+  // Keyboard: Esc cancel · arrows nudge by 1 physical px (⇧ = 10) ·
+  // Enter/Space pick (or full-screen capture in shot mode) · C copy hex.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        void ipc.closeOverlay(false);
+        return;
+      }
+      if (!meta) return;
+      const scale = meta.scale || 1;
+      const step = (e.shiftKey ? 10 : 1) / scale;
+      if (e.key.startsWith("Arrow")) {
+        e.preventDefault();
+        const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+        const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
+        setMouse((m) => {
+          const base = m ?? { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+          return {
+            x: Math.min(Math.max(base.x + dx, 0), window.innerWidth - 1),
+            y: Math.min(Math.max(base.y + dy, 0), window.innerHeight - 1),
+          };
+        });
+        return;
+      }
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        if (meta.mode === "shot") {
+          void captureFull();
+        } else if (mouse) {
+          void pickAt(mouse.x, mouse.y);
+        }
+        return;
+      }
+      if ((e.key === "c" || e.key === "C") && meta.mode !== "shot" && mouse) {
+        const loc = physical(mouse.x, mouse.y);
+        if (loc) {
+          void ipc.copyText(colorAt(loc.px, loc.py).hex).then(() => ipc.closeOverlay(false));
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meta, mouse, firstPick]);
 
   function physical(clientX: number, clientY: number) {
     const scale = meta?.scale ?? 1;
@@ -114,9 +154,9 @@ export default function OverlayWindow() {
     ctx.strokeRect(half * LOUPE.zoom - 2, half * LOUPE.zoom - 2, LOUPE.zoom + 4, LOUPE.zoom + 4);
   }, [mouse, meta]);
 
-  async function onClick(e: React.MouseEvent) {
+  async function pickAt(clientX: number, clientY: number) {
     if (!meta) return;
-    const loc = physical(e.clientX, e.clientY);
+    const loc = physical(clientX, clientY);
     if (!loc) return;
     const color = colorAt(loc.px, loc.py);
     if (meta.mode === "fg" || meta.mode === "bg") {
@@ -130,6 +170,13 @@ export default function OverlayWindow() {
         await ipc.closeOverlay(true);
       }
     }
+  }
+
+  async function captureFull() {
+    const src = imgCanvasRef.current;
+    if (!src) return;
+    const blob: Blob = await new Promise((resolve) => src.toBlob((x) => resolve(x!), "image/png"));
+    await ipc.storeAnnotation(new Uint8Array(await blob.arrayBuffer()));
   }
 
   async function finishRegion() {
@@ -199,7 +246,7 @@ export default function OverlayWindow() {
         if (isShot) void finishRegion();
       }}
       onClick={(e) => {
-        if (!isShot) void onClick(e);
+        if (!isShot) void pickAt(e.clientX, e.clientY);
       }}
     >
       {imageUrl && (
@@ -247,8 +294,21 @@ export default function OverlayWindow() {
                   <span className="font-mono text-[11px] text-white">{currentColor.hex}</span>
                 </span>
                 {liveRatio !== null && (
-                  <span className="font-mono text-[11px] text-white/80">
-                    {liveRatio.toFixed(2)}:1
+                  <span className="flex items-center gap-1">
+                    <span className="font-mono text-[11px] text-white/80">
+                      {liveRatio.toFixed(2)}:1
+                    </span>
+                    <span
+                      className={`rounded px-1 py-px text-[9px] font-bold ${
+                        liveRatio >= 4.5
+                          ? "bg-emerald-500/90 text-white"
+                          : liveRatio >= 3
+                            ? "bg-amber-500/90 text-black"
+                            : "bg-red-500/90 text-white"
+                      }`}
+                    >
+                      {liveRatio >= 4.5 ? "AA" : liveRatio >= 3 ? "AA-L" : "✕"}
+                    </span>
                   </span>
                 )}
               </>
@@ -275,12 +335,12 @@ export default function OverlayWindow() {
       {/* instruction pill */}
       <div className="pointer-events-none absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-full bg-black/80 px-3 py-1.5 text-[11px] text-white/90 shadow-lg">
         {isShot
-          ? "Drag to capture a region · Esc to cancel"
+          ? "Drag to capture a region · Space for full screen · Esc to cancel"
           : meta?.mode === "pair"
             ? firstPick
-              ? "Click the background color · Esc to cancel"
-              : "Click the text color · Esc to cancel"
-            : `Click to pick the ${meta?.mode === "bg" ? "background" : "text"} color · Esc to cancel`}
+              ? "Click the background color · arrows nudge · C copies hex · Esc cancels"
+              : "Click the text color · arrows nudge · C copies hex · Esc cancels"
+            : `Click to pick the ${meta?.mode === "bg" ? "background" : "text"} color · arrows nudge · C copies hex · Esc cancels`}
       </div>
     </div>
   );

@@ -70,20 +70,23 @@ export class GlFilter {
     return s;
   }
 
-  /** matrix is row-major 3x3 from a11y-core; GLSL wants column-major. */
-  draw(pixels: Uint8Array, width: number, height: number, matrix: number[]) {
+  private setMatrix(matrix: number[]) {
+    // matrix is row-major 3x3 from a11y-core; GLSL wants column-major.
+    this.gl.uniformMatrix3fv(this.matrixLoc, false, [
+      matrix[0], matrix[3], matrix[6],
+      matrix[1], matrix[4], matrix[7],
+      matrix[2], matrix[5], matrix[8],
+    ]);
+  }
+
+  /** With split=true the left half stays unfiltered for comparison. */
+  draw(pixels: Uint8Array, width: number, height: number, matrix: number[], split = false) {
     const gl = this.gl;
     if (this.canvas.width !== width || this.canvas.height !== height) {
       this.canvas.width = width;
       this.canvas.height = height;
     }
     gl.viewport(0, 0, width, height);
-    const colMajor = [
-      matrix[0], matrix[3], matrix[6],
-      matrix[1], matrix[4], matrix[7],
-      matrix[2], matrix[5], matrix[8],
-    ];
-    gl.uniformMatrix3fv(this.matrixLoc, false, colMajor);
     if (width === this.texWidth && height === this.texHeight) {
       gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
     } else {
@@ -91,7 +94,20 @@ export class GlFilter {
       this.texWidth = width;
       this.texHeight = height;
     }
+    if (!split) {
+      this.setMatrix(matrix);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      return;
+    }
+    const half = Math.floor(width / 2);
+    gl.enable(gl.SCISSOR_TEST);
+    gl.scissor(0, 0, half, height);
+    this.setMatrix(IDENTITY_MATRIX);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.scissor(half, 0, width - half, height);
+    this.setMatrix(matrix);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.disable(gl.SCISSOR_TEST);
   }
 }
 

@@ -8,7 +8,7 @@ import {
   wcagVerdict,
   type Rgb,
 } from "@accessibility-build/a11y-core";
-import { events, ipc } from "../lib/ipc";
+import { displayShortcut, events, ipc, type Shortcuts } from "../lib/ipc";
 
 const SITE = "https://accessibility.build";
 const HISTORY_KEY = "contrast-history-v1";
@@ -34,10 +34,12 @@ export default function MainWindow() {
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [autostart, setAutostartState] = useState(false);
+  const [shortcuts, setShortcuts] = useState<Shortcuts | null>(null);
 
   useEffect(() => {
     void refreshPermission();
     void ipc.autostartEnabled().then(setAutostartState).catch(() => {});
+    void ipc.getShortcuts().then(setShortcuts).catch(() => {});
     const unlisteners = [
       events.onPicked((p) => {
         setError(null);
@@ -143,19 +145,19 @@ export default function MainWindow() {
       <section className="mb-3 grid grid-cols-3 gap-2">
         <ToolCard
           title="Pick pair"
-          hotkey="⌥⌘P"
+          hotkey={shortcuts ? displayShortcut(shortcuts.pick) : ""}
           hint="fg + bg from screen"
           onClick={() => void ipc.beginOverlay("pair")}
         />
         <ToolCard
           title="Capture"
-          hotkey="⌥⌘S"
+          hotkey={shortcuts ? displayShortcut(shortcuts.shot) : ""}
           hint="region + annotate"
           onClick={() => void ipc.beginOverlay("shot")}
         />
         <ToolCard
           title="Lens"
-          hotkey="⌥⌘L"
+          hotkey={shortcuts ? displayShortcut(shortcuts.lens) : ""}
           hint="colorblind view"
           onClick={() => void ipc.toggleLens()}
         />
@@ -163,9 +165,20 @@ export default function MainWindow() {
 
       {history.length > 0 && (
         <section className="mb-3 rounded-xl border border-border bg-card p-3">
-          <h2 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Recent pairs
-          </h2>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Recent pairs
+            </h2>
+            <button
+              onClick={() => {
+                setHistory([]);
+                localStorage.removeItem(HISTORY_KEY);
+              }}
+              className="text-[10px] text-muted-foreground hover:text-coral"
+            >
+              Clear
+            </button>
+          </div>
           <div className="flex flex-wrap gap-1.5">
             {history.map((p, i) => (
               <button
@@ -183,6 +196,10 @@ export default function MainWindow() {
             ))}
           </div>
         </section>
+      )}
+
+      {shortcuts && (
+        <ShortcutsCard shortcuts={shortcuts} onChanged={setShortcuts} onError={setError} />
       )}
 
       {screenshot && (
@@ -212,9 +229,95 @@ export default function MainWindow() {
           />
           Launch at login
         </label>
-        <span className="text-[10px] text-muted-foreground">v1.0.0</span>
+        <span className="text-[10px] text-muted-foreground">v1.1.0</span>
       </footer>
     </div>
+  );
+}
+
+function ShortcutsCard(props: {
+  shortcuts: Shortcuts;
+  onChanged: (s: Shortcuts) => void;
+  onError: (message: string | null) => void;
+}) {
+  const [recording, setRecording] = useState<keyof Shortcuts | null>(null);
+
+  useEffect(() => {
+    if (!recording) return;
+    const onKey = async (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === "Escape") {
+        setRecording(null);
+        return;
+      }
+      if (/^(Control|Alt|Shift|Meta)/.test(e.code)) return; // wait for the non-modifier
+      const mods = [
+        e.ctrlKey && "ctrl",
+        e.altKey && "alt",
+        e.shiftKey && "shift",
+        e.metaKey && "super",
+      ].filter(Boolean) as string[];
+      if (mods.length === 0) {
+        props.onError("Shortcuts need at least one modifier (⌘, ⌥, ⌃ or ⇧)");
+        setRecording(null);
+        return;
+      }
+      const combo = [...mods, e.code].join("+");
+      try {
+        await ipc.setShortcut(recording, combo);
+        props.onChanged({ ...props.shortcuts, [recording]: combo });
+        props.onError(null);
+      } catch (err) {
+        props.onError(String(err));
+      }
+      setRecording(null);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recording]);
+
+  const rows: { action: keyof Shortcuts; label: string }[] = [
+    { action: "pick", label: "Check contrast" },
+    { action: "shot", label: "Capture & annotate" },
+    { action: "lens", label: "Colorblind lens" },
+  ];
+
+  return (
+    <section className="mb-3 rounded-xl border border-border bg-card p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Keyboard shortcuts
+        </h2>
+        <button
+          onClick={() =>
+            void ipc.resetShortcuts().then((s) => {
+              props.onChanged(s);
+              props.onError(null);
+            })
+          }
+          className="text-[10px] text-muted-foreground hover:text-foreground"
+        >
+          Reset
+        </button>
+      </div>
+      {rows.map(({ action, label }) => (
+        <div key={action} className="flex items-center justify-between py-1">
+          <span className="text-xs">{label}</span>
+          <button
+            onClick={() => setRecording(recording === action ? null : action)}
+            className={`min-w-20 rounded-md border px-2 py-1 font-mono text-[11px] transition-colors ${
+              recording === action
+                ? "animate-pulse border-primary bg-primary/10 text-primary"
+                : "border-border bg-card-2 hover:border-primary/50"
+            }`}
+          >
+            {recording === action ? "press keys…" : displayShortcut(props.shortcuts[action])}
+          </button>
+        </div>
+      ))}
+    </section>
   );
 }
 
@@ -269,8 +372,12 @@ function ContrastPanel(props: {
   const wcag = wcagVerdict(fgRgb, bgRgb);
   const lc = apcaLc(fgRgb, bgRgb);
   const rating = apcaRating(lc);
-  const suggestions = useMemo(
+  const fgFixes = useMemo(
     () => (wcag.normalAA ? [] : suggestAccessible(fgRgb, bgRgb, 4.5)),
+    [props.fg, props.bg], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const bgFixes = useMemo(
+    () => (wcag.normalAA ? [] : suggestAccessible(bgRgb, fgRgb, 4.5)),
     [props.fg, props.bg], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
@@ -329,38 +436,60 @@ function ContrastPanel(props: {
         <Verdict label="AA" sub="UI" ok={wcag.uiAA} />
       </div>
 
-      {suggestions.length > 0 && (
+      {(fgFixes.length > 0 || bgFixes.length > 0) && (
         <div className="mt-3 border-t border-border pt-3">
           <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             Make it pass — nearest AA fixes
           </h3>
-          <div className="flex gap-2">
-            {suggestions.map((s) => {
-              const hex = rgbToHex(s.color);
-              return (
-                <button
-                  key={hex}
-                  onClick={() => props.onApply(hex, props.bg)}
-                  className="flex items-center gap-2 rounded-lg border border-border px-2 py-1.5 hover:bg-muted"
-                  title={`Apply ${hex}`}
-                >
-                  <span
-                    className="h-5 w-5 rounded border border-border"
-                    style={{ backgroundColor: hex }}
-                  />
-                  <span className="text-left">
-                    <span className="block font-mono text-[11px]">{hex}</span>
-                    <span className="block text-[10px] text-muted-foreground">
-                      {s.ratio.toFixed(2)}:1 · {s.direction}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
+          <div className="flex flex-wrap gap-2">
+            {fgFixes.map((s) => (
+              <FixButton
+                key={`fg${rgbToHex(s.color)}`}
+                hex={rgbToHex(s.color)}
+                ratio={s.ratio}
+                which="text"
+                onApply={(hex) => props.onApply(hex, props.bg)}
+              />
+            ))}
+            {bgFixes.map((s) => (
+              <FixButton
+                key={`bg${rgbToHex(s.color)}`}
+                hex={rgbToHex(s.color)}
+                ratio={s.ratio}
+                which="bg"
+                onApply={(hex) => props.onApply(props.fg, hex)}
+              />
+            ))}
           </div>
         </div>
       )}
     </section>
+  );
+}
+
+function FixButton(props: {
+  hex: string;
+  ratio: number;
+  which: "text" | "bg";
+  onApply: (hex: string) => void;
+}) {
+  return (
+    <button
+      onClick={() => props.onApply(props.hex)}
+      className="flex items-center gap-2 rounded-lg border border-border px-2 py-1.5 hover:bg-muted"
+      title={`Apply as ${props.which}`}
+    >
+      <span
+        className="h-5 w-5 rounded border border-border"
+        style={{ backgroundColor: props.hex }}
+      />
+      <span className="text-left">
+        <span className="block font-mono text-[11px]">{props.hex}</span>
+        <span className="block text-[10px] text-muted-foreground">
+          {props.ratio.toFixed(2)}:1 · {props.which}
+        </span>
+      </span>
+    </button>
   );
 }
 
@@ -371,6 +500,7 @@ function Swatch(props: {
   pickMode: "fg" | "bg";
 }) {
   const [draft, setDraft] = useState(props.hex);
+  const [copied, setCopied] = useState(false);
   useEffect(() => setDraft(props.hex), [props.hex]);
   return (
     <div className="min-w-0 flex-1">
@@ -393,6 +523,17 @@ function Swatch(props: {
           spellCheck={false}
           className="w-full min-w-0 rounded-md border border-border bg-card-2 px-2 py-1.5 font-mono text-xs outline-none focus:ring-1 focus:ring-ring"
         />
+        <button
+          onClick={() => {
+            void ipc.copyText(props.hex);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1200);
+          }}
+          title="Copy hex"
+          className="shrink-0 rounded-md border border-border px-1.5 py-1.5 text-[10px] text-muted-foreground hover:bg-muted"
+        >
+          {copied ? "✓" : "⧉"}
+        </button>
       </div>
     </div>
   );
@@ -421,9 +562,11 @@ function ToolCard(props: { title: string; hotkey: string; hint: string; onClick:
     >
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold">{props.title}</span>
-        <kbd className="rounded border border-border bg-card-2 px-1 py-0.5 text-[9px] text-muted-foreground">
-          {props.hotkey}
-        </kbd>
+        {props.hotkey && (
+          <kbd className="rounded border border-border bg-card-2 px-1 py-0.5 text-[9px] text-muted-foreground">
+            {props.hotkey}
+          </kbd>
+        )}
       </div>
       <p className="mt-1 text-[10px] text-muted-foreground group-hover:text-foreground">
         {props.hint}

@@ -43,6 +43,36 @@ export default function AnnotateWindow() {
   const [status, setStatus] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const dragRef = useRef<{ id: number; dx: number; dy: number } | null>(null);
+  const pastRef = useRef<Shape[][]>([]);
+  const futureRef = useRef<Shape[][]>([]);
+
+  /** Mutate shapes with an undo snapshot. Drag-moves snapshot at drag start. */
+  function commit(update: (prev: Shape[]) => Shape[]) {
+    setShapes((prev) => {
+      pastRef.current.push(prev);
+      futureRef.current = [];
+      return update(prev);
+    });
+  }
+
+  function undo() {
+    setShapes((prev) => {
+      const past = pastRef.current.pop();
+      if (!past) return prev;
+      futureRef.current.push(prev);
+      setSelectedId(null);
+      return past;
+    });
+  }
+
+  function redo() {
+    setShapes((prev) => {
+      const future = futureRef.current.pop();
+      if (!future) return prev;
+      pastRef.current.push(prev);
+      return future;
+    });
+  }
 
   useEffect(() => {
     void (async () => {
@@ -120,14 +150,15 @@ export default function AnnotateWindow() {
           case "badge": {
             badgeNum += 1;
             const r = 20;
+            const onDark = !isLight(s.color);
             ctx.beginPath();
             ctx.arc(s.x1, s.y1, r, 0, Math.PI * 2);
             ctx.fillStyle = s.color;
             ctx.fill();
             ctx.lineWidth = 3;
-            ctx.strokeStyle = "#FFFFFF";
+            ctx.strokeStyle = onDark ? "#FFFFFF" : "#0F172A";
             ctx.stroke();
-            ctx.fillStyle = "#FFFFFF";
+            ctx.fillStyle = onDark ? "#FFFFFF" : "#0F172A";
             ctx.font = "700 22px -apple-system, system-ui, sans-serif";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
@@ -187,7 +218,11 @@ export default function AnnotateWindow() {
     if (tool === "select") {
       const hit = hitTest(p.x, p.y);
       setSelectedId(hit?.id ?? null);
-      if (hit) dragRef.current = { id: hit.id, dx: p.x - hit.x1, dy: p.y - hit.y1 };
+      if (hit) {
+        pastRef.current.push(shapes); // one snapshot per drag-move
+        futureRef.current = [];
+        dragRef.current = { id: hit.id, dx: p.x - hit.x1, dy: p.y - hit.y1 };
+      }
       return;
     }
     if (tool === "text") {
@@ -203,11 +238,11 @@ export default function AnnotateWindow() {
         y1: p.y,
         x2: p.x,
         y2: p.y,
-        color: PALETTE[0],
+        color,
         issueType: "contrast",
         note: "",
       };
-      setShapes((prev) => [...prev, shape]);
+      commit((prev) => [...prev, shape]);
       setSelectedId(shape.id);
       return;
     }
@@ -235,7 +270,8 @@ export default function AnnotateWindow() {
     dragRef.current = null;
     if (draft) {
       if (Math.abs(draft.x2 - draft.x1) > 6 || Math.abs(draft.y2 - draft.y1) > 6) {
-        setShapes((prev) => [...prev, draft]);
+        const committed = draft;
+        commit((prev) => [...prev, committed]);
       }
       setDraft(null);
     }
@@ -243,16 +279,38 @@ export default function AnnotateWindow() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const typing =
+        target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT";
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+        return;
+      }
+      if (typing) return;
+      const toolKeys: Record<string, Tool> = {
+        v: "select",
+        i: "badge",
+        a: "arrow",
+        r: "rect",
+        x: "blur",
+        t: "text",
+      };
+      const mapped = toolKeys[e.key.toLowerCase()];
+      if (mapped && !e.metaKey && !e.ctrlKey) {
+        setTool(mapped);
+        return;
+      }
       if ((e.key === "Delete" || e.key === "Backspace") && selectedId !== null) {
-        const target = e.target as HTMLElement;
-        if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
-        setShapes((prev) => prev.filter((s) => s.id !== selectedId));
+        commit((prev) => prev.filter((s) => s.id !== selectedId));
         setSelectedId(null);
       }
       if (e.key === "Escape") setSelectedId(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
   async function exportPng(): Promise<Uint8Array> {
@@ -303,17 +361,18 @@ export default function AnnotateWindow() {
         <div className="flex items-center gap-1">
           {(
             [
-              ["select", "Select"],
-              ["badge", "① Issue"],
-              ["arrow", "↗ Arrow"],
-              ["rect", "▢ Box"],
-              ["blur", "▦ Redact"],
-              ["text", "T Text"],
-            ] as [Tool, string][]
-          ).map(([t, label]) => (
+              ["select", "Select", "V"],
+              ["badge", "① Issue", "I"],
+              ["arrow", "↗ Arrow", "A"],
+              ["rect", "▢ Box", "R"],
+              ["blur", "▦ Redact", "X"],
+              ["text", "T Text", "T"],
+            ] as [Tool, string, string][]
+          ).map(([t, label, key]) => (
             <button
               key={t}
               onClick={() => setTool(t)}
+              title={`${label.replace(/^\S+ /, "")} (${key})`}
               className={`rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
                 tool === t
                   ? "bg-primary text-primary-foreground"
@@ -323,6 +382,21 @@ export default function AnnotateWindow() {
               {label}
             </button>
           ))}
+          <span className="mx-2 h-5 w-px bg-border" />
+          <button
+            onClick={undo}
+            title="Undo (⌘Z)"
+            className="rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            ↩
+          </button>
+          <button
+            onClick={redo}
+            title="Redo (⇧⌘Z)"
+            className="rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            ↪
+          </button>
           <span className="mx-2 h-5 w-px bg-border" />
           {PALETTE.map((c) => (
             <button
@@ -381,19 +455,17 @@ export default function AnnotateWindow() {
                   if (e.key === "Enter" && textEntry.value.trim()) {
                     const canvas = canvasRef.current!;
                     const rect = canvas.getBoundingClientRect();
-                    setShapes((prev) => [
-                      ...prev,
-                      {
-                        id: nextId++,
-                        kind: "text",
-                        x1: (textEntry.x / rect.width) * canvas.width,
-                        y1: (textEntry.y / rect.height) * canvas.height,
-                        x2: 0,
-                        y2: 0,
-                        color,
-                        text: textEntry.value.trim(),
-                      },
-                    ]);
+                    const shape: Shape = {
+                      id: nextId++,
+                      kind: "text",
+                      x1: (textEntry.x / rect.width) * canvas.width,
+                      y1: (textEntry.y / rect.height) * canvas.height,
+                      x2: 0,
+                      y2: 0,
+                      color,
+                      text: textEntry.value.trim(),
+                    };
+                    commit((prev) => [...prev, shape]);
                     setTextEntry(null);
                   }
                   if (e.key === "Escape") setTextEntry(null);
@@ -467,4 +539,12 @@ export default function AnnotateWindow() {
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function isLight(hex: string): boolean {
+  const n = parseInt(hex.replace("#", ""), 16);
+  const r = (n >> 16) & 0xff;
+  const g = (n >> 8) & 0xff;
+  const b = n & 0xff;
+  return 0.299 * r + 0.587 * g + 0.114 * b > 150;
 }

@@ -22,9 +22,25 @@ export default function LensWindow() {
   const filterRef = useRef<GlFilter | null>(null);
   const [filter, setFilter] = useState<ColorblindType | "off">("deuteranopia");
   const [frozen, setFrozen] = useState(false);
+  const [split, setSplit] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const stateRef = useRef({ filter, frozen });
-  stateRef.current = { filter, frozen };
+  const stateRef = useRef({ filter, frozen, split });
+  stateRef.current = { filter, frozen, split };
+
+  // 1-5 pick a filter · Space freezes · D toggles the split view.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const index = Number(e.key) - 1;
+      if (index >= 0 && index < FILTERS.length) setFilter(FILTERS[index].key);
+      if (e.key === " ") {
+        e.preventDefault();
+        setFrozen((f) => !f);
+      }
+      if (e.key.toLowerCase() === "d") setSplit((s) => !s);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,7 +55,7 @@ export default function LensWindow() {
 
     async function tick() {
       if (cancelled) return;
-      const { filter: f, frozen: fz } = stateRef.current;
+      const { filter: f, frozen: fz, split: sp } = stateRef.current;
       if (!fz) {
         try {
           const buf = await ipc.lensFrame();
@@ -48,7 +64,7 @@ export default function LensWindow() {
           const height = view.getUint32(4, true);
           const pixels = new Uint8Array(buf, 8);
           const matrix = f === "off" ? IDENTITY_MATRIX : COLORBLIND_MATRICES[f];
-          filterRef.current?.draw(pixels, width, height, matrix);
+          filterRef.current?.draw(pixels, width, height, matrix, sp && f !== "off");
           setError(null);
         } catch (e) {
           setError(String(e));
@@ -96,6 +112,17 @@ export default function LensWindow() {
         </div>
         <div className="flex items-center gap-1">
           <button
+            onClick={() => setSplit((s) => !s)}
+            title="Split view: left original, right filtered (D)"
+            className={`rounded-md px-2 py-1 text-[11px] ${
+              split
+                ? "bg-primary/20 text-primary"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}
+          >
+            ◧
+          </button>
+          <button
             onClick={() => setFrozen((f) => !f)}
             title={frozen ? "Resume" : "Freeze frame"}
             className={`rounded-md px-2 py-1 text-[11px] ${
@@ -124,6 +151,17 @@ export default function LensWindow() {
       </header>
       <div className="relative min-h-0 flex-1 bg-black">
         <canvas ref={canvasRef} className="h-full w-full" />
+        {split && filter !== "off" && (
+          <>
+            <div className="pointer-events-none absolute inset-y-0 left-1/2 w-px bg-white/60" />
+            <span className="pointer-events-none absolute bottom-1.5 left-2 rounded bg-black/70 px-1.5 py-0.5 text-[9px] text-white/80">
+              original
+            </span>
+            <span className="pointer-events-none absolute bottom-1.5 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[9px] text-white/80">
+              {filter}
+            </span>
+          </>
+        )}
         {error && (
           <div className="absolute inset-0 flex items-center justify-center p-4 text-center text-xs text-white/70">
             {error}

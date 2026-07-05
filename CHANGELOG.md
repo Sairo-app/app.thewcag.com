@@ -1,5 +1,33 @@
 # Changelog
 
+## v1.1.0 — 2026-07-06
+
+Customizable shortcuts + a depth pass on all three tools.
+
+**Keyboard shortcuts**
+- Fully customizable from the main window: click a shortcut, press the new
+  combo. Persisted to disk, applied instantly, conflict-checked, and rolled
+  back automatically if macOS rejects the combo. Tray menu labels follow.
+
+**Contrast picker**
+- Arrow keys nudge the pick point one physical pixel (⇧ = 10) for
+  pixel-perfect picking; Enter/Space picks; C copies the hovered hex
+- Live AA / AA-large / fail badge in the loupe while choosing the
+  background color
+- Copy buttons on both hex fields; suggestions now include background
+  fixes as well as text fixes; history has a Clear button
+
+**Capture & annotate**
+- Undo/redo (⌘Z / ⇧⌘Z) across add, move, and delete
+- Tool hotkeys: V select · I issue · A arrow · R box · X redact · T text
+- Space in the capture overlay grabs the full screen (no dragging)
+- Issue badges use the selected palette color with auto-contrast numerals
+
+**Colorblind lens**
+- Split view (D or the ◧ button): left half original, right half filtered,
+  with labels — ideal for before/after screenshots
+- 1–5 switch filters, Space freezes
+
 ## v1.0.0 — 2026-07-06
 
 First full release. Three tools, one menu-bar app (macOS).

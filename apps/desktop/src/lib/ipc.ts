@@ -38,7 +38,53 @@ export const ipc = {
   openSite: (url: string) => invoke<void>("open_site", { url }),
   autostartEnabled: () => invoke<boolean>("autostart_enabled"),
   setAutostart: (enabled: boolean) => invoke<void>("set_autostart", { enabled }),
+  getShortcuts: () => invoke<Shortcuts>("get_shortcuts"),
+  setShortcut: (action: keyof Shortcuts, shortcut: string) =>
+    invoke<void>("set_shortcut", { action, shortcut }),
+  resetShortcuts: () => invoke<Shortcuts>("reset_shortcuts"),
 };
+
+export interface Shortcuts {
+  pick: string;
+  shot: string;
+  lens: string;
+}
+
+/** "alt+super+KeyP" → "⌥⌘P" (matches settings::display in Rust). */
+export function displayShortcut(shortcut: string): string {
+  let mods = "";
+  let key = "";
+  for (const token of shortcut.split("+")) {
+    switch (token.toLowerCase()) {
+      case "ctrl":
+      case "control":
+        mods += "⌃";
+        break;
+      case "alt":
+      case "option":
+        mods += "⌥";
+        break;
+      case "shift":
+        mods += "⇧";
+        break;
+      case "super":
+      case "cmd":
+      case "command":
+      case "meta":
+        mods += "⌘";
+        break;
+      default:
+        key = token.replace(/^Key/, "").replace(/^Digit/, "");
+    }
+  }
+  const arrows: Record<string, string> = {
+    ArrowUp: "↑",
+    ArrowDown: "↓",
+    ArrowLeft: "←",
+    ArrowRight: "→",
+  };
+  return mods + (arrows[key] ?? key.toUpperCase());
+}
 
 export interface PickedPair {
   mode: OverlayMode;

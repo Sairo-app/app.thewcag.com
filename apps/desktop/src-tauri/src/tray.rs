@@ -1,20 +1,44 @@
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
-    AppHandle,
+    AppHandle, Manager, Wry,
 };
 
-use crate::{actions, lens, overlay};
+use crate::{actions, lens, overlay, settings};
 
-pub fn create(app: &AppHandle) -> tauri::Result<()> {
-    let pick = MenuItem::with_id(app, "pick", "Check Contrast (⌥⌘P)", true, None::<&str>)?;
-    let shot = MenuItem::with_id(app, "shot", "Capture & Annotate (⌥⌘S)", true, None::<&str>)?;
-    let lens_item = MenuItem::with_id(app, "lens", "Colorblind Lens (⌥⌘L)", true, None::<&str>)?;
+fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
+    let cfg = app
+        .state::<settings::ShortcutSettings>()
+        .0
+        .lock()
+        .unwrap()
+        .clone();
+    let pick = MenuItem::with_id(
+        app,
+        "pick",
+        format!("Check Contrast ({})", settings::display(&cfg.pick)),
+        true,
+        None::<&str>,
+    )?;
+    let shot = MenuItem::with_id(
+        app,
+        "shot",
+        format!("Capture & Annotate ({})", settings::display(&cfg.shot)),
+        true,
+        None::<&str>,
+    )?;
+    let lens_item = MenuItem::with_id(
+        app,
+        "lens",
+        format!("Colorblind Lens ({})", settings::display(&cfg.lens)),
+        true,
+        None::<&str>,
+    )?;
     let full = MenuItem::with_id(app, "full", "Capture Full Screen", true, None::<&str>)?;
     let show = MenuItem::with_id(app, "show", "Open Accessibility.build", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 
-    let menu = Menu::with_items(
+    Menu::with_items(
         app,
         &[
             &pick,
@@ -25,8 +49,20 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             &show,
             &quit,
         ],
-    )?;
+    )
+}
 
+/// Rebuild the tray menu (called after shortcut changes).
+pub fn refresh(app: &AppHandle) {
+    if let Some(tray) = app.tray_by_id("main") {
+        if let Ok(menu) = build_menu(app) {
+            let _ = tray.set_menu(Some(menu));
+        }
+    }
+}
+
+pub fn create(app: &AppHandle) -> tauri::Result<()> {
+    let menu = build_menu(app)?;
     TrayIconBuilder::with_id("main")
         .icon(app.default_window_icon().expect("bundled icon").clone())
         .icon_as_template(false)

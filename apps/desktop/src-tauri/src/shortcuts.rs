@@ -1,34 +1,22 @@
 use tauri::Wry;
-use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::ShortcutState;
 
-use crate::{lens, overlay};
+use crate::{lens, overlay, settings};
 
-fn pick_shortcut() -> Shortcut {
-    Shortcut::new(Some(Modifiers::ALT | Modifiers::SUPER), Code::KeyP)
-}
-
-fn screenshot_shortcut() -> Shortcut {
-    Shortcut::new(Some(Modifiers::ALT | Modifiers::SUPER), Code::KeyS)
-}
-
-fn lens_shortcut() -> Shortcut {
-    Shortcut::new(Some(Modifiers::ALT | Modifiers::SUPER), Code::KeyL)
-}
-
+/// Shortcuts are registered dynamically from the saved config (see
+/// settings::apply, called in setup and after every change) — the plugin
+/// here only routes fired shortcuts to their action.
 pub fn plugin() -> tauri::plugin::TauriPlugin<Wry> {
     tauri_plugin_global_shortcut::Builder::new()
-        .with_shortcuts([pick_shortcut(), screenshot_shortcut(), lens_shortcut()])
-        .expect("valid default shortcuts")
         .with_handler(|app, shortcut, event| {
             if event.state() != ShortcutState::Pressed {
                 return;
             }
-            if shortcut == &pick_shortcut() {
-                overlay::begin(app, "pair");
-            } else if shortcut == &screenshot_shortcut() {
-                overlay::begin(app, "shot");
-            } else if shortcut == &lens_shortcut() {
-                lens::toggle(app);
+            match settings::action_for(app, shortcut) {
+                Some("pick") => overlay::begin(app, "pair"),
+                Some("shot") => overlay::begin(app, "shot"),
+                Some("lens") => lens::toggle(app),
+                _ => {}
             }
         })
         .build()

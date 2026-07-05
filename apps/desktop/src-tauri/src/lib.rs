@@ -4,13 +4,17 @@ mod export;
 mod lens;
 mod overlay;
 mod permissions;
+mod settings;
 mod shortcuts;
 mod state;
 mod tray;
 
+use tauri::Manager;
+
 pub fn run() {
     tauri::Builder::default()
         .manage(state::AppState::default())
+        .manage(settings::ShortcutSettings::default())
         .plugin(shortcuts::plugin())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
@@ -40,12 +44,25 @@ pub fn run() {
             export::open_site,
             export::autostart_enabled,
             export::set_autostart,
+            settings::get_shortcuts,
+            settings::set_shortcut,
+            settings::reset_shortcuts,
         ])
         .setup(|app| {
             // Menu-bar utility: no Dock icon.
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-            tray::create(app.handle())?;
+            let handle = app.handle();
+            let saved = settings::load(handle);
+            *handle
+                .state::<settings::ShortcutSettings>()
+                .0
+                .lock()
+                .unwrap() = saved;
+            // A failed registration (combo taken by another app) must not
+            // prevent startup; the settings UI surfaces it instead.
+            let _ = settings::apply(handle);
+            tray::create(handle)?;
             Ok(())
         })
         .on_window_event(|window, event| {
