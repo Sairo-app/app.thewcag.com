@@ -2,6 +2,7 @@ mod actions;
 mod capture;
 mod export;
 mod lens;
+mod library;
 mod overlay;
 mod permissions;
 mod settings;
@@ -38,6 +39,12 @@ pub fn run() {
             overlay::store_annotation,
             overlay::annotation_png,
             overlay::begin_overlay,
+            library::annotation_meta,
+            library::save_annotation_doc,
+            library::load_annotation_doc,
+            library::list_annotation_docs,
+            library::open_annotation,
+            library::delete_annotation,
             lens::toggle_lens,
             lens::lens_frame,
             export::copy_png,

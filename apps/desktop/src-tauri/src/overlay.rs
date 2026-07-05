@@ -196,34 +196,28 @@ pub fn close_overlay(app: AppHandle, reopen_main: bool) {
     }
 }
 
-/// Receives the cropped region PNG from an overlay and opens the editor.
+/// Receives the cropped region PNG from an overlay, writes it into the
+/// capture library and opens the editor. Every capture is re-editable.
 #[tauri::command]
 pub fn store_annotation(app: AppHandle, request: tauri::ipc::Request) -> Result<(), String> {
     let bytes = match request.body() {
         tauri::ipc::InvokeBody::Raw(bytes) => bytes.clone(),
         _ => return Err("expected raw body".into()),
     };
+    let id = crate::library::new_id();
+    let dir = crate::library::captures_dir(&app)?;
+    std::fs::write(dir.join(format!("{id}.png")), &bytes).map_err(|e| e.to_string())?;
+
     let state: State<AppState> = app.state();
-    *state.annotation.lock().unwrap() = Some(bytes);
+    *state.annotation.lock().unwrap() = Some((id, bytes));
 
     close_all_overlays(&app);
-    if let Some(existing) = app.get_webview_window("annotate") {
-        let _ = existing.close();
-    }
-    WebviewWindowBuilder::new(&app, "annotate", WebviewUrl::App(Default::default()))
-        .title("Annotate — Accessibility.build")
-        .inner_size(1120.0, 760.0)
-        .min_inner_size(840.0, 560.0)
-        .center()
-        .focused(true)
-        .build()
-        .map_err(|e| e.to_string())?;
-    Ok(())
+    crate::library::open_annotate_window(&app)
 }
 
 #[tauri::command]
 pub fn annotation_png(state: State<AppState>) -> Result<tauri::ipc::Response, String> {
     let guard = state.annotation.lock().unwrap();
-    let payload = guard.as_ref().ok_or("no annotation payload")?;
-    Ok(tauri::ipc::Response::new(payload.clone()))
+    let (_, png) = guard.as_ref().ok_or("no annotation payload")?;
+    Ok(tauri::ipc::Response::new(png.clone()))
 }

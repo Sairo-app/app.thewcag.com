@@ -1,11 +1,37 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { emit } from "@tauri-apps/api/event";
+import { contrastRatio } from "@accessibility-build/a11y-core";
 import { ipc } from "../lib/ipc";
+import {
+  emptyDoc,
+  ISSUE_TYPES,
+  issueTypeOf,
+  parseDoc,
+  SEVERITIES,
+  SEVERITY_COLORS,
+  type IssueId,
+  type Severity,
+  type Shape,
+  type Tool,
+} from "../lib/annotate/model";
+import {
+  applyHandle,
+  floodBounds,
+  handlesFor,
+  hitTest,
+  snapAngle,
+  type Point,
+} from "../lib/annotate/geometry";
+import { badgeColor, renderDoc } from "../lib/annotate/render";
 import {
   ArrowIcon,
   BoxIcon,
   CursorIcon,
+  FitIcon,
   IssueIcon,
+  MinusIcon,
+  PipetteIcon,
+  PlusIcon,
   RedactIcon,
   RedoIcon,
   RulerIcon,
@@ -13,63 +39,134 @@ import {
   UndoIcon,
 } from "../lib/icons";
 
-type Tool = "select" | "arrow" | "rect" | "blur" | "text" | "badge" | "measure";
+const PALETTE = ["#F2543D", "#2563EB", "#F5B00B", "#FFFFFF", "#0F172A"];
 
-const ISSUE_TYPES = [
-  { id: "contrast", label: "Contrast", sc: "1.4.3" },
-  { id: "use-of-color", label: "Use of color", sc: "1.4.1" },
-  { id: "focus", label: "Focus indicator", sc: "2.4.7" },
-  { id: "target-size", label: "Target size", sc: "2.5.8" },
-  { id: "alt-text", label: "Alt text", sc: "1.1.1" },
-  { id: "label", label: "Label / name", sc: "4.1.2" },
-  { id: "keyboard", label: "Keyboard", sc: "2.1.1" },
-  { id: "other", label: "Other", sc: "" },
-] as const;
-type IssueId = (typeof ISSUE_TYPES)[number]["id"];
-
-const SEVERITIES = ["blocker", "major", "minor"] as const;
-type Severity = (typeof SEVERITIES)[number];
-
-interface Shape {
-  id: number;
-  kind: Exclude<Tool, "select">;
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-  color: string;
-  text?: string;
-  issueType?: IssueId;
-  severity?: Severity;
-  note?: string;
+interface View {
+  scale: number;
+  tx: number;
+  ty: number;
 }
 
-const PALETTE = ["#F2543D", "#2563EB", "#F5B00B", "#FFFFFF", "#0F172A"];
-const STROKE = 4;
-const TARGET_MIN = 24; // WCAG 2.5.8 minimum target size (CSS px ~ physical here)
-
-let nextId = 1;
-
 export default function AnnotateWindow() {
+  const [docId, setDocId] = useState<string | null>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
+  const imgDataRef = useRef<ImageData | null>(null);
   const [shapes, setShapes] = useState<Shape[]>([]);
+  const nextIdRef = useRef(1);
   const [tool, setTool] = useState<Tool>("badge");
   const [color, setColor] = useState(PALETTE[0]);
+  const [redactStyle, setRedactStyle] = useState<"solid" | "pixel">("solid");
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [hoverId, setHoverId] = useState<number | null>(null);
   const [draft, setDraft] = useState<Shape | null>(null);
-  const [textEntry, setTextEntry] = useState<{
-    x: number;
-    y: number;
-    value: string;
-    editId?: number;
-  } | null>(null);
+  const [probeFirst, setProbeFirst] = useState<Point | null>(null);
+  const [mouseDoc, setMouseDoc] = useState<Point | null>(null);
+  const [textEntry, setTextEntry] = useState<{ docX: number; docY: number; value: string; editId?: number } | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [view, setView] = useState<View>({ scale: 1, tx: 0, ty: 0 });
+
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const dragRef = useRef<{ id: number; dx: number; dy: number } | null>(null);
   const resizeRef = useRef<{ id: number; handle: string } | null>(null);
+  const panRef = useRef<{ x: number; y: number } | null>(null);
+  const spaceRef = useRef(false);
+  const downDocRef = useRef<Point | null>(null);
   const pastRef = useRef<Shape[][]>([]);
   const futureRef = useRef<Shape[][]>([]);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ---------- document lifecycle: load capture + restore doc, autosave ----------
+  useEffect(() => {
+    void (async () => {
+      const [meta, buf] = await Promise.all([ipc.annotationMeta(), ipc.annotationPng()]);
+      setDocId(meta.id);
+      const url = URL.createObjectURL(new Blob([buf], { type: "image/png" }));
+      const img = new Image();
+      img.onload = async () => {
+        const off = document.createElement("canvas");
+        off.width = img.naturalWidth;
+        off.height = img.naturalHeight;
+        const octx = off.getContext("2d", { willReadFrequently: true })!;
+        octx.drawImage(img, 0, 0);
+        imgDataRef.current = octx.getImageData(0, 0, off.width, off.height);
+        setImage(img);
+        const saved = await ipc.loadAnnotationDoc(meta.id).catch(() => null);
+        const doc = (saved && parseDoc(saved)) || emptyDoc();
+        nextIdRef.current = doc.nextId;
+        setShapes(doc.shapes);
+      };
+      img.src = url;
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!docId) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      void ipc
+        .saveAnnotationDoc(docId, JSON.stringify({ version: 1, nextId: nextIdRef.current, shapes }))
+        .catch(() => {});
+    }, 400);
+  }, [shapes, docId]);
+
+  // ---------- viewport ----------
+  const fit = useCallback(() => {
+    const container = containerRef.current;
+    if (!container || !image) return;
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    const scale = Math.min(cw / image.naturalWidth, ch / image.naturalHeight) * 0.96;
+    setView({
+      scale,
+      tx: (cw - image.naturalWidth * scale) / 2,
+      ty: (ch - image.naturalHeight * scale) / 2,
+    });
+  }, [image]);
+
+  useEffect(() => {
+    fit();
+    const onResize = () => fit();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [fit]);
+
+  function zoomAt(cx: number, cy: number, factor: number) {
+    setView((v) => {
+      const scale = Math.min(8, Math.max(0.05, v.scale * factor));
+      return {
+        scale,
+        tx: cx - ((cx - v.tx) * scale) / v.scale,
+        ty: cy - ((cy - v.ty) * scale) / v.scale,
+      };
+    });
+  }
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = container.getBoundingClientRect();
+      if (e.ctrlKey || e.metaKey) {
+        zoomAt(e.clientX - rect.left, e.clientY - rect.top, Math.exp(-e.deltaY * 0.01));
+      } else {
+        setView((v) => ({ ...v, tx: v.tx - e.deltaX, ty: v.ty - e.deltaY }));
+      }
+    };
+    container.addEventListener("wheel", onWheel, { passive: false });
+    return () => container.removeEventListener("wheel", onWheel);
+  }, []);
+
+  function toDoc(e: { clientX: number; clientY: number }): Point {
+    const rect = containerRef.current!.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left - view.tx) / view.scale,
+      y: (e.clientY - rect.top - view.ty) / view.scale,
+    };
+  }
+
+  // ---------- history ----------
   function commit(update: (prev: Shape[]) => Shape[]) {
     setShapes((prev) => {
       pastRef.current.push(prev);
@@ -77,7 +174,6 @@ export default function AnnotateWindow() {
       return update(prev);
     });
   }
-
   function undo() {
     setShapes((prev) => {
       const past = pastRef.current.pop();
@@ -87,7 +183,6 @@ export default function AnnotateWindow() {
       return past;
     });
   }
-
   function redo() {
     setShapes((prev) => {
       const future = futureRef.current.pop();
@@ -97,177 +192,64 @@ export default function AnnotateWindow() {
     });
   }
 
-  useEffect(() => {
-    void (async () => {
-      const buf = await ipc.annotationPng();
-      const url = URL.createObjectURL(new Blob([buf], { type: "image/png" }));
-      const img = new Image();
-      img.onload = () => setImage(img);
-      img.src = url;
-    })();
-  }, []);
-
+  // ---------- rendering ----------
   const badges = shapes.filter((s) => s.kind === "badge");
-
-  const render = useCallback(
-    (ctx: CanvasRenderingContext2D, forExport = false) => {
-      if (!image) return;
-      ctx.canvas.width = image.naturalWidth;
-      ctx.canvas.height = image.naturalHeight;
-      ctx.drawImage(image, 0, 0);
-      const all = draft ? [...shapes, draft] : shapes;
-      let badgeNum = 0;
-      for (const s of all) {
-        const x = Math.min(s.x1, s.x2);
-        const y = Math.min(s.y1, s.y2);
-        const w = Math.abs(s.x2 - s.x1);
-        const h = Math.abs(s.y2 - s.y1);
-        ctx.strokeStyle = s.color;
-        ctx.fillStyle = s.color;
-        ctx.lineWidth = STROKE;
-        switch (s.kind) {
-          case "rect":
-            ctx.strokeRect(x, y, w, h);
-            break;
-          case "measure": {
-            ctx.setLineDash([8, 5]);
-            ctx.lineWidth = 2;
-            ctx.strokeRect(x, y, w, h);
-            ctx.setLineDash([]);
-            const fails = w < TARGET_MIN && h < TARGET_MIN;
-            const label = `${Math.round(w)} × ${Math.round(h)} px${fails ? "  ✕ 2.5.8" : ""}`;
-            ctx.font = "600 15px -apple-system, system-ui, sans-serif";
-            const tw = ctx.measureText(label).width + 12;
-            const ly = y > 26 ? y - 24 : y + h + 4;
-            ctx.fillStyle = fails ? "#DC2626" : "rgba(15,23,42,0.85)";
-            ctx.beginPath();
-            ctx.roundRect(x, ly, tw, 20, 5);
-            ctx.fill();
-            ctx.fillStyle = "#FFFFFF";
-            ctx.fillText(label, x + 6, ly + 15);
-            break;
-          }
-          case "blur": {
-            const block = 14;
-            const tiny = document.createElement("canvas");
-            tiny.width = Math.max(1, Math.round(w / block));
-            tiny.height = Math.max(1, Math.round(h / block));
-            const tctx = tiny.getContext("2d")!;
-            tctx.drawImage(image, x, y, w, h, 0, 0, tiny.width, tiny.height);
-            ctx.imageSmoothingEnabled = false;
-            ctx.drawImage(tiny, 0, 0, tiny.width, tiny.height, x, y, w, h);
-            ctx.imageSmoothingEnabled = true;
-            break;
-          }
-          case "arrow": {
-            const angle = Math.atan2(s.y2 - s.y1, s.x2 - s.x1);
-            const head = 18;
-            ctx.beginPath();
-            ctx.moveTo(s.x1, s.y1);
-            ctx.lineTo(s.x2, s.y2);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(s.x2, s.y2);
-            ctx.lineTo(s.x2 - head * Math.cos(angle - Math.PI / 6), s.y2 - head * Math.sin(angle - Math.PI / 6));
-            ctx.lineTo(s.x2 - head * Math.cos(angle + Math.PI / 6), s.y2 - head * Math.sin(angle + Math.PI / 6));
-            ctx.closePath();
-            ctx.fill();
-            break;
-          }
-          case "text": {
-            ctx.font = "600 26px -apple-system, system-ui, sans-serif";
-            ctx.lineWidth = 5;
-            ctx.strokeStyle = s.color === "#FFFFFF" ? "rgba(0,0,0,0.7)" : "rgba(255,255,255,0.85)";
-            ctx.strokeText(s.text ?? "", s.x1, s.y1);
-            ctx.fillText(s.text ?? "", s.x1, s.y1);
-            break;
-          }
-          case "badge": {
-            badgeNum += 1;
-            const r = 20;
-            const onDark = !isLight(s.color);
-            ctx.beginPath();
-            ctx.arc(s.x1, s.y1, r, 0, Math.PI * 2);
-            ctx.fillStyle = s.color;
-            ctx.fill();
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = onDark ? "#FFFFFF" : "#0F172A";
-            ctx.stroke();
-            ctx.fillStyle = onDark ? "#FFFFFF" : "#0F172A";
-            ctx.font = "700 22px -apple-system, system-ui, sans-serif";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText(String(badgeNum), s.x1, s.y1 + 1);
-            ctx.textAlign = "start";
-            ctx.textBaseline = "alphabetic";
-            break;
-          }
-        }
-        if (!forExport && s.id === selectedId) {
-          ctx.setLineDash([6, 4]);
-          ctx.lineWidth = 2;
-          ctx.strokeStyle = "#2563EB";
-          if (s.kind === "badge") ctx.strokeRect(s.x1 - 24, s.y1 - 24, 48, 48);
-          else ctx.strokeRect(x - 6, y - 6, w + 12, h + 12);
-          ctx.setLineDash([]);
-          // resize handles
-          for (const hd of handlesFor(s)) {
-            ctx.fillStyle = "#FFFFFF";
-            ctx.strokeStyle = "#2563EB";
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(hd.x, hd.y, 7, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
-          }
-        }
-      }
-    },
-    [image, shapes, draft, selectedId],
-  );
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    render(canvas.getContext("2d")!);
-  }, [render]);
-
-  function canvasPoint(e: React.MouseEvent): { x: number; y: number } {
-    const canvas = canvasRef.current!;
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: ((e.clientX - rect.left) / rect.width) * canvas.width,
-      y: ((e.clientY - rect.top) / rect.height) * canvas.height,
-    };
-  }
-
-  function hitTest(x: number, y: number): Shape | null {
-    for (let i = shapes.length - 1; i >= 0; i--) {
-      const s = shapes[i];
-      if (s.kind === "badge") {
-        if (Math.hypot(x - s.x1, y - s.y1) <= 26) return s;
-        continue;
-      }
-      const pad = 10;
-      const bx = Math.min(s.x1, s.x2) - pad;
-      const by = Math.min(s.y1, s.y2) - pad;
-      const bw = Math.abs(s.x2 - s.x1) + pad * 2;
-      const bh = Math.abs(s.y2 - s.y1) + pad * 2;
-      if (x >= bx && x <= bx + bw && y >= by && y <= by + bh) return s;
+    const container = containerRef.current;
+    if (!canvas || !container || !image) return;
+    const dpr = window.devicePixelRatio || 1;
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    if (canvas.width !== cw * dpr || canvas.height !== ch * dpr) {
+      canvas.width = cw * dpr;
+      canvas.height = ch * dpr;
     }
-    return null;
+    const ctx = canvas.getContext("2d")!;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cw, ch);
+    ctx.setTransform(dpr * view.scale, 0, 0, dpr * view.scale, dpr * view.tx, dpr * view.ty);
+    const all = draft ? [...shapes, draft] : shapes;
+    renderDoc(ctx, image, all, {
+      selectedId,
+      hoverId,
+      ghost:
+        tool === "badge" && mouseDoc && !textEntry
+          ? { kind: "badge", x: mouseDoc.x, y: mouseDoc.y, num: badges.length + 1 }
+          : null,
+    });
+    if (probeFirst) {
+      ctx.beginPath();
+      ctx.arc(probeFirst.x, probeFirst.y, 7, 0, Math.PI * 2);
+      ctx.strokeStyle = "#FFFFFF";
+      ctx.lineWidth = 2 / view.scale;
+      ctx.stroke();
+    }
+  }, [image, shapes, draft, selectedId, hoverId, view, mouseDoc, tool, probeFirst, textEntry, badges.length]);
+
+  // ---------- pointer input ----------
+  function sample(p: Point): { r: number; g: number; b: number } {
+    const data = imgDataRef.current!;
+    const x = Math.min(Math.max(Math.round(p.x), 0), data.width - 1);
+    const y = Math.min(Math.max(Math.round(p.y), 0), data.height - 1);
+    const i = (y * data.width + x) * 4;
+    return { r: data.data[i], g: data.data[i + 1], b: data.data[i + 2] };
   }
 
   function onMouseDown(e: React.MouseEvent) {
-    const p = canvasPoint(e);
+    if (spaceRef.current || e.button === 1) {
+      panRef.current = { x: e.clientX, y: e.clientY };
+      return;
+    }
+    const p = toDoc(e);
+    downDocRef.current = p;
+    const tolerance = 10 / view.scale;
+
     if (tool === "select") {
-      // handles first: resizing the selected shape wins over re-selecting
       const selected = shapes.find((s) => s.id === selectedId);
       if (selected) {
-        const canvas = canvasRef.current!;
-        const rect = canvas.getBoundingClientRect();
-        const threshold = 10 * (canvas.width / rect.width);
-        const handle = handlesFor(selected).find((hd) => Math.hypot(p.x - hd.x, p.y - hd.y) <= threshold);
+        const handle = handlesFor(selected).find((hd) => Math.hypot(p.x - hd.x, p.y - hd.y) <= tolerance + 4);
         if (handle) {
           pastRef.current.push(shapes);
           futureRef.current = [];
@@ -275,7 +257,7 @@ export default function AnnotateWindow() {
           return;
         }
       }
-      const hit = hitTest(p.x, p.y);
+      const hit = hitTest(shapes, p, tolerance);
       setSelectedId(hit?.id ?? null);
       if (hit) {
         pastRef.current.push(shapes);
@@ -285,54 +267,84 @@ export default function AnnotateWindow() {
       return;
     }
     if (tool === "text") {
-      const rect = canvasRef.current!.getBoundingClientRect();
-      setTextEntry({ x: e.clientX - rect.left, y: e.clientY - rect.top, value: "" });
+      setTextEntry({ docX: p.x, docY: p.y, value: "" });
       return;
     }
     if (tool === "badge") {
       const shape: Shape = {
-        id: nextId++,
+        id: nextIdRef.current++,
         kind: "badge",
         x1: p.x,
         y1: p.y,
         x2: p.x,
         y2: p.y,
-        color,
+        color: SEVERITY_COLORS.major,
         issueType: "contrast",
         severity: "major",
-        note: "",
+        note: ISSUE_TYPES[0].template,
       };
       commit((prev) => [...prev, shape]);
       setSelectedId(shape.id);
       return;
     }
-    setDraft({ id: nextId++, kind: tool, x1: p.x, y1: p.y, x2: p.x, y2: p.y, color });
+    if (tool === "probe") {
+      if (!probeFirst) {
+        setProbeFirst(p);
+      } else {
+        const a = sample(probeFirst);
+        const b = sample(p);
+        const ratio = contrastRatio(a, b);
+        const verdict = ratio >= 4.5 ? "✓ AA" : ratio >= 3 ? "AA large only" : "✕ fails AA";
+        const shape: Shape = {
+          id: nextIdRef.current++,
+          kind: "probe",
+          x1: probeFirst.x,
+          y1: probeFirst.y,
+          x2: p.x,
+          y2: p.y,
+          color: "#FFFFFF",
+          text: `${ratio.toFixed(2)}:1 ${verdict}`,
+        };
+        commit((prev) => [...prev, shape]);
+        // attach as evidence to the selected issue, if any
+        if (selectedId !== null) {
+          setShapes((prev) =>
+            prev.map((s) =>
+              s.id === selectedId && s.kind === "badge"
+                ? { ...s, note: `${s.note ? `${s.note}\n` : ""}Measured ${ratio.toFixed(2)}:1 in capture.` }
+                : s,
+            ),
+          );
+        }
+        setProbeFirst(null);
+      }
+      return;
+    }
+    // drag tools: arrow / rect / redact / measure
+    setDraft({
+      id: nextIdRef.current++,
+      kind: tool,
+      x1: p.x,
+      y1: p.y,
+      x2: p.x,
+      y2: p.y,
+      color: tool === "redact" ? "#0F172A" : color,
+      style: tool === "redact" ? redactStyle : undefined,
+    });
   }
 
   function onMouseMove(e: React.MouseEvent) {
-    const p = canvasPoint(e);
+    if (panRef.current) {
+      const last = panRef.current;
+      panRef.current = { x: e.clientX, y: e.clientY };
+      setView((v) => ({ ...v, tx: v.tx + e.clientX - last.x, ty: v.ty + e.clientY - last.y }));
+      return;
+    }
+    const p = toDoc(e);
+    setMouseDoc(p);
     if (resizeRef.current) {
       const { id, handle } = resizeRef.current;
-      setShapes((prev) =>
-        prev.map((s) => {
-          if (s.id !== id) return s;
-          const next = { ...s };
-          if (handle === "start" || handle === "p11") {
-            next.x1 = p.x;
-            next.y1 = p.y;
-          } else if (handle === "end" || handle === "p22") {
-            next.x2 = p.x;
-            next.y2 = p.y;
-          } else if (handle === "p12") {
-            next.x1 = p.x;
-            next.y2 = p.y;
-          } else if (handle === "p21") {
-            next.x2 = p.x;
-            next.y1 = p.y;
-          }
-          return next;
-        }),
-      );
+      setShapes((prev) => prev.map((s) => (s.id === id ? applyHandle(s, handle, p) : s)));
       return;
     }
     if (dragRef.current) {
@@ -347,149 +359,245 @@ export default function AnnotateWindow() {
       );
       return;
     }
-    if (draft) setDraft({ ...draft, x2: p.x, y2: p.y });
-  }
-
-  function onDoubleClick(e: React.MouseEvent) {
-    const p = canvasPoint(e);
-    const hit = hitTest(p.x, p.y);
-    if (hit?.kind === "text") {
-      const canvas = canvasRef.current!;
-      const rect = canvas.getBoundingClientRect();
-      setTextEntry({
-        x: (hit.x1 / canvas.width) * rect.width,
-        y: (hit.y1 / canvas.height) * rect.height,
-        value: hit.text ?? "",
-        editId: hit.id,
-      });
+    if (draft) {
+      let end = p;
+      if (e.shiftKey) {
+        if (draft.kind === "arrow") end = snapAngle({ x: draft.x1, y: draft.y1 }, p);
+        else {
+          const side = Math.max(Math.abs(p.x - draft.x1), Math.abs(p.y - draft.y1));
+          end = { x: draft.x1 + Math.sign(p.x - draft.x1 || 1) * side, y: draft.y1 + Math.sign(p.y - draft.y1 || 1) * side };
+        }
+      }
+      setDraft({ ...draft, x2: end.x, y2: end.y });
     }
   }
 
   function onMouseUp() {
+    panRef.current = null;
     dragRef.current = null;
     resizeRef.current = null;
-    if (draft) {
-      if (Math.abs(draft.x2 - draft.x1) > 6 || Math.abs(draft.y2 - draft.y1) > 6) {
-        const committed = draft;
-        commit((prev) => [...prev, committed]);
+    if (!draft) return;
+    const moved = Math.abs(draft.x2 - draft.x1) > 5 || Math.abs(draft.y2 - draft.y1) > 5;
+    if (moved) {
+      const committed = draft;
+      commit((prev) => [...prev, committed]);
+    } else if (draft.kind === "measure" && downDocRef.current && imgDataRef.current) {
+      // auto-measure: click an element, flood-fill detects its bounds
+      const bounds = floodBounds(imgDataRef.current, downDocRef.current.x, downDocRef.current.y);
+      if (bounds) {
+        const shape: Shape = { ...draft, ...bounds };
+        commit((prev) => [...prev, shape]);
+      } else {
+        flash("Couldn't detect an element here — drag to measure manually");
       }
-      setDraft(null);
+    }
+    setDraft(null);
+  }
+
+  function onDoubleClick(e: React.MouseEvent) {
+    const p = toDoc(e);
+    const hit = hitTest(shapes, p, 10 / view.scale);
+    if (hit?.kind === "text") {
+      setTextEntry({ docX: hit.x1, docY: hit.y1, value: hit.text ?? "", editId: hit.id });
     }
   }
 
+  // ---------- keyboard ----------
   useEffect(() => {
+    const toolKeys: Record<string, Tool> = {
+      v: "select",
+      i: "badge",
+      a: "arrow",
+      r: "rect",
+      x: "redact",
+      t: "text",
+      m: "measure",
+      p: "probe",
+    };
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      const typing =
-        target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT";
+      const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
+      if (e.key === " " && !typing) {
+        spaceRef.current = e.type === "keydown";
+        e.preventDefault();
+        return;
+      }
+      if (e.type !== "keydown") return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
         e.preventDefault();
         if (e.shiftKey) redo();
         else undo();
         return;
       }
+      if ((e.metaKey || e.ctrlKey) && e.key === "0") {
+        e.preventDefault();
+        fit();
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key === "=" || e.key === "-")) {
+        e.preventDefault();
+        const container = containerRef.current!;
+        zoomAt(container.clientWidth / 2, container.clientHeight / 2, e.key === "=" ? 1.25 : 0.8);
+        return;
+      }
       if (typing) return;
-      const toolKeys: Record<string, Tool> = {
-        v: "select",
-        i: "badge",
-        a: "arrow",
-        r: "rect",
-        x: "blur",
-        t: "text",
-        m: "measure",
-      };
       const mapped = toolKeys[e.key.toLowerCase()];
       if (mapped && !e.metaKey && !e.ctrlKey) {
         setTool(mapped);
+        setProbeFirst(null);
         return;
       }
       if ((e.key === "Delete" || e.key === "Backspace") && selectedId !== null) {
         commit((prev) => prev.filter((s) => s.id !== selectedId));
         setSelectedId(null);
       }
-      if (e.key === "Escape") setSelectedId(null);
+      if (e.key === "Escape") {
+        setSelectedId(null);
+        setProbeFirst(null);
+      }
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keyup", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onKey);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId]);
+  }, [selectedId, fit]);
 
+  // ---------- exports ----------
   async function exportPng(): Promise<Uint8Array> {
     const canvas = document.createElement("canvas");
-    render(canvas.getContext("2d")!, true);
+    canvas.width = image!.naturalWidth;
+    canvas.height = image!.naturalHeight;
+    renderDoc(canvas.getContext("2d")!, image!, shapes, { forExport: true });
+    const blob: Blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b!), "image/png"));
+    return new Uint8Array(await blob.arrayBuffer());
+  }
+
+  /** One-page finding sheet: annotated image + issue table, branded. */
+  async function exportReport(): Promise<Uint8Array> {
+    const img = image!;
+    const W = Math.max(900, img.naturalWidth);
+    const pad = 48;
+    const rowH = 34;
+    const headerH = 110;
+    const tableH = badges.length > 0 ? 56 + badges.length * rowH : 0;
+    const imgScale = (W - pad * 2) / img.naturalWidth;
+    const imgH = img.naturalHeight * imgScale;
+    const H = headerH + imgH + tableH + pad * 2;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext("2d")!;
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#0F172A";
+    ctx.font = "700 30px -apple-system, system-ui, sans-serif";
+    ctx.fillText("Accessibility findings", pad, 58);
+    ctx.font = "400 16px -apple-system, system-ui, sans-serif";
+    ctx.fillStyle = "#64748B";
+    ctx.fillText(`${new Date().toDateString()} · ${badges.length} issue${badges.length === 1 ? "" : "s"} · accessibility.build`, pad, 84);
+
+    const annotated = document.createElement("canvas");
+    annotated.width = img.naturalWidth;
+    annotated.height = img.naturalHeight;
+    renderDoc(annotated.getContext("2d")!, img, shapes, { forExport: true });
+    ctx.drawImage(annotated, pad, headerH, W - pad * 2, imgH);
+    ctx.strokeStyle = "#E2E8F0";
+    ctx.strokeRect(pad, headerH, W - pad * 2, imgH);
+
+    if (badges.length > 0) {
+      let y = headerH + imgH + 44;
+      ctx.font = "600 14px -apple-system, system-ui, sans-serif";
+      ctx.fillStyle = "#64748B";
+      ctx.fillText("#", pad, y);
+      ctx.fillText("CRITERION", pad + 40, y);
+      ctx.fillText("SEVERITY", pad + 280, y);
+      ctx.fillText("NOTE", pad + 390, y);
+      y += 10;
+      badges.forEach((b, i) => {
+        const type = issueTypeOf(b);
+        const rowY = y + (i + 1) * rowH - 10;
+        ctx.fillStyle = badgeColor(b);
+        ctx.beginPath();
+        ctx.arc(pad + 8, rowY - 5, 11, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = "700 12px -apple-system, system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(String(i + 1), pad + 8, rowY - 1);
+        ctx.textAlign = "start";
+        ctx.fillStyle = "#0F172A";
+        ctx.font = "500 15px -apple-system, system-ui, sans-serif";
+        ctx.fillText(type.sc ? `${type.sc} ${type.label}` : type.label, pad + 40, rowY);
+        ctx.fillText(b.severity ?? "major", pad + 280, rowY);
+        ctx.fillStyle = "#334155";
+        const note = (b.note ?? "").replace(/\n/g, " ");
+        ctx.fillText(note.length > 70 ? `${note.slice(0, 69)}…` : note, pad + 390, rowY, W - pad - 400);
+      });
+    }
     const blob: Blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b!), "image/png"));
     return new Uint8Array(await blob.arrayBuffer());
   }
 
   function flash(message: string) {
     setStatus(message);
-    setTimeout(() => setStatus(null), 2200);
+    setTimeout(() => setStatus(null), 2400);
   }
 
   function issueSummaries(): string[] {
     return badges.map((b) => {
-      const { type, severity, note } = issueMeta(b);
-      return `${type.sc ? `[WCAG ${type.sc}] ` : ""}${type.label} (${severity}) — ${note}`;
+      const type = issueTypeOf(b);
+      return `${type.sc ? `[WCAG ${type.sc}] ` : ""}${type.label} (${b.severity ?? "major"}) — ${b.note?.trim() || "(no note)"}`;
     });
   }
 
   async function onSave() {
-    const name = `a11y-annotated-${new Date().toISOString().slice(0, 10)}.png`;
-    const path = await ipc.savePng(await exportPng(), name);
+    const path = await ipc.savePng(await exportPng(), `a11y-annotated-${docId}.png`);
     if (path) {
       flash(`Saved ${path.split("/").pop()}`);
       void emit("annotate-exported", issueSummaries());
     }
   }
-
   async function onCopy() {
     await ipc.copyPng(await exportPng());
-    flash("Image copied to clipboard");
+    flash("Image copied");
     void emit("annotate-exported", issueSummaries());
   }
-
-  function issueMeta(b: Shape) {
-    const type = ISSUE_TYPES.find((t) => t.id === b.issueType) ?? ISSUE_TYPES[ISSUE_TYPES.length - 1];
-    return { type, severity: b.severity ?? "major", note: b.note?.trim() || "(add note)" };
+  async function onReport() {
+    const path = await ipc.savePng(await exportReport(), `a11y-report-${docId}.png`);
+    if (path) {
+      flash(`Report saved`);
+      void emit("annotate-exported", issueSummaries());
+    }
   }
-
   async function onCopyMarkdown() {
     const lines = badges.map((b, i) => {
-      const { type, severity, note } = issueMeta(b);
-      const sc = type.sc ? `WCAG ${type.sc} ` : "";
-      return `${i + 1}. **${sc}${type.label}** · \`${severity}\` — ${note}`;
+      const type = issueTypeOf(b);
+      return `${i + 1}. **${type.sc ? `WCAG ${type.sc} ` : ""}${type.label}** · \`${b.severity ?? "major"}\` — ${b.note?.trim() || "(add note)"}`;
     });
-    const md = [
-      "## Accessibility issues",
-      "",
-      "_Annotated screenshot attached (numbers reference the list below)._",
-      "",
-      ...lines,
-      "",
-      "Found with [Accessibility.build](https://accessibility.build) desktop.",
-    ].join("\n");
-    await ipc.copyText(md);
+    await ipc.copyText(
+      ["## Accessibility issues", "", "_Annotated screenshot attached._", "", ...lines, "", "Found with [Accessibility.build](https://accessibility.build) desktop."].join("\n"),
+    );
     flash("Markdown copied");
   }
-
   async function onCopyJira() {
-    const lines = badges.map((b, i) => {
-      const { type, severity, note } = issueMeta(b);
-      const sc = type.sc ? `WCAG ${type.sc} ` : "";
-      return `# *${sc}${type.label}* {{${severity}}} — ${note}`;
+    const lines = badges.map((b) => {
+      const type = issueTypeOf(b);
+      return `# *${type.sc ? `WCAG ${type.sc} ` : ""}${type.label}* {{${b.severity ?? "major"}}} — ${b.note?.trim() || "(add note)"}`;
     });
-    const jira = [
-      "h2. Accessibility issues",
-      "",
-      "_Annotated screenshot attached (numbers reference the list below)._",
-      "",
-      ...lines,
-      "",
-      "Found with [Accessibility.build|https://accessibility.build] desktop.",
-    ].join("\n");
-    await ipc.copyText(jira);
+    await ipc.copyText(
+      ["h2. Accessibility issues", "", "_Annotated screenshot attached._", "", ...lines, "", "Found with [Accessibility.build|https://accessibility.build] desktop."].join("\n"),
+    );
     flash("Jira markup copied");
   }
+
+  // text entry position in screen space
+  const textEntryStyle = textEntry
+    ? { left: textEntry.docX * view.scale + view.tx, top: textEntry.docY * view.scale + view.ty }
+    : undefined;
 
   return (
     <div className="app-bg-solid flex h-screen flex-col font-sans text-[13px] text-foreground">
@@ -503,14 +611,18 @@ export default function AnnotateWindow() {
                 ["arrow", <ArrowIcon key="i" />, "", "A"],
                 ["rect", <BoxIcon key="i" />, "", "R"],
                 ["measure", <RulerIcon key="i" />, "24px", "M"],
-                ["blur", <RedactIcon key="i" />, "", "X"],
+                ["probe", <PipetteIcon key="i" />, "Probe", "P"],
+                ["redact", <RedactIcon key="i" />, "", "X"],
                 ["text", <TypeIcon key="i" />, "", "T"],
               ] as [Tool, ReactNode, string, string][]
             ).map(([t, icon, label, key]) => (
               <button
                 key={t}
                 data-active={tool === t}
-                onClick={() => setTool(t)}
+                onClick={() => {
+                  setTool(t);
+                  setProbeFirst(null);
+                }}
                 title={`${t} (${key})`}
               >
                 {icon}
@@ -518,14 +630,22 @@ export default function AnnotateWindow() {
               </button>
             ))}
           </div>
+          {tool === "redact" && (
+            <div className="seg">
+              <button data-active={redactStyle === "solid"} onClick={() => setRedactStyle("solid")} title="Solid block — safe redaction">
+                Solid
+              </button>
+              <button data-active={redactStyle === "pixel"} onClick={() => setRedactStyle("pixel")} title="Pixelate — cosmetic only, can be reversed on text">
+                Pixel
+              </button>
+            </div>
+          )}
           <span className="h-5 w-px bg-border" />
           {PALETTE.map((c) => (
             <button
               key={c}
               onClick={() => setColor(c)}
-              className={`h-5 w-5 rounded-full border ${
-                color === c ? "border-primary ring-2 ring-ring/40" : "border-border"
-              }`}
+              className={`h-5 w-5 rounded-full border ${color === c ? "border-primary ring-2 ring-ring/40" : "border-border"}`}
               style={{ backgroundColor: c }}
               title={c}
             />
@@ -537,86 +657,99 @@ export default function AnnotateWindow() {
           <button onClick={redo} title="Redo (⇧⌘Z)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
             <RedoIcon />
           </button>
+          <span className="h-5 w-px bg-border" />
+          <button onClick={() => zoomAt(containerRef.current!.clientWidth / 2, containerRef.current!.clientHeight / 2, 0.8)} title="Zoom out (⌘-)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+            <MinusIcon />
+          </button>
+          <span className="w-11 text-center font-mono text-[10px] text-muted-foreground">
+            {Math.round(view.scale * 100)}%
+          </span>
+          <button onClick={() => zoomAt(containerRef.current!.clientWidth / 2, containerRef.current!.clientHeight / 2, 1.25)} title="Zoom in (⌘=)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+            <PlusIcon />
+          </button>
+          <button onClick={fit} title="Fit to window (⌘0)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+            <FitIcon />
+          </button>
         </div>
         <div className="flex items-center gap-1.5">
           {status && <span className="rise mr-2 text-[11px] text-ok">{status}</span>}
-          <button
-            onClick={() => void onCopyMarkdown()}
-            disabled={badges.length === 0}
-            className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-40"
-            title="GitHub-ready issue list"
-          >
+          <button onClick={() => void onCopyMarkdown()} disabled={badges.length === 0} className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-40">
             Markdown
           </button>
-          <button
-            onClick={() => void onCopyJira()}
-            disabled={badges.length === 0}
-            className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-40"
-            title="Jira wiki markup"
-          >
+          <button onClick={() => void onCopyJira()} disabled={badges.length === 0} className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-40">
             Jira
+          </button>
+          <button onClick={() => void onReport()} className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted" title="One-page finding sheet: annotated image + issue table">
+            Report
           </button>
           <button onClick={() => void onCopy()} className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted">
             Copy PNG
           </button>
-          <button
-            onClick={() => void onSave()}
-            className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90"
-          >
+          <button onClick={() => void onSave()} className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90">
             Save…
           </button>
         </div>
       </header>
 
       <div className="flex min-h-0 flex-1">
-        <main className="relative flex min-w-0 flex-1 items-center justify-center overflow-auto p-4">
-          <div className="relative">
-            <canvas
-              ref={canvasRef}
-              onMouseDown={onMouseDown}
-              onMouseMove={onMouseMove}
-              onMouseUp={onMouseUp}
-              onDoubleClick={onDoubleClick}
-              className="max-h-[calc(100vh-120px)] max-w-full rounded-lg border border-border shadow-xl"
-              style={{ cursor: tool === "select" ? "default" : "crosshair" }}
-            />
-            {textEntry && (
-              <input
-                autoFocus
-                value={textEntry.value}
-                onChange={(e) => setTextEntry({ ...textEntry, value: e.target.value })}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && textEntry.value.trim()) {
-                    const value = textEntry.value.trim();
-                    if (textEntry.editId !== undefined) {
-                      const editId = textEntry.editId;
-                      commit((prev) => prev.map((s) => (s.id === editId ? { ...s, text: value } : s)));
-                    } else {
-                      const canvas = canvasRef.current!;
-                      const rect = canvas.getBoundingClientRect();
-                      const shape: Shape = {
-                        id: nextId++,
-                        kind: "text",
-                        x1: (textEntry.x / rect.width) * canvas.width,
-                        y1: (textEntry.y / rect.height) * canvas.height,
-                        x2: 0,
-                        y2: 0,
-                        color,
-                        text: value,
-                      };
-                      commit((prev) => [...prev, shape]);
-                    }
-                    setTextEntry(null);
+        <main
+          ref={containerRef}
+          className="relative min-w-0 flex-1 overflow-hidden"
+          style={{ cursor: spaceRef.current ? "grab" : tool === "select" ? "default" : "crosshair" }}
+        >
+          <canvas
+            ref={canvasRef}
+            className="absolute inset-0 h-full w-full"
+            onMouseDown={onMouseDown}
+            onMouseMove={onMouseMove}
+            onMouseUp={onMouseUp}
+            onMouseLeave={() => setMouseDoc(null)}
+            onDoubleClick={onDoubleClick}
+          />
+          {shapes.length === 0 && !draft && (
+            <div className="fade pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-card/90 px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur">
+              Press <kbd className="font-mono">I</kbd> and click to drop issue #1 · scroll to pan · pinch or ⌘scroll to zoom
+            </div>
+          )}
+          {tool === "probe" && (
+            <div className="fade pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-card/90 px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur">
+              {probeFirst ? "Click the second color — ratio attaches to the selected issue" : "Click the first color to probe contrast in this capture"}
+            </div>
+          )}
+          {textEntry && (
+            <input
+              autoFocus
+              value={textEntry.value}
+              onChange={(e) => setTextEntry({ ...textEntry, value: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && textEntry.value.trim()) {
+                  const value = textEntry.value.trim();
+                  if (textEntry.editId !== undefined) {
+                    const editId = textEntry.editId;
+                    commit((prev) => prev.map((s) => (s.id === editId ? { ...s, text: value } : s)));
+                  } else {
+                    const shape: Shape = {
+                      id: nextIdRef.current++,
+                      kind: "text",
+                      x1: textEntry.docX,
+                      y1: textEntry.docY,
+                      x2: 0,
+                      y2: 0,
+                      color,
+                      text: value,
+                    };
+                    commit((prev) => [...prev, shape]);
                   }
-                  if (e.key === "Escape") setTextEntry(null);
-                }}
-                onBlur={() => setTextEntry(null)}
-                placeholder="Type, then Enter"
-                className="absolute z-10 rounded-md border border-primary bg-card px-2 py-1 text-sm outline-none"
-                style={{ left: textEntry.x, top: textEntry.y }}
-              />
-            )}
-          </div>
+                  setTextEntry(null);
+                }
+                if (e.key === "Escape") setTextEntry(null);
+              }}
+              onBlur={() => setTextEntry(null)}
+              placeholder="Type, then Enter"
+              className="absolute z-10 rounded-md border border-primary bg-card px-2 py-1 text-sm outline-none"
+              style={textEntryStyle}
+            />
+          )}
         </main>
 
         {badges.length > 0 && (
@@ -625,29 +758,36 @@ export default function AnnotateWindow() {
               Issues ({badges.length})
             </h2>
             {badges.map((b, i) => {
-              const type = ISSUE_TYPES.find((t) => t.id === b.issueType);
+              const type = issueTypeOf(b);
               return (
                 <div
                   key={b.id}
-                  className={`rise mb-2 rounded-lg border p-2 ${
-                    selectedId === b.id ? "border-primary" : "border-border"
-                  }`}
+                  className={`rise mb-2 rounded-lg border p-2 ${selectedId === b.id ? "border-primary" : "border-border"}`}
                   onClick={() => setSelectedId(b.id)}
+                  onMouseEnter={() => setHoverId(b.id)}
+                  onMouseLeave={() => setHoverId(null)}
                 >
                   <div className="mb-1.5 flex items-center gap-2">
                     <span
-                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
-                      style={{ backgroundColor: b.color, color: isLight(b.color) ? "#0F172A" : "#FFF" }}
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
+                      style={{ backgroundColor: badgeColor(b) }}
                     >
                       {i + 1}
                     </span>
                     <select
                       value={b.issueType}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const nextType = e.target.value as IssueId;
                         setShapes((prev) =>
-                          prev.map((s) => (s.id === b.id ? { ...s, issueType: e.target.value as IssueId } : s)),
-                        )
-                      }
+                          prev.map((s) => {
+                            if (s.id !== b.id) return s;
+                            const oldTemplate = issueTypeOf(s).template;
+                            const newTemplate = ISSUE_TYPES.find((t) => t.id === nextType)?.template ?? "";
+                            const note = !s.note?.trim() || s.note === oldTemplate ? newTemplate : s.note;
+                            return { ...s, issueType: nextType, note };
+                          }),
+                        );
+                      }}
                       className="min-w-0 flex-1 rounded-md border border-border bg-card-2/70 px-1.5 py-1 text-xs outline-none"
                     >
                       {ISSUE_TYPES.map((t) => (
@@ -664,9 +804,8 @@ export default function AnnotateWindow() {
                           prev.map((s) => (s.id === b.id ? { ...s, severity: e.target.value as Severity } : s)),
                         )
                       }
-                      className={`rounded-md border border-border bg-card-2/70 px-1 py-1 text-[11px] outline-none ${
-                        b.severity === "blocker" ? "text-coral" : b.severity === "minor" ? "text-muted-foreground" : ""
-                      }`}
+                      className="rounded-md border border-border bg-card-2/70 px-1 py-1 text-[11px] outline-none"
+                      style={{ color: SEVERITY_COLORS[b.severity ?? "major"] }}
                     >
                       {SEVERITIES.map((s) => (
                         <option key={s} value={s}>
@@ -675,9 +814,7 @@ export default function AnnotateWindow() {
                       ))}
                     </select>
                   </div>
-                  {type?.sc && (
-                    <p className="mb-1 text-[10px] text-muted-foreground">WCAG {type.sc} — {type.label}</p>
-                  )}
+                  {type.sc && <p className="mb-1 text-[10px] text-muted-foreground">WCAG {type.sc} — {type.label}</p>}
                   <textarea
                     value={b.note}
                     onChange={(e) =>
@@ -695,29 +832,4 @@ export default function AnnotateWindow() {
       </div>
     </div>
   );
-}
-
-/** Resize handle positions for a shape (none for badges and text). */
-function handlesFor(s: Shape): { key: string; x: number; y: number }[] {
-  if (s.kind === "badge" || s.kind === "text") return [];
-  if (s.kind === "arrow") {
-    return [
-      { key: "start", x: s.x1, y: s.y1 },
-      { key: "end", x: s.x2, y: s.y2 },
-    ];
-  }
-  return [
-    { key: "p11", x: s.x1, y: s.y1 },
-    { key: "p22", x: s.x2, y: s.y2 },
-    { key: "p12", x: s.x1, y: s.y2 },
-    { key: "p21", x: s.x2, y: s.y1 },
-  ];
-}
-
-function isLight(hex: string): boolean {
-  const n = parseInt(hex.replace("#", ""), 16);
-  const r = (n >> 16) & 0xff;
-  const g = (n >> 8) & 0xff;
-  const b = n & 0xff;
-  return 0.299 * r + 0.587 * g + 0.114 * b > 150;
 }

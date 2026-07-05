@@ -1,5 +1,36 @@
 # Changelog
 
+## v1.4.0 — 2026-07-06
+
+The annotation editor, rebuilt properly.
+
+**Never lose work**
+- Every capture becomes a document: pixels + annotations saved to the app
+  library, autosaved continuously — close the window, reopen from the new
+  "Captures" card in the main window, keep editing
+- Corrupted or missing docs degrade gracefully to a fresh canvas
+
+**Engine**
+- Editor logic extracted into pure modules (model / geometry / render):
+  precise segment hit-testing for arrows, cached rendering, per-tool logic
+- Zoom & pan viewport: pinch or ⌘scroll to zoom, scroll to pan, ⌘0 fit,
+  ⌘+/⌘−, space-drag; exports always at true pixel size
+
+**Tools**
+- Auto-measure: click any element — flood-fill detects its bounds and
+  drops a measured box with the 2.5.8 verdict (drag still works)
+- Contrast probe (P): click two pixels in the capture for a ratio pill
+  with AA verdict; attaches as evidence to the selected issue's note
+- Solid redaction is now the default (pixelation can be reversed on text;
+  it remains available as a style)
+- Issue badges are colored by severity (blocker red / major amber / minor
+  gray) — triage readable at a glance, palette stays for drawing tools
+- Issue templates: choosing a criterion pre-fills an editable finding note
+- Shift constrains arrows to 45° and boxes to squares; ghost badge number
+  follows the cursor; hovering an issue in the panel highlights its badge
+- "Report" export: one-page finding sheet PNG — annotated image on top,
+  numbered issue table (criterion, severity, note) below
+
 ## v1.3.0 — 2026-07-06
 
 The launch-readiness release.

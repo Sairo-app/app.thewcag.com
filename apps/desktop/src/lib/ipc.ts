@@ -30,6 +30,14 @@ export const ipc = {
   closeOverlay: (reopenMain: boolean) => invoke<void>("close_overlay", { reopenMain }),
   storeAnnotation: (png: Uint8Array) => invoke<void>("store_annotation", png),
   annotationPng: () => invoke<ArrayBuffer>("annotation_png"),
+  annotationMeta: () => invoke<{ id: string }>("annotation_meta"),
+  saveAnnotationDoc: (id: string, json: string) =>
+    invoke<void>("save_annotation_doc", { id, json }),
+  loadAnnotationDoc: (id: string) => invoke<string | null>("load_annotation_doc", { id }),
+  listAnnotationDocs: () =>
+    invoke<{ id: string; modified_ms: number; issues: number }[]>("list_annotation_docs"),
+  openAnnotation: (id: string) => invoke<void>("open_annotation", { id }),
+  deleteAnnotation: (id: string) => invoke<void>("delete_annotation", { id }),
   toggleLens: () => invoke<void>("toggle_lens"),
   lensFrame: () => invoke<ArrayBuffer>("lens_frame"),
   copyPng: (png: Uint8Array) => invoke<void>("copy_png", png),

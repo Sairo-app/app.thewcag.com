@@ -13,5 +13,6 @@ pub struct OverlayPayload {
 pub struct AppState {
     /// one frozen frame per overlay window, keyed by window label
     pub overlays: Mutex<HashMap<String, OverlayPayload>>,
-    pub annotation: Mutex<Option<Vec<u8>>>,
+    /// (capture id, png) for the annotate window currently opening
+    pub annotation: Mutex<Option<(String, Vec<u8>)>>,
 }

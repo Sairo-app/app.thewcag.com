@@ -154,6 +154,36 @@ export const FolderIcon = (p: { size?: number }) => (
   </Icon>
 );
 
+export const PipetteIcon = (p: { size?: number }) => (
+  <Icon {...p}>
+    <path d="m2 22 1-1h3l9-9" />
+    <path d="M3 21v-3l9-9" />
+    <path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.9.9a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l-.1-.1Z" />
+  </Icon>
+);
+
+export const PlusIcon = (p: { size?: number }) => (
+  <Icon {...p}>
+    <path d="M5 12h14" />
+    <path d="M12 5v14" />
+  </Icon>
+);
+
+export const MinusIcon = (p: { size?: number }) => (
+  <Icon {...p}>
+    <path d="M5 12h14" />
+  </Icon>
+);
+
+export const FitIcon = (p: { size?: number }) => (
+  <Icon {...p}>
+    <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+    <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
+    <path d="M3 16v3a2 2 0 0 0 2 2h3" />
+    <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+  </Icon>
+);
+
 export const TimerIcon = (p: { size?: number }) => (
   <Icon {...p}>
     <path d="M10 2h4" />

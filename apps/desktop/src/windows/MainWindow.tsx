@@ -298,6 +298,8 @@ export default function MainWindow() {
         </section>
       )}
 
+      <CapturesCard />
+
       {log.length > 0 && <SessionLogCard log={log} onClear={() => {
         setLog([]);
         localStorage.removeItem(LOG_KEY);
@@ -337,7 +339,7 @@ export default function MainWindow() {
           />
           Launch at login
         </label>
-        <span className="text-[10px] text-muted-foreground">v1.3.0</span>
+        <span className="text-[10px] text-muted-foreground">v1.4.0</span>
       </footer>
 
       {onboarding && (
@@ -352,6 +354,53 @@ export default function MainWindow() {
         />
       )}
     </div>
+  );
+}
+
+function CapturesCard() {
+  const [docs, setDocs] = useState<{ id: string; modified_ms: number; issues: number }[]>([]);
+
+  const refresh = () => void ipc.listAnnotationDocs().then(setDocs).catch(() => {});
+  useEffect(() => {
+    refresh();
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, []);
+
+  if (docs.length === 0) return null;
+  return (
+    <section className="card mb-3 p-3">
+      <h2 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        Captures — click to re-edit
+      </h2>
+      <div className="max-h-36 space-y-1 overflow-y-auto">
+        {docs.slice(0, 8).map((d) => (
+          <div key={d.id} className="group flex items-center justify-between rounded-md px-1.5 py-1 hover:bg-muted">
+            <button
+              onClick={() => void ipc.openAnnotation(d.id)}
+              className="min-w-0 flex-1 text-left text-xs"
+              title="Reopen in the annotation editor"
+            >
+              {new Date(d.modified_ms).toLocaleString([], {
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+              <span className="ml-2 text-[10px] text-muted-foreground">
+                {d.issues} issue{d.issues === 1 ? "" : "s"}
+              </span>
+            </button>
+            <button
+              onClick={() => void ipc.deleteAnnotation(d.id).then(refresh)}
+              className="text-[10px] text-muted-foreground opacity-0 hover:text-coral group-hover:opacity-100"
+            >
+              Delete
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
