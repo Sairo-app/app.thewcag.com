@@ -5,11 +5,14 @@ import { ipc, type OverlayMeta, type PickedColor } from "../lib/ipc";
 
 const LOUPE = { cells: 13, zoom: 14 }; // 13x13 physical pixels at 14x
 const LOUPE_SIZE = LOUPE.cells * LOUPE.zoom;
+const ARM_MS = 250; // ignore clicks right after open (launch click bleed)
 
 /**
  * Fullscreen frozen-frame overlay. Two jobs:
- *  - pick modes ("pair" | "fg" | "bg"): magnified loupe, click to pick
- *  - "shot": drag to select a region, opens the annotation editor
+ *  - pick modes ("pair" | "fg" | "bg"): magnified loupe, click / Enter picks;
+ *    in pair mode, dragging during the background step samples the region's
+ *    WORST-case pixel (gradients, images)
+ *  - "shot": drag to select a region (Space = full screen) → annotation editor
  */
 export default function OverlayWindow() {
   const [meta, setMeta] = useState<OverlayMeta | null>(null);
@@ -19,9 +22,13 @@ export default function OverlayWindow() {
   const [mouse, setMouse] = useState<{ x: number; y: number } | null>(null);
   const [firstPick, setFirstPick] = useState<PickedColor | null>(null);
   const [drag, setDrag] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const [edgy, setEdgy] = useState(false);
   const loupeRef = useRef<HTMLCanvasElement | null>(null);
+  const armedAtRef = useRef(0);
+  const doneRef = useRef(false);
 
   useEffect(() => {
+    armedAtRef.current = performance.now() + ARM_MS;
     let revoke: string | null = null;
     void (async () => {
       const [m, buf] = await Promise.all([ipc.overlayMeta(), ipc.overlayPng()]);
@@ -39,6 +46,8 @@ export default function OverlayWindow() {
         imgCanvasRef.current = canvas;
         imgDataRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
         setImageUrl(url);
+        // loupe is visible immediately, even before the mouse moves
+        setMouse((m0) => m0 ?? { x: window.innerWidth / 2, y: window.innerHeight / 2 });
       };
       img.src = url;
     })().catch(() => void ipc.closeOverlay(false));
@@ -48,8 +57,56 @@ export default function OverlayWindow() {
     };
   }, []);
 
-  // Keyboard: Esc cancel · arrows nudge by 1 physical px (⇧ = 10) ·
-  // Enter/Space pick (or full-screen capture in shot mode) · C copy hex.
+  function armed(): boolean {
+    return performance.now() >= armedAtRef.current && !doneRef.current;
+  }
+
+  function physical(clientX: number, clientY: number) {
+    const scale = meta?.scale ?? 1;
+    const data = imgDataRef.current;
+    if (!data) return null;
+    const px = Math.min(Math.max(Math.round(clientX * scale), 0), data.width - 1);
+    const py = Math.min(Math.max(Math.round(clientY * scale), 0), data.height - 1);
+    return { px, py };
+  }
+
+  function colorAt(px: number, py: number): PickedColor {
+    const data = imgDataRef.current!;
+    const i = (py * data.width + px) * 4;
+    const [r, g, b] = [data.data[i], data.data[i + 1], data.data[i + 2]];
+    const hex = `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`.toUpperCase();
+    return { hex, r, g, b, x: px, y: py };
+  }
+
+  /** Worst-contrast pixel of a physical-pixel region vs `against`. */
+  function worstInRegion(
+    ax: number,
+    ay: number,
+    bx: number,
+    by: number,
+    against: Rgb,
+  ): { color: PickedColor; ratio: number } {
+    const data = imgDataRef.current!;
+    let worst: PickedColor | null = null;
+    let worstRatio = Infinity;
+    const stepX = Math.max(1, Math.floor((bx - ax) / 400));
+    const stepY = Math.max(1, Math.floor((by - ay) / 400));
+    for (let y = ay; y <= by; y += stepY) {
+      for (let x = ax; x <= bx; x += stepX) {
+        const i = (y * data.width + x) * 4;
+        const c = { r: data.data[i], g: data.data[i + 1], b: data.data[i + 2] };
+        const ratio = contrastRatio(against, c);
+        if (ratio < worstRatio) {
+          worstRatio = ratio;
+          worst = colorAt(x, y);
+        }
+      }
+    }
+    return { color: worst!, ratio: worstRatio };
+  }
+
+  // Keyboard: Esc cancel · arrows nudge one physical px (⇧ = 10) ·
+  // Enter/Space pick or full-screen capture · C copy hex.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -93,24 +150,7 @@ export default function OverlayWindow() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meta, mouse, firstPick]);
 
-  function physical(clientX: number, clientY: number) {
-    const scale = meta?.scale ?? 1;
-    const data = imgDataRef.current;
-    if (!data) return null;
-    const px = Math.min(Math.max(Math.round(clientX * scale), 0), data.width - 1);
-    const py = Math.min(Math.max(Math.round(clientY * scale), 0), data.height - 1);
-    return { px, py };
-  }
-
-  function colorAt(px: number, py: number): PickedColor {
-    const data = imgDataRef.current!;
-    const i = (py * data.width + px) * 4;
-    const [r, g, b] = [data.data[i], data.data[i + 1], data.data[i + 2]];
-    const hex = `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`.toUpperCase();
-    return { hex, r, g, b, x: px, y: py };
-  }
-
-  // Loupe rendering
+  // Loupe rendering + anti-aliased-edge heuristic
   useEffect(() => {
     if (!mouse || !meta || meta.mode === "shot") return;
     const loc = physical(mouse.x, mouse.y);
@@ -121,18 +161,7 @@ export default function OverlayWindow() {
     ctx.imageSmoothingEnabled = false;
     const half = Math.floor(LOUPE.cells / 2);
     ctx.clearRect(0, 0, LOUPE_SIZE, LOUPE_SIZE);
-    ctx.drawImage(
-      src,
-      loc.px - half,
-      loc.py - half,
-      LOUPE.cells,
-      LOUPE.cells,
-      0,
-      0,
-      LOUPE_SIZE,
-      LOUPE_SIZE,
-    );
-    // pixel grid
+    ctx.drawImage(src, loc.px - half, loc.py - half, LOUPE.cells, LOUPE.cells, 0, 0, LOUPE_SIZE, LOUPE_SIZE);
     ctx.strokeStyle = "rgba(0,0,0,0.15)";
     ctx.lineWidth = 1;
     for (let i = 1; i < LOUPE.cells; i++) {
@@ -145,42 +174,81 @@ export default function OverlayWindow() {
       ctx.lineTo(LOUPE_SIZE, i * LOUPE.zoom + 0.5);
       ctx.stroke();
     }
-    // center pixel
     ctx.strokeStyle = "#fff";
     ctx.lineWidth = 2;
     ctx.strokeRect(half * LOUPE.zoom - 1, half * LOUPE.zoom - 1, LOUPE.zoom + 2, LOUPE.zoom + 2);
     ctx.strokeStyle = "#000";
     ctx.lineWidth = 1;
     ctx.strokeRect(half * LOUPE.zoom - 2, half * LOUPE.zoom - 2, LOUPE.zoom + 4, LOUPE.zoom + 4);
+
+    // AA-edge heuristic: the center pixel sits between two contrasting
+    // neighbors — a blended edge, not the ink color.
+    const data = imgDataRef.current!;
+    const luma = (x: number, y: number) => {
+      const i = (Math.min(Math.max(y, 0), data.height - 1) * data.width + Math.min(Math.max(x, 0), data.width - 1)) * 4;
+      return 0.299 * data.data[i] + 0.587 * data.data[i + 1] + 0.114 * data.data[i + 2];
+    };
+    const c = luma(loc.px, loc.py);
+    let lo = 255;
+    let hi = 0;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const v = luma(loc.px + dx, loc.py + dy);
+        lo = Math.min(lo, v);
+        hi = Math.max(hi, v);
+      }
+    }
+    setEdgy(hi - lo > 70 && c - lo > 18 && hi - c > 18);
   }, [mouse, meta]);
 
   async function pickAt(clientX: number, clientY: number) {
-    if (!meta) return;
+    if (!meta || !armed()) return;
     const loc = physical(clientX, clientY);
     if (!loc) return;
     const color = colorAt(loc.px, loc.py);
     if (meta.mode === "fg" || meta.mode === "bg") {
+      doneRef.current = true;
       await emit("overlay-picked", { mode: meta.mode, colors: [color] });
       await ipc.closeOverlay(true);
     } else if (meta.mode === "pair") {
       if (!firstPick) {
         setFirstPick(color);
       } else {
+        doneRef.current = true;
         await emit("overlay-picked", { mode: "pair", colors: [firstPick, color] });
         await ipc.closeOverlay(true);
       }
     }
   }
 
+  async function finishBgRegion() {
+    if (!drag || !meta || !firstPick || !armed()) return;
+    const a = physical(Math.min(drag.x1, drag.x2), Math.min(drag.y1, drag.y2));
+    const b = physical(Math.max(drag.x1, drag.x2), Math.max(drag.y1, drag.y2));
+    setDrag(null);
+    if (!a || !b) return;
+    if (b.px - a.px < 6 && b.py - a.py < 6) {
+      // treat as a plain click
+      void pickAt(drag.x2, drag.y2);
+      return;
+    }
+    const fgRgb: Rgb = { r: firstPick.r, g: firstPick.g, b: firstPick.b };
+    const { color } = worstInRegion(a.px, a.py, b.px, b.py, fgRgb);
+    doneRef.current = true;
+    await emit("overlay-picked", { mode: "pair", colors: [firstPick, color], worst: true });
+    await ipc.closeOverlay(true);
+  }
+
   async function captureFull() {
     const src = imgCanvasRef.current;
-    if (!src) return;
+    if (!src || doneRef.current) return;
+    doneRef.current = true;
     const blob: Blob = await new Promise((resolve) => src.toBlob((x) => resolve(x!), "image/png"));
     await ipc.storeAnnotation(new Uint8Array(await blob.arrayBuffer()));
   }
 
-  async function finishRegion() {
-    if (!drag || !meta) return;
+  async function finishShotRegion() {
+    if (!drag || !meta || !armed()) return;
     const a = physical(Math.min(drag.x1, drag.x2), Math.min(drag.y1, drag.y2));
     const b = physical(Math.max(drag.x1, drag.x2), Math.max(drag.y1, drag.y2));
     if (!a || !b || b.px - a.px < 8 || b.py - a.py < 8) {
@@ -192,11 +260,13 @@ export default function OverlayWindow() {
     crop.width = b.px - a.px;
     crop.height = b.py - a.py;
     crop.getContext("2d")!.drawImage(src, a.px, a.py, crop.width, crop.height, 0, 0, crop.width, crop.height);
+    doneRef.current = true;
     const blob: Blob = await new Promise((resolve) => crop.toBlob((x) => resolve(x!), "image/png"));
     await ipc.storeAnnotation(new Uint8Array(await blob.arrayBuffer()));
   }
 
   const isShot = meta?.mode === "shot";
+  const canRegionBg = meta?.mode === "pair" && firstPick !== null;
   const currentColor =
     mouse && !isShot && imgDataRef.current
       ? (() => {
@@ -208,12 +278,11 @@ export default function OverlayWindow() {
   const liveRatio =
     firstPick && currentColor
       ? contrastRatio(
-          { r: firstPick.r, g: firstPick.g, b: firstPick.b } as Rgb,
-          { r: currentColor.r, g: currentColor.g, b: currentColor.b } as Rgb,
+          { r: firstPick.r, g: firstPick.g, b: firstPick.b },
+          { r: currentColor.r, g: currentColor.g, b: currentColor.b },
         )
       : null;
 
-  // loupe placement: flip when near edges
   const loupeStyle = (() => {
     if (!mouse) return { display: "none" } as React.CSSProperties;
     const pad = 24;
@@ -240,13 +309,17 @@ export default function OverlayWindow() {
         if (drag) setDrag({ ...drag, x2: e.clientX, y2: e.clientY });
       }}
       onMouseDown={(e) => {
-        if (isShot) setDrag({ x1: e.clientX, y1: e.clientY, x2: e.clientX, y2: e.clientY });
+        if (!armed()) return;
+        if (isShot || canRegionBg) {
+          setDrag({ x1: e.clientX, y1: e.clientY, x2: e.clientX, y2: e.clientY });
+        }
       }}
       onMouseUp={() => {
-        if (isShot) void finishRegion();
+        if (isShot) void finishShotRegion();
+        else if (canRegionBg && drag) void finishBgRegion();
       }}
       onClick={(e) => {
-        if (!isShot) void pickAt(e.clientX, e.clientY);
+        if (!isShot && !canRegionBg) void pickAt(e.clientX, e.clientY);
       }}
     >
       {imageUrl && (
@@ -258,28 +331,31 @@ export default function OverlayWindow() {
         />
       )}
 
-      {/* dim mask for region select */}
-      {isShot && (
+      {(isShot || (canRegionBg && drag)) && (
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute inset-0 bg-black/40" />
-          {sel && (
+          {isShot && <div className="absolute inset-0 bg-black/40" />}
+          {sel && (sel.width > 2 || sel.height > 2) && (
             <div
-              className="absolute border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.4)]"
-              style={{ ...sel, backgroundColor: "transparent" }}
+              className={`absolute border-2 border-white ${
+                isShot ? "shadow-[0_0_0_9999px_rgba(0,0,0,0.4)]" : "border-dashed"
+              }`}
+              style={sel}
             >
-              <span className="absolute -top-6 left-0 rounded bg-black/80 px-1.5 py-0.5 font-mono text-[10px] text-white">
-                {Math.round((sel.width ?? 0) * (meta?.scale ?? 1))} ×{" "}
-                {Math.round((sel.height ?? 0) * (meta?.scale ?? 1))}
+              <span className="absolute -top-6 left-0 rounded-md bg-black/80 px-1.5 py-0.5 font-mono text-[10px] text-white">
+                {isShot
+                  ? `${Math.round((sel.width ?? 0) * (meta?.scale ?? 1))} × ${Math.round(
+                      (sel.height ?? 0) * (meta?.scale ?? 1),
+                    )}`
+                  : "sampling worst-case pixel"}
               </span>
             </div>
           )}
         </div>
       )}
 
-      {/* loupe */}
       {!isShot && mouse && (
         <div
-          className="pointer-events-none absolute z-10 overflow-hidden rounded-xl border border-white/70 bg-black/80 shadow-2xl"
+          className="fade pointer-events-none absolute z-10 overflow-hidden rounded-xl border border-white/70 bg-black/80 shadow-2xl"
           style={loupeStyle}
         >
           <canvas ref={loupeRef} width={LOUPE_SIZE} height={LOUPE_SIZE} />
@@ -293,6 +369,11 @@ export default function OverlayWindow() {
                   />
                   <span className="font-mono text-[11px] text-white">{currentColor.hex}</span>
                 </span>
+                {edgy && !liveRatio && (
+                  <span className="rounded bg-amber-500/90 px-1 py-px text-[9px] font-semibold text-black">
+                    edge — nudge ←→
+                  </span>
+                )}
                 {liveRatio !== null && (
                   <span className="flex items-center gap-1">
                     <span className="font-mono text-[11px] text-white/80">
@@ -317,28 +398,23 @@ export default function OverlayWindow() {
         </div>
       )}
 
-      {/* first pick marker */}
-      {firstPick && mouse && (
-        <div
-          className="pointer-events-none absolute z-10 flex items-center gap-1.5 rounded-full bg-black/80 px-2 py-1"
-          style={{ left: 16, top: 16 }}
-        >
+      {firstPick && (
+        <div className="fade pointer-events-none absolute z-10 flex items-center gap-1.5 rounded-full bg-black/80 px-2 py-1" style={{ left: 16, top: 16 }}>
           <span
             className="h-3.5 w-3.5 rounded-full border border-white/50"
             style={{ backgroundColor: firstPick.hex }}
           />
           <span className="font-mono text-[11px] text-white">text {firstPick.hex}</span>
-          <span className="text-[11px] text-white/60">— now click the background</span>
+          <span className="text-[11px] text-white/60">— click bg, or drag a region for worst-case</span>
         </div>
       )}
 
-      {/* instruction pill */}
-      <div className="pointer-events-none absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-full bg-black/80 px-3 py-1.5 text-[11px] text-white/90 shadow-lg">
+      <div className="fade pointer-events-none absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-full bg-black/80 px-3 py-1.5 text-[11px] text-white/90 shadow-lg">
         {isShot
           ? "Drag to capture a region · Space for full screen · Esc to cancel"
           : meta?.mode === "pair"
             ? firstPick
-              ? "Click the background color · arrows nudge · C copies hex · Esc cancels"
+              ? "Click the background — or drag across gradients/images for the worst-case pixel"
               : "Click the text color · arrows nudge · C copies hex · Esc cancels"
             : `Click to pick the ${meta?.mode === "bg" ? "background" : "text"} color · arrows nudge · C copies hex · Esc cancels`}
       </div>

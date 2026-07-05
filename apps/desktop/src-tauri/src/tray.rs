@@ -34,6 +34,10 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         true,
         None::<&str>,
     )?;
+    let pick_delayed =
+        MenuItem::with_id(app, "pick3", "Check Contrast in 3s (hover states)", true, None::<&str>)?;
+    let shot_delayed =
+        MenuItem::with_id(app, "shot3", "Capture in 3s (hover states)", true, None::<&str>)?;
     let full = MenuItem::with_id(app, "full", "Capture Full Screen", true, None::<&str>)?;
     let show = MenuItem::with_id(app, "show", "Open Accessibility.build", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
@@ -44,6 +48,9 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             &pick,
             &shot,
             &lens_item,
+            &PredefinedMenuItem::separator(app)?,
+            &pick_delayed,
+            &shot_delayed,
             &full,
             &PredefinedMenuItem::separator(app)?,
             &show,
@@ -72,6 +79,8 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id.as_ref() {
             "pick" => overlay::begin(app, "pair"),
             "shot" => overlay::begin(app, "shot"),
+            "pick3" => overlay::begin_delayed(app, "pair", 3000),
+            "shot3" => overlay::begin_delayed(app, "shot", 3000),
             "lens" => lens::toggle(app),
             "full" => actions::full_screenshot(app),
             "show" => actions::show_main(app),

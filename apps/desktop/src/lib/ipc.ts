@@ -22,7 +22,8 @@ export const ipc = {
   requestScreenPermission: () => invoke<boolean>("request_screen_permission"),
   openScreenRecordingSettings: () => invoke<void>("open_screen_recording_settings"),
   captureFullscreen: () => invoke<string>("capture_fullscreen"),
-  beginOverlay: (mode: OverlayMode) => invoke<void>("begin_overlay", { mode }),
+  beginOverlay: (mode: OverlayMode, delayMs?: number) =>
+    invoke<void>("begin_overlay", { mode, delayMs }),
   overlayMeta: () => invoke<OverlayMeta>("overlay_meta"),
   overlayPng: () => invoke<ArrayBuffer>("overlay_png"),
   closeOverlay: (reopenMain: boolean) => invoke<void>("close_overlay", { reopenMain }),
@@ -89,6 +90,8 @@ export function displayShortcut(shortcut: string): string {
 export interface PickedPair {
   mode: OverlayMode;
   colors: PickedColor[];
+  /** background is the worst-case pixel sampled from a dragged region */
+  worst?: boolean;
 }
 
 export const events = {

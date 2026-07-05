@@ -4,14 +4,30 @@ import {
   apcaRating,
   hexToRgb,
   rgbToHex,
+  simulateRgb,
   suggestAccessible,
   wcagVerdict,
+  type ColorblindType,
   type Rgb,
 } from "@accessibility-build/a11y-core";
 import { displayShortcut, events, ipc, type Shortcuts } from "../lib/ipc";
 
 const SITE = "https://accessibility.build";
 const HISTORY_KEY = "contrast-history-v1";
+
+type TextMode = "normal" | "large" | "ui";
+const TEXT_MODES: { key: TextMode; label: string; target: number; sc: string; aaa: number | null }[] = [
+  { key: "normal", label: "Normal text", target: 4.5, sc: "1.4.3", aaa: 7 },
+  { key: "large", label: "Large text", target: 3, sc: "1.4.3", aaa: 4.5 },
+  { key: "ui", label: "UI / graphics", target: 3, sc: "1.4.11", aaa: null },
+];
+
+const CVD: { key: ColorblindType; label: string }[] = [
+  { key: "protanopia", label: "Protan" },
+  { key: "deuteranopia", label: "Deutan" },
+  { key: "tritanopia", label: "Tritan" },
+  { key: "achromatopsia", label: "Mono" },
+];
 
 interface Pair {
   fg: string;
@@ -30,6 +46,7 @@ export default function MainWindow() {
   const [permission, setPermission] = useState<boolean | null>(null);
   const [fg, setFg] = useState("#1E293B");
   const [bg, setBg] = useState("#FFFFFF");
+  const [worst, setWorst] = useState(false);
   const [history, setHistory] = useState<Pair[]>(loadHistory);
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +60,7 @@ export default function MainWindow() {
     const unlisteners = [
       events.onPicked((p) => {
         setError(null);
+        setWorst(Boolean(p.worst));
         if (p.mode === "pair" && p.colors.length === 2) {
           applyPair(p.colors[0].hex, p.colors[1].hex);
         } else if (p.mode === "fg" && p.colors.length === 1) {
@@ -98,23 +116,24 @@ export default function MainWindow() {
   const bgRgb = hexToRgb(bg);
 
   return (
-    <div className="app-bg min-h-screen px-5 pb-5 pt-6 font-sans text-foreground">
-      <header className="mb-4 flex items-center justify-between">
+    <div className="app-bg min-h-screen px-5 pb-5 font-sans text-[13px] text-foreground">
+      {/* titlebar overlay: draggable strip under the traffic lights */}
+      <header data-tauri-drag-region className="flex items-center justify-between pb-3 pt-9">
         <button
           onClick={() => void ipc.openSite(SITE)}
           className="text-left"
           title="Open accessibility.build"
         >
-          <h1 className="text-lg font-bold tracking-tight">
+          <h1 className="text-[17px] font-bold tracking-tight">
             Accessibility<span className="text-primary">.build</span>
           </h1>
-          <p className="text-xs text-muted-foreground">Instant checks, anywhere on screen</p>
+          <p className="text-[11px] text-muted-foreground">Instant checks, anywhere on screen</p>
         </button>
         <PermissionDot granted={permission} />
       </header>
 
       {error && (
-        <div className="rise mb-3 rounded-lg border border-coral/40 bg-coral/10 px-3 py-2 text-xs text-coral">
+        <div className="rise mb-3 rounded-xl border border-coral/40 bg-coral/10 px-3 py-2 text-xs text-coral">
           {error}
         </div>
       )}
@@ -132,13 +151,21 @@ export default function MainWindow() {
           bg={bg}
           fgRgb={fgRgb}
           bgRgb={bgRgb}
-          onFg={setFg}
-          onBg={setBg}
+          worst={worst}
+          onFg={(v) => {
+            setFg(v);
+            setWorst(false);
+          }}
+          onBg={(v) => {
+            setBg(v);
+            setWorst(false);
+          }}
           onSwap={() => {
             setFg(bg);
             setBg(fg);
           }}
           onApply={applyPair}
+          onError={setError}
         />
       )}
 
@@ -148,12 +175,14 @@ export default function MainWindow() {
           hotkey={shortcuts ? displayShortcut(shortcuts.pick) : ""}
           hint="fg + bg from screen"
           onClick={() => void ipc.beginOverlay("pair")}
+          onDelayed={() => void ipc.beginOverlay("pair", 3000)}
         />
         <ToolCard
           title="Capture"
           hotkey={shortcuts ? displayShortcut(shortcuts.shot) : ""}
           hint="region + annotate"
           onClick={() => void ipc.beginOverlay("shot")}
+          onDelayed={() => void ipc.beginOverlay("shot", 3000)}
         />
         <ToolCard
           title="Lens"
@@ -164,7 +193,7 @@ export default function MainWindow() {
       </section>
 
       {history.length > 0 && (
-        <section className="mb-3 rounded-xl border border-border bg-card p-3">
+        <section className="card mb-3 p-3">
           <div className="mb-2 flex items-center justify-between">
             <h2 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               Recent pairs
@@ -186,8 +215,9 @@ export default function MainWindow() {
                 onClick={() => {
                   setFg(p.fg);
                   setBg(p.bg);
+                  setWorst(false);
                 }}
-                className="rounded-md border border-border px-2 py-1 font-mono text-[10px] transition-transform hover:scale-105"
+                className="rounded-md border border-border px-2 py-1 font-mono text-[10px] hover:-translate-y-px hover:shadow-sm"
                 style={{ color: p.fg, backgroundColor: p.bg }}
                 title={`${p.fg} on ${p.bg}`}
               >
@@ -203,7 +233,7 @@ export default function MainWindow() {
       )}
 
       {screenshot && (
-        <section className="rise mb-3 flex items-center justify-between rounded-xl border border-border bg-card px-3 py-2">
+        <section className="rise card mb-3 flex items-center justify-between px-3 py-2">
           <p className="mr-2 truncate text-xs text-muted-foreground" title={screenshot}>
             Saved: {screenshot.split("/").pop()}
           </p>
@@ -216,20 +246,22 @@ export default function MainWindow() {
         </section>
       )}
 
-      <footer className="flex items-center justify-between border-t border-border pt-3">
-        <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          <input
-            type="checkbox"
-            checked={autostart}
-            onChange={(e) => {
-              setAutostartState(e.target.checked);
-              void ipc.setAutostart(e.target.checked).catch(() => {});
+      <footer className="flex items-center justify-between border-t border-border/70 pt-3">
+        <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+          <button
+            role="switch"
+            aria-checked={autostart}
+            onClick={() => {
+              const next = !autostart;
+              setAutostartState(next);
+              void ipc.setAutostart(next).catch(() => {});
             }}
-            className="accent-[hsl(var(--primary))]"
+            className="switch"
+            data-on={autostart}
           />
           Launch at login
         </label>
-        <span className="text-[10px] text-muted-foreground">v1.1.0</span>
+        <span className="text-[10px] text-muted-foreground">v1.2.0</span>
       </footer>
     </div>
   );
@@ -251,7 +283,7 @@ function ShortcutsCard(props: {
         setRecording(null);
         return;
       }
-      if (/^(Control|Alt|Shift|Meta)/.test(e.code)) return; // wait for the non-modifier
+      if (/^(Control|Alt|Shift|Meta)/.test(e.code)) return;
       const mods = [
         e.ctrlKey && "ctrl",
         e.altKey && "alt",
@@ -285,7 +317,7 @@ function ShortcutsCard(props: {
   ];
 
   return (
-    <section className="mb-3 rounded-xl border border-border bg-card p-3">
+    <section className="card mb-3 p-3">
       <div className="mb-2 flex items-center justify-between">
         <h2 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           Keyboard shortcuts
@@ -307,10 +339,10 @@ function ShortcutsCard(props: {
           <span className="text-xs">{label}</span>
           <button
             onClick={() => setRecording(recording === action ? null : action)}
-            className={`min-w-20 rounded-md border px-2 py-1 font-mono text-[11px] transition-colors ${
+            className={`min-w-20 rounded-md border px-2 py-1 font-mono text-[11px] ${
               recording === action
                 ? "animate-pulse border-primary bg-primary/10 text-primary"
-                : "border-border bg-card-2 hover:border-primary/50"
+                : "border-border bg-card-2/70 hover:border-primary/50"
             }`}
           >
             {recording === action ? "press keys…" : displayShortcut(props.shortcuts[action])}
@@ -363,26 +395,52 @@ function ContrastPanel(props: {
   bg: string;
   fgRgb: Rgb;
   bgRgb: Rgb;
+  worst: boolean;
   onFg: (hex: string) => void;
   onBg: (hex: string) => void;
   onSwap: () => void;
   onApply: (fg: string, bg: string) => void;
+  onError: (message: string | null) => void;
 }) {
   const { fgRgb, bgRgb } = props;
+  const [mode, setMode] = useState<TextMode>("normal");
+  const [copied, setCopied] = useState(false);
+  const modeInfo = TEXT_MODES.find((m) => m.key === mode)!;
   const wcag = wcagVerdict(fgRgb, bgRgb);
   const lc = apcaLc(fgRgb, bgRgb);
   const rating = apcaRating(lc);
+  const passes = wcag.ratio >= modeInfo.target;
+  const passesAAA = modeInfo.aaa !== null && wcag.ratio >= modeInfo.aaa;
+
   const fgFixes = useMemo(
-    () => (wcag.normalAA ? [] : suggestAccessible(fgRgb, bgRgb, 4.5)),
-    [props.fg, props.bg], // eslint-disable-line react-hooks/exhaustive-deps
+    () => (passes ? [] : suggestAccessible(fgRgb, bgRgb, modeInfo.target)),
+    [props.fg, props.bg, mode], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const bgFixes = useMemo(
-    () => (wcag.normalAA ? [] : suggestAccessible(bgRgb, fgRgb, 4.5)),
+    () => (passes ? [] : suggestAccessible(bgRgb, fgRgb, modeInfo.target)),
+    [props.fg, props.bg, mode], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const cvdRows = useMemo(
+    () =>
+      CVD.map(({ key, label }) => {
+        const simFg = simulateRgb(fgRgb, key);
+        const simBg = simulateRgb(bgRgb, key);
+        return { key, label, ratio: wcagVerdict(simFg, simBg).ratio };
+      }),
     [props.fg, props.bg], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
+  async function copyFinding() {
+    const verdict = passes ? "passes" : "fails";
+    const text = `${props.fg} on ${props.bg}${props.worst ? " (worst-case pixel of sampled region)" : ""} — ${wcag.ratio.toFixed(2)}:1 — ${verdict} WCAG ${modeInfo.sc} AA (${modeInfo.label.toLowerCase()}); APCA Lc ${lc.toFixed(1)}`;
+    await ipc.copyText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
   return (
-    <section className="rise mb-3 rounded-xl border border-border bg-card p-4">
+    <section className="rise card mb-3 p-4">
       <div className="mb-3 flex items-center gap-2">
         <Swatch label="Text" hex={props.fg} onChange={props.onFg} pickMode="fg" />
         <button
@@ -399,16 +457,40 @@ function ContrastPanel(props: {
         className="mb-3 rounded-lg border border-border px-4 py-3 text-center"
         style={{ backgroundColor: props.bg, color: props.fg }}
       >
-        <span className="text-lg font-semibold">The quick brown fox</span>
-        <span className="ml-2 text-xs">jumps over the lazy dog</span>
+        <span className={mode === "large" ? "text-2xl font-semibold" : "text-lg font-semibold"}>
+          The quick brown fox
+        </span>
+        {mode !== "large" && <span className="ml-2 text-xs">jumps over the lazy dog</span>}
+      </div>
+
+      <div className="mb-3 flex items-center justify-between">
+        <div className="seg" role="tablist" aria-label="Text size">
+          {TEXT_MODES.map((m) => (
+            <button key={m.key} data-active={mode === m.key} onClick={() => setMode(m.key)}>
+              {m.label}
+            </button>
+          ))}
+        </div>
+        {props.worst && (
+          <span className="rounded-full bg-yellow/15 px-2 py-0.5 text-[9px] font-semibold text-yellow">
+            region worst-case
+          </span>
+        )}
       </div>
 
       <div className="mb-2 flex items-end justify-between">
-        <div>
+        <div className="flex items-baseline gap-2">
           <span className="font-mono text-3xl font-bold tabular-nums">
             {wcag.ratio.toFixed(2)}
           </span>
-          <span className="ml-1 text-sm text-muted-foreground">: 1</span>
+          <span className="text-sm text-muted-foreground">: 1</span>
+          <span
+            className={`rounded-md px-1.5 py-0.5 text-[11px] font-bold ${
+              passes ? "bg-ok/15 text-ok" : "bg-coral/15 text-coral"
+            }`}
+          >
+            {passes ? `AA ✓${passesAAA ? " AAA ✓" : ""}` : `AA ✕ (needs ${modeInfo.target}:1)`}
+          </span>
         </div>
         <div className="text-right">
           <span
@@ -428,18 +510,36 @@ function ContrastPanel(props: {
         </div>
       </div>
 
-      <div className="grid grid-cols-5 gap-1.5">
-        <Verdict label="AA" sub="normal" ok={wcag.normalAA} />
-        <Verdict label="AAA" sub="normal" ok={wcag.normalAAA} />
-        <Verdict label="AA" sub="large" ok={wcag.largeAA} />
-        <Verdict label="AAA" sub="large" ok={wcag.largeAAA} />
-        <Verdict label="AA" sub="UI" ok={wcag.uiAA} />
+      <div className="mb-1 flex items-center justify-between">
+        <div className="flex gap-1.5" title="Ratio as seen with color-vision deficiencies">
+          {cvdRows.map((row) => {
+            const bad = row.ratio < 3 && wcag.ratio >= modeInfo.target;
+            return (
+              <span
+                key={row.key}
+                className={`rounded-md px-1.5 py-0.5 font-mono text-[9px] ${
+                  bad ? "bg-coral/15 font-bold text-coral" : "bg-muted/70 text-muted-foreground"
+                }`}
+                title={`${row.key}: ${row.ratio.toFixed(2)}:1${bad ? " — passes normally but fails under this CVD" : ""}`}
+              >
+                {row.label} {row.ratio.toFixed(1)}
+              </span>
+            );
+          })}
+        </div>
+        <button
+          onClick={() => void copyFinding()}
+          className="rounded-md border border-border px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
+          title={`Copy as audit finding (WCAG ${modeInfo.sc})`}
+        >
+          {copied ? "✓ copied" : "Copy finding"}
+        </button>
       </div>
 
       {(fgFixes.length > 0 || bgFixes.length > 0) && (
-        <div className="mt-3 border-t border-border pt-3">
+        <div className="mt-3 border-t border-border/70 pt-3">
           <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Make it pass — nearest AA fixes
+            Make it pass — nearest {modeInfo.target}:1 fixes
           </h3>
           <div className="flex flex-wrap gap-2">
             {fgFixes.map((s) => (
@@ -479,10 +579,7 @@ function FixButton(props: {
       className="flex items-center gap-2 rounded-lg border border-border px-2 py-1.5 hover:bg-muted"
       title={`Apply as ${props.which}`}
     >
-      <span
-        className="h-5 w-5 rounded border border-border"
-        style={{ backgroundColor: props.hex }}
-      />
+      <span className="h-5 w-5 rounded border border-border" style={{ backgroundColor: props.hex }} />
       <span className="text-left">
         <span className="block font-mono text-[11px]">{props.hex}</span>
         <span className="block text-[10px] text-muted-foreground">
@@ -511,7 +608,7 @@ function Swatch(props: {
         <button
           onClick={() => void ipc.beginOverlay(props.pickMode)}
           title={`Pick ${props.label.toLowerCase()} from screen`}
-          className="h-8 w-8 shrink-0 rounded-lg border border-border shadow-sm transition-transform hover:scale-105"
+          className="h-8 w-8 shrink-0 rounded-lg border border-border shadow-sm hover:scale-105"
           style={{ backgroundColor: props.hex }}
         />
         <input
@@ -521,7 +618,7 @@ function Swatch(props: {
             if (hexToRgb(e.target.value)) props.onChange(e.target.value.toUpperCase());
           }}
           spellCheck={false}
-          className="w-full min-w-0 rounded-md border border-border bg-card-2 px-2 py-1.5 font-mono text-xs outline-none focus:ring-1 focus:ring-ring"
+          className="w-full min-w-0 rounded-md border border-border bg-card-2/70 px-2 py-1.5 font-mono text-xs outline-none focus:ring-1 focus:ring-ring"
         />
         <button
           onClick={() => {
@@ -539,38 +636,37 @@ function Swatch(props: {
   );
 }
 
-function Verdict({ label, sub, ok }: { label: string; sub: string; ok: boolean }) {
+function ToolCard(props: {
+  title: string;
+  hotkey: string;
+  hint: string;
+  onClick: () => void;
+  onDelayed?: () => void;
+}) {
   return (
-    <div
-      className={`rounded-md border px-1 py-1 text-center ${
-        ok ? "border-ok/40 bg-ok/10" : "border-coral/40 bg-coral/10"
-      }`}
-    >
-      <span className={`block text-[11px] font-bold ${ok ? "text-ok" : "text-coral"}`}>
-        {ok ? label : `${label} ✕`}
-      </span>
-      <span className="block text-[9px] text-muted-foreground">{sub}</span>
+    <div className="card group relative p-3 transition-colors hover:border-primary/50">
+      <button onClick={props.onClick} className="w-full text-left">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold">{props.title}</span>
+          {props.hotkey && (
+            <kbd className="rounded border border-border bg-card-2/70 px-1 py-0.5 text-[9px] text-muted-foreground">
+              {props.hotkey}
+            </kbd>
+          )}
+        </div>
+        <p className="mt-1 text-[10px] text-muted-foreground group-hover:text-foreground">
+          {props.hint}
+        </p>
+      </button>
+      {props.onDelayed && (
+        <button
+          onClick={props.onDelayed}
+          title="Start after a 3s delay — time to open hover states and menus"
+          className="absolute bottom-2 right-2 rounded-md border border-border px-1.5 py-0.5 text-[9px] text-muted-foreground opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
+        >
+          3s
+        </button>
+      )}
     </div>
-  );
-}
-
-function ToolCard(props: { title: string; hotkey: string; hint: string; onClick: () => void }) {
-  return (
-    <button
-      onClick={props.onClick}
-      className="group rounded-xl border border-border bg-card p-3 text-left transition-colors hover:border-primary/50"
-    >
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold">{props.title}</span>
-        {props.hotkey && (
-          <kbd className="rounded border border-border bg-card-2 px-1 py-0.5 text-[9px] text-muted-foreground">
-            {props.hotkey}
-          </kbd>
-        )}
-      </div>
-      <p className="mt-1 text-[10px] text-muted-foreground group-hover:text-foreground">
-        {props.hint}
-      </p>
-    </button>
   );
 }

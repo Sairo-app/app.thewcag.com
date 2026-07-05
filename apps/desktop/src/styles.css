@@ -2,37 +2,41 @@
 
 /*
  * Brand tokens mirrored from Accessibility.build (app/globals.css on the
- * site). Light-first with automatic dark mode, same HSL variables.
+ * site). Light-first with automatic dark mode, same HSL variables. The main
+ * window sits on an NSVisualEffectView (vibrancy), so surfaces here are
+ * translucent and the OS blurs whatever is behind the window.
  */
 :root {
   --background: 0 0% 100%;
   --foreground: 222.2 84% 4.9%;
   --card: 0 0% 100%;
-  --card-2: 210 40% 98%;
+  --card-2: 210 40% 96%;
   --primary: 221.2 83.2% 53.3%;
   --primary-foreground: 210 40% 98%;
-  --muted: 210 40% 96%;
+  --muted: 210 40% 94%;
   --muted-foreground: 215.4 16.3% 46.9%;
-  --border: 214.3 31.8% 91.4%;
+  --border: 214.3 31.8% 88%;
   --ring: 221.2 83.2% 53.3%;
   --teal: 181 76% 40%;
   --coral: 9 88% 62%;
   --yellow: 45 95% 58%;
   --ok: 160 84% 30%;
+  --ease-out: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
-    --card: 222.2 60% 7.5%;
-    --card-2: 217.2 32.6% 12%;
+    --card: 222.2 47% 9%;
+    --card-2: 217.2 32.6% 14%;
     --primary: 217.2 91.2% 59.8%;
     --primary-foreground: 222.2 84% 4.9%;
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
-    --border: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 94.1%;
+    --border: 217.2 32.6% 19%;
+    --ring: 217.2 91.2% 59.8%;
     --teal: 181 82% 46%;
     --coral: 9 94% 70%;
     --yellow: 45 98% 68%;
@@ -55,23 +59,45 @@
   --color-coral: hsl(var(--coral));
   --color-yellow: hsl(var(--yellow));
   --color-ok: hsl(var(--ok));
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+}
+
+html,
+body {
+  background: transparent;
 }
 
 body {
   -webkit-user-select: none;
   user-select: none;
   cursor: default;
-  background: transparent;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-/* subtle brand wash behind the main window */
+/* main window sits on vibrancy: translucent wash, opaque enough to read */
 .app-bg {
   background:
-    radial-gradient(1200px 500px at 85% -10%, hsl(var(--primary) / 0.10), transparent 60%),
-    radial-gradient(900px 400px at -20% 110%, hsl(var(--teal) / 0.08), transparent 60%),
+    radial-gradient(1200px 500px at 85% -10%, hsl(var(--primary) / 0.08), transparent 60%),
+    hsl(var(--background) / 0.82);
+  min-height: 100vh;
+}
+
+/* opaque variant for tool windows (annotate / lens) */
+.app-bg-solid {
+  background:
+    radial-gradient(1200px 500px at 85% -10%, hsl(var(--primary) / 0.06), transparent 60%),
     hsl(var(--background));
+}
+
+/* translucent card surface */
+.card {
+  background: hsl(var(--card) / 0.72);
+  border: 1px solid hsl(var(--border) / 0.9);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
 }
 
 input,
@@ -80,16 +106,121 @@ textarea {
   user-select: text;
 }
 
+button,
+input,
+select,
+textarea {
+  transition:
+    background-color 150ms var(--ease-out),
+    border-color 150ms var(--ease-out),
+    color 150ms var(--ease-out),
+    opacity 150ms var(--ease-out),
+    transform 150ms var(--ease-spring),
+    box-shadow 150ms var(--ease-out);
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* keyboard a11y — this is an accessibility app, walk the walk */
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 1px;
+  border-radius: 6px;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* macOS-style segmented control */
+.seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: hsl(var(--muted) / 0.7);
+}
+.seg > button {
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+}
+.seg > button:hover {
+  color: hsl(var(--foreground));
+}
+.seg > button[data-active="true"] {
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
+}
+
+/* macOS-style switch */
+.switch {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  border-radius: 10px;
+  background: hsl(var(--muted));
+  transition: background-color 200ms var(--ease-out);
+  flex-shrink: 0;
+}
+.switch[data-on="true"] {
+  background: hsl(var(--primary));
+}
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
+  transition: transform 200ms var(--ease-spring);
+}
+.switch[data-on="true"]::after {
+  transform: translateX(14px);
+}
+
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(6px) scale(0.99);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 .rise {
-  animation: rise 0.25s ease-out both;
+  animation: rise 300ms var(--ease-spring) both;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.fade {
+  animation: fade 200ms var(--ease-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .fade {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

@@ -1,18 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ipc } from "../lib/ipc";
 
-type Tool = "select" | "arrow" | "rect" | "blur" | "text" | "badge";
+type Tool = "select" | "arrow" | "rect" | "blur" | "text" | "badge" | "measure";
 
 const ISSUE_TYPES = [
-  "contrast",
-  "focus indicator",
-  "target size",
-  "alt text",
-  "label",
-  "keyboard",
-  "other",
+  { id: "contrast", label: "Contrast", sc: "1.4.3" },
+  { id: "use-of-color", label: "Use of color", sc: "1.4.1" },
+  { id: "focus", label: "Focus indicator", sc: "2.4.7" },
+  { id: "target-size", label: "Target size", sc: "2.5.8" },
+  { id: "alt-text", label: "Alt text", sc: "1.1.1" },
+  { id: "label", label: "Label / name", sc: "4.1.2" },
+  { id: "keyboard", label: "Keyboard", sc: "2.1.1" },
+  { id: "other", label: "Other", sc: "" },
 ] as const;
-type IssueType = (typeof ISSUE_TYPES)[number];
+type IssueId = (typeof ISSUE_TYPES)[number]["id"];
+
+const SEVERITIES = ["blocker", "major", "minor"] as const;
+type Severity = (typeof SEVERITIES)[number];
 
 interface Shape {
   id: number;
@@ -23,12 +27,14 @@ interface Shape {
   y2: number;
   color: string;
   text?: string;
-  issueType?: IssueType;
+  issueType?: IssueId;
+  severity?: Severity;
   note?: string;
 }
 
 const PALETTE = ["#F2543D", "#2563EB", "#F5B00B", "#FFFFFF", "#0F172A"];
 const STROKE = 4;
+const TARGET_MIN = 24; // WCAG 2.5.8 minimum target size (CSS px ~ physical here)
 
 let nextId = 1;
 
@@ -46,7 +52,6 @@ export default function AnnotateWindow() {
   const pastRef = useRef<Shape[][]>([]);
   const futureRef = useRef<Shape[][]>([]);
 
-  /** Mutate shapes with an undo snapshot. Drag-moves snapshot at drag start. */
   function commit(update: (prev: Shape[]) => Shape[]) {
     setShapes((prev) => {
       pastRef.current.push(prev);
@@ -106,6 +111,24 @@ export default function AnnotateWindow() {
           case "rect":
             ctx.strokeRect(x, y, w, h);
             break;
+          case "measure": {
+            ctx.setLineDash([8, 5]);
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, w, h);
+            ctx.setLineDash([]);
+            const fails = w < TARGET_MIN && h < TARGET_MIN;
+            const label = `${Math.round(w)} × ${Math.round(h)} px${fails ? "  ✕ 2.5.8" : ""}`;
+            ctx.font = "600 15px -apple-system, system-ui, sans-serif";
+            const tw = ctx.measureText(label).width + 12;
+            const ly = y > 26 ? y - 24 : y + h + 4;
+            ctx.fillStyle = fails ? "#DC2626" : "rgba(15,23,42,0.85)";
+            ctx.beginPath();
+            ctx.roundRect(x, ly, tw, 20, 5);
+            ctx.fill();
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillText(label, x + 6, ly + 15);
+            break;
+          }
           case "blur": {
             const block = 14;
             const tiny = document.createElement("canvas");
@@ -127,14 +150,8 @@ export default function AnnotateWindow() {
             ctx.stroke();
             ctx.beginPath();
             ctx.moveTo(s.x2, s.y2);
-            ctx.lineTo(
-              s.x2 - head * Math.cos(angle - Math.PI / 6),
-              s.y2 - head * Math.sin(angle - Math.PI / 6),
-            );
-            ctx.lineTo(
-              s.x2 - head * Math.cos(angle + Math.PI / 6),
-              s.y2 - head * Math.sin(angle + Math.PI / 6),
-            );
+            ctx.lineTo(s.x2 - head * Math.cos(angle - Math.PI / 6), s.y2 - head * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(s.x2 - head * Math.cos(angle + Math.PI / 6), s.y2 - head * Math.sin(angle + Math.PI / 6));
             ctx.closePath();
             ctx.fill();
             break;
@@ -219,7 +236,7 @@ export default function AnnotateWindow() {
       const hit = hitTest(p.x, p.y);
       setSelectedId(hit?.id ?? null);
       if (hit) {
-        pastRef.current.push(shapes); // one snapshot per drag-move
+        pastRef.current.push(shapes);
         futureRef.current = [];
         dragRef.current = { id: hit.id, dx: p.x - hit.x1, dy: p.y - hit.y1 };
       }
@@ -240,6 +257,7 @@ export default function AnnotateWindow() {
         y2: p.y,
         color,
         issueType: "contrast",
+        severity: "major",
         note: "",
       };
       commit((prev) => [...prev, shape]);
@@ -296,6 +314,7 @@ export default function AnnotateWindow() {
         r: "rect",
         x: "blur",
         t: "text",
+        m: "measure",
       };
       const mapped = toolKeys[e.key.toLowerCase()];
       if (mapped && !e.metaKey && !e.ctrlKey) {
@@ -316,9 +335,7 @@ export default function AnnotateWindow() {
   async function exportPng(): Promise<Uint8Array> {
     const canvas = document.createElement("canvas");
     render(canvas.getContext("2d")!, true);
-    const blob: Blob = await new Promise((resolve) =>
-      canvas.toBlob((b) => resolve(b!), "image/png"),
-    );
+    const blob: Blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b!), "image/png"));
     return new Uint8Array(await blob.arrayBuffer());
   }
 
@@ -338,10 +355,17 @@ export default function AnnotateWindow() {
     flash("Image copied to clipboard");
   }
 
+  function issueMeta(b: Shape) {
+    const type = ISSUE_TYPES.find((t) => t.id === b.issueType) ?? ISSUE_TYPES[ISSUE_TYPES.length - 1];
+    return { type, severity: b.severity ?? "major", note: b.note?.trim() || "(add note)" };
+  }
+
   async function onCopyMarkdown() {
-    const lines = badges.map(
-      (b, i) => `${i + 1}. **${capitalize(b.issueType ?? "other")}** — ${b.note?.trim() || "(add note)"}`,
-    );
+    const lines = badges.map((b, i) => {
+      const { type, severity, note } = issueMeta(b);
+      const sc = type.sc ? `WCAG ${type.sc} ` : "";
+      return `${i + 1}. **${sc}${type.label}** · \`${severity}\` — ${note}`;
+    });
     const md = [
       "## Accessibility issues",
       "",
@@ -352,52 +376,50 @@ export default function AnnotateWindow() {
       "Found with [Accessibility.build](https://accessibility.build) desktop.",
     ].join("\n");
     await ipc.copyText(md);
-    flash("Markdown copied to clipboard");
+    flash("Markdown copied");
+  }
+
+  async function onCopyJira() {
+    const lines = badges.map((b, i) => {
+      const { type, severity, note } = issueMeta(b);
+      const sc = type.sc ? `WCAG ${type.sc} ` : "";
+      return `# *${sc}${type.label}* {{${severity}}} — ${note}`;
+    });
+    const jira = [
+      "h2. Accessibility issues",
+      "",
+      "_Annotated screenshot attached (numbers reference the list below)._",
+      "",
+      ...lines,
+      "",
+      "Found with [Accessibility.build|https://accessibility.build] desktop.",
+    ].join("\n");
+    await ipc.copyText(jira);
+    flash("Jira markup copied");
   }
 
   return (
-    <div className="app-bg flex h-screen flex-col font-sans text-foreground">
-      <header className="flex items-center justify-between border-b border-border bg-card px-3 py-2">
-        <div className="flex items-center gap-1">
-          {(
-            [
-              ["select", "Select", "V"],
-              ["badge", "① Issue", "I"],
-              ["arrow", "↗ Arrow", "A"],
-              ["rect", "▢ Box", "R"],
-              ["blur", "▦ Redact", "X"],
-              ["text", "T Text", "T"],
-            ] as [Tool, string, string][]
-          ).map(([t, label, key]) => (
-            <button
-              key={t}
-              onClick={() => setTool(t)}
-              title={`${label.replace(/^\S+ /, "")} (${key})`}
-              className={`rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                tool === t
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-          <span className="mx-2 h-5 w-px bg-border" />
-          <button
-            onClick={undo}
-            title="Undo (⌘Z)"
-            className="rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            ↩
-          </button>
-          <button
-            onClick={redo}
-            title="Redo (⇧⌘Z)"
-            className="rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            ↪
-          </button>
-          <span className="mx-2 h-5 w-px bg-border" />
+    <div className="app-bg-solid flex h-screen flex-col font-sans text-[13px] text-foreground">
+      <header className="flex items-center justify-between border-b border-border bg-card/80 px-3 py-2 backdrop-blur-xl">
+        <div className="flex items-center gap-2">
+          <div className="seg">
+            {(
+              [
+                ["select", "Select", "V"],
+                ["badge", "① Issue", "I"],
+                ["arrow", "↗", "A"],
+                ["rect", "▢", "R"],
+                ["measure", "⤢ 24px", "M"],
+                ["blur", "▦", "X"],
+                ["text", "T", "T"],
+              ] as [Tool, string, string][]
+            ).map(([t, label, key]) => (
+              <button key={t} data-active={tool === t} onClick={() => setTool(t)} title={`${t} (${key})`}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <span className="h-5 w-px bg-border" />
           {PALETTE.map((c) => (
             <button
               key={c}
@@ -409,6 +431,13 @@ export default function AnnotateWindow() {
               title={c}
             />
           ))}
+          <span className="h-5 w-px bg-border" />
+          <button onClick={undo} title="Undo (⌘Z)" className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">
+            ↩
+          </button>
+          <button onClick={redo} title="Redo (⇧⌘Z)" className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">
+            ↪
+          </button>
         </div>
         <div className="flex items-center gap-1.5">
           {status && <span className="rise mr-2 text-[11px] text-ok">{status}</span>}
@@ -416,14 +445,19 @@ export default function AnnotateWindow() {
             onClick={() => void onCopyMarkdown()}
             disabled={badges.length === 0}
             className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-40"
-            title="Copy a GitHub-ready issue list"
+            title="GitHub-ready issue list"
           >
-            Copy Markdown
+            Markdown
           </button>
           <button
-            onClick={() => void onCopy()}
-            className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted"
+            onClick={() => void onCopyJira()}
+            disabled={badges.length === 0}
+            className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-40"
+            title="Jira wiki markup"
           >
+            Jira
+          </button>
+          <button onClick={() => void onCopy()} className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted">
             Copy PNG
           </button>
           <button
@@ -472,7 +506,7 @@ export default function AnnotateWindow() {
                 }}
                 onBlur={() => setTextEntry(null)}
                 placeholder="Type, then Enter"
-                className="absolute z-10 rounded border border-primary bg-card px-2 py-1 text-sm outline-none"
+                className="absolute z-10 rounded-md border border-primary bg-card px-2 py-1 text-sm outline-none"
                 style={{ left: textEntry.x, top: textEntry.y }}
               />
             )}
@@ -480,65 +514,81 @@ export default function AnnotateWindow() {
         </main>
 
         {badges.length > 0 && (
-          <aside className="w-72 shrink-0 overflow-y-auto border-l border-border bg-card p-3">
+          <aside className="w-80 shrink-0 overflow-y-auto border-l border-border bg-card/80 p-3 backdrop-blur-xl">
             <h2 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               Issues ({badges.length})
             </h2>
-            {badges.map((b, i) => (
-              <div
-                key={b.id}
-                className={`mb-2 rounded-lg border p-2 ${
-                  selectedId === b.id ? "border-primary" : "border-border"
-                }`}
-                onClick={() => setSelectedId(b.id)}
-              >
-                <div className="mb-1.5 flex items-center gap-2">
-                  <span
-                    className="flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold text-white"
-                    style={{ backgroundColor: b.color }}
-                  >
-                    {i + 1}
-                  </span>
-                  <select
-                    value={b.issueType}
+            {badges.map((b, i) => {
+              const type = ISSUE_TYPES.find((t) => t.id === b.issueType);
+              return (
+                <div
+                  key={b.id}
+                  className={`rise mb-2 rounded-lg border p-2 ${
+                    selectedId === b.id ? "border-primary" : "border-border"
+                  }`}
+                  onClick={() => setSelectedId(b.id)}
+                >
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <span
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
+                      style={{ backgroundColor: b.color, color: isLight(b.color) ? "#0F172A" : "#FFF" }}
+                    >
+                      {i + 1}
+                    </span>
+                    <select
+                      value={b.issueType}
+                      onChange={(e) =>
+                        setShapes((prev) =>
+                          prev.map((s) => (s.id === b.id ? { ...s, issueType: e.target.value as IssueId } : s)),
+                        )
+                      }
+                      className="min-w-0 flex-1 rounded-md border border-border bg-card-2/70 px-1.5 py-1 text-xs outline-none"
+                    >
+                      {ISSUE_TYPES.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.sc ? `${t.sc} · ` : ""}
+                          {t.label}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={b.severity ?? "major"}
+                      onChange={(e) =>
+                        setShapes((prev) =>
+                          prev.map((s) => (s.id === b.id ? { ...s, severity: e.target.value as Severity } : s)),
+                        )
+                      }
+                      className={`rounded-md border border-border bg-card-2/70 px-1 py-1 text-[11px] outline-none ${
+                        b.severity === "blocker" ? "text-coral" : b.severity === "minor" ? "text-muted-foreground" : ""
+                      }`}
+                    >
+                      {SEVERITIES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {type?.sc && (
+                    <p className="mb-1 text-[10px] text-muted-foreground">WCAG {type.sc} — {type.label}</p>
+                  )}
+                  <textarea
+                    value={b.note}
                     onChange={(e) =>
-                      setShapes((prev) =>
-                        prev.map((s) =>
-                          s.id === b.id ? { ...s, issueType: e.target.value as IssueType } : s,
-                        ),
-                      )
+                      setShapes((prev) => prev.map((s) => (s.id === b.id ? { ...s, note: e.target.value } : s)))
                     }
-                    className="flex-1 rounded-md border border-border bg-card-2 px-1.5 py-1 text-xs outline-none"
-                  >
-                    {ISSUE_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {capitalize(t)}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="What's wrong here?"
+                    rows={2}
+                    className="w-full resize-none rounded-md border border-border bg-card-2/70 px-1.5 py-1 text-xs outline-none focus:ring-1 focus:ring-ring"
+                  />
                 </div>
-                <textarea
-                  value={b.note}
-                  onChange={(e) =>
-                    setShapes((prev) =>
-                      prev.map((s) => (s.id === b.id ? { ...s, note: e.target.value } : s)),
-                    )
-                  }
-                  placeholder="What's wrong here?"
-                  rows={2}
-                  className="w-full resize-none rounded-md border border-border bg-card-2 px-1.5 py-1 text-xs outline-none focus:ring-1 focus:ring-ring"
-                />
-              </div>
-            ))}
+              );
+            })}
           </aside>
         )}
       </div>
     </div>
   );
-}
-
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 function isLight(hex: string): boolean {

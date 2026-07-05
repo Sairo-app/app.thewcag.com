@@ -10,17 +10,23 @@ use crate::state::{AppState, OverlayPayload};
 /// on that monitor. `mode` is "pair" | "fg" | "bg" | "shot". If the main
 /// window is focused we hide it first so it isn't part of the frozen frame.
 pub fn begin(app: &AppHandle, mode: &str) {
+    begin_delayed(app, mode, 0);
+}
+
+/// `extra_delay_ms` lets auditors arrange hover states, open menus and
+/// tooltips before the frame freezes ("capture in 3s").
+pub fn begin_delayed(app: &AppHandle, mode: &str, extra_delay_ms: u64) {
     if !permissions::granted() {
         crate::actions::show_main(app);
         let _ = app.emit("permission-needed", ());
         return;
     }
 
-    let mut delay_ms = 0u64;
+    let mut delay_ms = extra_delay_ms;
     if let Some(main) = app.get_webview_window("main") {
         if main.is_visible().unwrap_or(false) && main.is_focused().unwrap_or(false) {
             let _ = main.hide();
-            delay_ms = 250; // let the hide animation finish before capturing
+            delay_ms = delay_ms.max(250); // let the hide animation finish
         }
     }
 
@@ -91,8 +97,8 @@ fn capture_and_open(app: &AppHandle, mode: &str) -> Result<(), String> {
 
 /// Frontend entry point (main-window buttons); tray/hotkeys call begin().
 #[tauri::command]
-pub fn begin_overlay(app: AppHandle, mode: String) {
-    begin(&app, &mode);
+pub fn begin_overlay(app: AppHandle, mode: String, delay_ms: Option<u64>) {
+    begin_delayed(&app, &mode, delay_ms.unwrap_or(0));
 }
 
 #[tauri::command]

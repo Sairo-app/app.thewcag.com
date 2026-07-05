@@ -1,5 +1,38 @@
 # Changelog
 
+## v1.2.0 — 2026-07-06
+
+Apple-grade UI, two overlay bug fixes, and the auditor feature set.
+
+**Look & feel**
+- Native macOS vibrancy (translucent window over desktop blur), overlay
+  title bar with hidden title, macOS-style segmented controls and switches
+- Consistent micro-animations with Apple spring easing; full
+  `prefers-reduced-motion` support; focus-visible rings everywhere
+
+**Fixes**
+- Picker loupe now appears immediately at screen center (was invisible
+  until the mouse moved)
+- Overlay ignores clicks for 250ms after opening — the click that launched
+  the tool can no longer register as a pick or drop a stray badge
+
+**Auditor features**
+- Delayed capture (3s) for hover states, menus, tooltips — tray items and
+  hover "3s" buttons on the tool cards
+- Worst-case contrast over gradients/images: during the background step,
+  drag a region to find its lowest-contrast pixel vs your text color
+- Anti-aliased-edge warning in the loupe ("edge — nudge ←→")
+- Text-size modes (normal / large / UI) with a single AA verdict, correct
+  thresholds (4.5:1 vs 3:1) and matching fix targets
+- "Copy finding" — one-click audit sentence with WCAG SC reference
+- CVD-simulated ratios (protan/deutan/tritan/mono) shown live; flags pairs
+  that pass normally but fail under color-vision deficiency (1.4.1)
+- Annotate: issue types mapped to WCAG SCs (1.4.3, 2.4.7, 2.5.8, 1.1.1,
+  4.1.2, 2.1.1, 1.4.1), severity per issue (blocker/major/minor), measure
+  tool (M) with auto 2.5.8 target-size fail flag, Copy Jira export
+- Lens: severity slider (anomalous trichromacy, Machado interpolation),
+  low-vision filters — blur (B) and low contrast sensitivity (L)
+
 ## v1.1.0 — 2026-07-06
 
 Customizable shortcuts + a depth pass on all three tools.
