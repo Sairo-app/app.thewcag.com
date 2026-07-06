@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.7.1 — 2026-07-06
+
+Hardened the shared-report portal.
+
+- Published reports now carry a description (severity counts + WCAG criteria)
+  shown on the public share page alongside a severity summary and a
+  copy-link button.
+- Report images are validated as real PNGs within a size cap before storage;
+  slug allocation retries on the (astronomically unlikely) collision.
+- New **My shared reports** page on the site (`/reports`) to review, copy
+  links for, and delete published reports — deleting revokes the link.
+
 ## v1.7.0 — 2026-07-06
 
 Five new tools for logging and auditing issues — all fully local.

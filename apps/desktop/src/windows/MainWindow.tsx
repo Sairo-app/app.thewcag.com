@@ -351,7 +351,7 @@ export default function MainWindow() {
           />
           Launch at login
         </label>
-        <span className="text-[10px] text-muted-foreground">v1.7.0</span>
+        <span className="text-[10px] text-muted-foreground">v1.7.1</span>
       </footer>
 
       {onboarding && (

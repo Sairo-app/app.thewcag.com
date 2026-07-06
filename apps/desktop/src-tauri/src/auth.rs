@@ -109,6 +109,7 @@ struct PublishResult {
 #[tauri::command]
 pub async fn publish_report(
     title: String,
+    description: String,
     issues: serde_json::Value,
     image_base64: String,
 ) -> Result<String, String> {
@@ -121,6 +122,7 @@ pub async fn publish_report(
         .bearer_auth(&token)
         .json(&serde_json::json!({
             "title": title,
+            "description": description,
             "issues": issues,
             "imageBase64": image_base64,
         }))

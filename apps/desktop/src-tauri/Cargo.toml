@@ -1,6 +1,6 @@
 [package]
 name = "accessibility-build-desktop"
-version = "1.7.0"
+version = "1.7.1"
 description = "Instant accessibility checks, anywhere on screen"
 edition = "2021"
 

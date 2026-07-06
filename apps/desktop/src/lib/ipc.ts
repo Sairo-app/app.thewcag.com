@@ -61,8 +61,8 @@ export const ipc = {
   signIn: () => invoke<void>("sign_in"),
   signOut: () => invoke<void>("sign_out"),
   getAccount: () => invoke<Account>("get_account"),
-  publishReport: (title: string, issues: unknown, imageBase64: string) =>
-    invoke<string>("publish_report", { title, issues, imageBase64 }),
+  publishReport: (title: string, description: string, issues: unknown, imageBase64: string) =>
+    invoke<string>("publish_report", { title, description, issues, imageBase64 }),
   storeGet: (key: string) => invoke<string | null>("store_get", { key }),
   storeSet: (key: string, json: string) => invoke<void>("store_set", { key, json }),
   addFindings: (items: unknown) => invoke<void>("add_findings", { items }),

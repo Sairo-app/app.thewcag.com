@@ -634,7 +634,19 @@ export default function AnnotateWindow() {
         };
       });
       const title = `Accessibility findings (${badges.length} issue${badges.length === 1 ? "" : "s"})`;
-      const url = await ipc.publishReport(title, issues, base64);
+      const sevCounts = (["blocker", "major", "minor"] as const)
+        .map((s) => ({ s, n: badges.filter((b) => (b.severity ?? "major") === s).length }))
+        .filter((x) => x.n > 0)
+        .map((x) => `${x.n} ${x.s}`)
+        .join(", ");
+      const scs = Array.from(new Set(badges.map((b) => issueTypeOf(b).sc).filter(Boolean)));
+      const description = [
+        sevCounts && `${sevCounts}.`,
+        scs.length > 0 && `Criteria: ${scs.slice(0, 8).join(", ")}${scs.length > 8 ? "…" : ""}.`,
+      ]
+        .filter(Boolean)
+        .join(" ");
+      const url = await ipc.publishReport(title, description, issues, base64);
       await ipc.copyText(url);
       await ipc.openSite(url);
       flash("Published — link copied");
