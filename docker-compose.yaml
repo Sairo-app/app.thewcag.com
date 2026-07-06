@@ -1,0 +1,54 @@
+# Production stack for app.thewcag.com on Coolify (Docker Compose build pack).
+# Postgres runs co-located in this stack - no third-party database. The web
+# container derives DATABASE_URL from the postgres service and applies
+# migrations on startup.
+#
+# Coolify setup:
+#   Build Pack: Docker Compose
+#   Compose file: docker-compose.yaml (repo root)
+#   Set the environment variables below in Coolify (POSTGRES_PASSWORD + the
+#   app secrets). Point app.thewcag.com at the `web` service, port 3100.
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: thewcag
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: thewcag
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U thewcag -d thewcag"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Derived internally - Postgres lives in this stack, not a third party.
+      DATABASE_URL: postgres://thewcag:${POSTGRES_PASSWORD}@postgres:5432/thewcag
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+      AUTH_SECRET: ${AUTH_SECRET}
+      AUTH_TRUST_HOST: "true"
+      AUTH_RESEND_KEY: ${AUTH_RESEND_KEY}
+      AUTH_EMAIL_FROM: ${AUTH_EMAIL_FROM}
+      R2_ENDPOINT: ${R2_ENDPOINT}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_BUCKET: ${R2_BUCKET}
+      R2_PUBLIC_URL: ${R2_PUBLIC_URL}
+    expose:
+      - "3100"
+    ports:
+      - "3100:3100"
+
+volumes:
+  pgdata:

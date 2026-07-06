@@ -28,10 +28,12 @@ RUN pnpm --filter @thewcag/web build
 FROM base AS runner
 ENV NODE_ENV=production
 ENV PORT=3100
-WORKDIR /app/apps/web
-# Next standalone output bundles a minimal server + traced node_modules.
+WORKDIR /app
+# Standalone (traced from the monorepo root) bundles the server, node_modules
+# and packages. Server lives at apps/web/server.js; static + public sit beside it.
 COPY --from=build /app/apps/web/.next/standalone ./
 COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=build /app/apps/web/public ./apps/web/public
 EXPOSE 3100
+# Migrations run inside the server on boot (see instrumentation.ts).
 CMD ["node", "apps/web/server.js"]

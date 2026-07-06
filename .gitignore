@@ -10,3 +10,8 @@ dist-updater/
 .next/
 next-env.d.ts
 *.tsbuildinfo
+
+# Env files (never commit) — keep only the example
+.env
+.env.*
+!.env.example
