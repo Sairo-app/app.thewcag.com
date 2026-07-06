@@ -66,6 +66,7 @@ pub fn run() {
             auth::sign_in,
             auth::sign_out,
             auth::get_account,
+            auth::publish_report,
         ])
         .setup(|app| {
             // Menu-bar utility: no Dock icon.

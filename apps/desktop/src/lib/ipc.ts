@@ -61,6 +61,8 @@ export const ipc = {
   signIn: () => invoke<void>("sign_in"),
   signOut: () => invoke<void>("sign_out"),
   getAccount: () => invoke<Account>("get_account"),
+  publishReport: (title: string, issues: unknown, imageBase64: string) =>
+    invoke<string>("publish_report", { title, issues, imageBase64 }),
 };
 
 export interface Account {

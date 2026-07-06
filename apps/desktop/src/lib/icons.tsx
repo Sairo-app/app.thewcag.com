@@ -184,6 +184,16 @@ export const FitIcon = (p: { size?: number }) => (
   </Icon>
 );
 
+export const ShareIcon = (p: { size?: number }) => (
+  <Icon {...p}>
+    <circle cx="18" cy="5" r="3" />
+    <circle cx="6" cy="12" r="3" />
+    <circle cx="18" cy="19" r="3" />
+    <path d="m8.6 13.5 6.8 4" />
+    <path d="m15.4 6.5-6.8 4" />
+  </Icon>
+);
+
 export const TimerIcon = (p: { size?: number }) => (
   <Icon {...p}>
     <path d="M10 2h4" />

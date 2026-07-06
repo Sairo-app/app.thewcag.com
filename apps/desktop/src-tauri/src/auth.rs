@@ -99,6 +99,49 @@ pub async fn get_account() -> Result<Account, String> {
     })
 }
 
+#[derive(serde::Deserialize)]
+struct PublishResult {
+    url: String,
+}
+
+/// Upload an annotated report (base64 PNG + issue list) to the site and
+/// return its public share URL. Requires a signed-in device token.
+#[tauri::command]
+pub async fn publish_report(
+    title: String,
+    issues: serde_json::Value,
+    image_base64: String,
+) -> Result<String, String> {
+    let Some(token) = read_token() else {
+        return Err("Sign in from the main window to publish reports.".into());
+    };
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(format!("{SITE}/api/desktop/reports"))
+        .bearer_auth(&token)
+        .json(&serde_json::json!({
+            "title": title,
+            "issues": issues,
+            "imageBase64": image_base64,
+        }))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
+        clear_token();
+        return Err("Your session expired — sign in again from the main window.".into());
+    }
+    if resp.status() == reqwest::StatusCode::PAYLOAD_TOO_LARGE {
+        return Err("This report is too large to publish.".into());
+    }
+    if !resp.status().is_success() {
+        return Err(format!("Publish failed ({}).", resp.status()));
+    }
+    let out: PublishResult = resp.json().await.map_err(|e| e.to_string())?;
+    Ok(out.url)
+}
+
 /// Handle an incoming accessibility-build://auth?token=..&state=.. URL.
 pub fn handle_deep_link(app: &AppHandle, url: &str) {
     let parsed = match url::Url::parse(url) {

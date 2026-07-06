@@ -35,6 +35,7 @@ import {
   RedactIcon,
   RedoIcon,
   RulerIcon,
+  ShareIcon,
   TypeIcon,
   UndoIcon,
 } from "../lib/icons";
@@ -476,7 +477,7 @@ export default function AnnotateWindow() {
   }
 
   /** One-page finding sheet: annotated image + issue table, branded. */
-  async function exportReport(): Promise<Uint8Array> {
+  function buildReportCanvas(): HTMLCanvasElement {
     const img = image!;
     const W = Math.max(900, img.naturalWidth);
     const pad = 48;
@@ -538,7 +539,13 @@ export default function AnnotateWindow() {
         ctx.fillText(note.length > 70 ? `${note.slice(0, 69)}…` : note, pad + 390, rowY, W - pad - 400);
       });
     }
-    const blob: Blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b!), "image/png"));
+    return canvas;
+  }
+
+  async function exportReport(): Promise<Uint8Array> {
+    const blob: Blob = await new Promise((resolve) =>
+      buildReportCanvas().toBlob((b) => resolve(b!), "image/png"),
+    );
     return new Uint8Array(await blob.arrayBuffer());
   }
 
@@ -571,6 +578,34 @@ export default function AnnotateWindow() {
     if (path) {
       flash(`Report saved`);
       void emit("annotate-exported", issueSummaries());
+    }
+  }
+  async function onPublish() {
+    if (shapes.length === 0) {
+      flash("Nothing to publish yet");
+      return;
+    }
+    setStatus("Publishing…");
+    try {
+      const base64 = await canvasToBase64(scaledCanvas(buildReportCanvas(), 1400));
+      const issues = badges.map((b, i) => {
+        const type = issueTypeOf(b);
+        return {
+          n: i + 1,
+          sc: type.sc || undefined,
+          label: type.label,
+          severity: b.severity ?? "major",
+          note: (b.note ?? "").replace(/\n/g, " ").trim(),
+        };
+      });
+      const title = `Accessibility findings (${badges.length} issue${badges.length === 1 ? "" : "s"})`;
+      const url = await ipc.publishReport(title, issues, base64);
+      await ipc.copyText(url);
+      await ipc.openSite(url);
+      flash("Published — link copied");
+      void emit("annotate-exported", issueSummaries());
+    } catch (e) {
+      flash(String(e));
     }
   }
   async function onCopyMarkdown() {
@@ -681,6 +716,14 @@ export default function AnnotateWindow() {
           </button>
           <button onClick={() => void onReport()} className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted" title="One-page finding sheet: annotated image + issue table">
             Report
+          </button>
+          <button
+            onClick={() => void onPublish()}
+            className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted"
+            title="Publish a shareable link on accessibility.build (requires sign-in)"
+          >
+            <ShareIcon size={13} />
+            Share
           </button>
           <button onClick={() => void onCopy()} className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted">
             Copy PNG
@@ -831,5 +874,26 @@ export default function AnnotateWindow() {
         )}
       </div>
     </div>
+  );
+}
+
+/** Cap a canvas's width (keeps published reports small enough to upload). */
+function scaledCanvas(src: HTMLCanvasElement, maxWidth: number): HTMLCanvasElement {
+  if (src.width <= maxWidth) return src;
+  const scale = maxWidth / src.width;
+  const out = document.createElement("canvas");
+  out.width = maxWidth;
+  out.height = Math.round(src.height * scale);
+  out.getContext("2d")!.drawImage(src, 0, 0, out.width, out.height);
+  return out;
+}
+
+function canvasToBase64(canvas: HTMLCanvasElement): Promise<string> {
+  return new Promise((resolve) =>
+    canvas.toBlob((b) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+      reader.readAsDataURL(b!);
+    }, "image/png"),
   );
 }

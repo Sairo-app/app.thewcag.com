@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.6.0 — 2026-07-06
+
+Share annotated reports through the Accessibility.build portal.
+
+- **Share button** in the annotation editor publishes the one-page finding
+  sheet (annotated image + issue table) to your account and returns a
+  public `accessibility.build/reports/<id>` link — copied to the clipboard
+  and opened in the browser in one click.
+- The shared page renders the image and a numbered findings list with
+  severity colors and WCAG criteria, plus social-preview cards (the report
+  image is the OG image) — paste the link in Slack/Jira/GitHub and it
+  unfurls. Requires sign-in (v1.5.0); revoked tokens fall back gracefully.
+- Reports are unlisted (unguessable slug, noindex) so client screenshots
+  stay private-by-link.
+
+Site side (branch `feat/desktop-integration`): `publishedReports` table +
+migration 0011, `POST /api/desktop/reports`, `GET /api/reports/[slug]/image`,
+public `/reports/[slug]` page with OG/Twitter meta.
+
 ## v1.5.0 — 2026-07-06
 
 Sign in with your Accessibility.build account.
