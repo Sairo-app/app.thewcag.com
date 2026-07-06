@@ -34,6 +34,7 @@ export function renderDoc(
     if (s.kind === "badge") badgeNum += 1;
     drawShape(ctx, image, s, badgeNum, opts);
   }
+  drawFocusPath(ctx, shapes);
   if (opts.ghost && !opts.forExport) {
     ctx.globalAlpha = 0.55;
     drawBadge(ctx, opts.ghost.x, opts.ghost.y, opts.ghost.num, SEVERITY_COLORS.major);
@@ -141,10 +142,11 @@ function drawShape(
       break;
   }
 
+  const pointLike = s.kind === "badge" || s.kind === "focus";
   if (!opts.forExport && s.id === opts.hoverId && s.id !== opts.selectedId) {
     ctx.strokeStyle = "rgba(37,99,235,0.5)";
     ctx.lineWidth = 3;
-    if (s.kind === "badge") {
+    if (pointLike) {
       ctx.beginPath();
       ctx.arc(s.x1, s.y1, 26, 0, Math.PI * 2);
       ctx.stroke();
@@ -157,7 +159,7 @@ function drawShape(
     ctx.setLineDash([6, 4]);
     ctx.lineWidth = 2;
     ctx.strokeStyle = "#2563EB";
-    if (s.kind === "badge") ctx.strokeRect(s.x1 - 24, s.y1 - 24, 48, 48);
+    if (pointLike) ctx.strokeRect(s.x1 - 24, s.y1 - 24, 48, 48);
     else ctx.strokeRect(x - 6, y - 6, w + 12, h + 12);
     ctx.setLineDash([]);
     for (const hd of handlesFor(s)) {
@@ -170,6 +172,55 @@ function drawShape(
       ctx.stroke();
     }
   }
+}
+
+/** Tab/focus-order visualization: a numbered connected path (WCAG 2.4.3). */
+function drawFocusPath(ctx: CanvasRenderingContext2D, shapes: Shape[]) {
+  const pts = shapes.filter((s) => s.kind === "focus");
+  if (pts.length === 0) return;
+
+  ctx.strokeStyle = "#2563EB";
+  ctx.lineWidth = 3;
+  ctx.setLineDash([2, 7]);
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x1, p.y1) : ctx.lineTo(p.x1, p.y1)));
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.lineCap = "butt";
+
+  for (let i = 1; i < pts.length; i++) {
+    const from = pts[i - 1];
+    const to = pts[i];
+    const angle = Math.atan2(to.y1 - from.y1, to.x1 - from.x1);
+    const tx = to.x1 - Math.cos(angle) * 16;
+    const ty = to.y1 - Math.sin(angle) * 16;
+    const head = 12;
+    ctx.fillStyle = "#2563EB";
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(tx - head * Math.cos(angle - Math.PI / 6), ty - head * Math.sin(angle - Math.PI / 6));
+    ctx.lineTo(tx - head * Math.cos(angle + Math.PI / 6), ty - head * Math.sin(angle + Math.PI / 6));
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  pts.forEach((p, i) => {
+    ctx.beginPath();
+    ctx.arc(p.x1, p.y1, 15, 0, Math.PI * 2);
+    ctx.fillStyle = "#2563EB";
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#FFFFFF";
+    ctx.stroke();
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = "700 16px -apple-system, system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(i + 1), p.x1, p.y1 + 1);
+    ctx.textAlign = "start";
+    ctx.textBaseline = "alphabetic";
+  });
 }
 
 function drawBadge(ctx: CanvasRenderingContext2D, x: number, y: number, num: number, color: string) {

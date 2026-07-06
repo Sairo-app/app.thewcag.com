@@ -10,7 +10,7 @@ export interface PickedColor {
   y: number;
 }
 
-export type OverlayMode = "pair" | "fg" | "bg" | "shot";
+export type OverlayMode = "pair" | "fg" | "bg" | "shot" | "measure";
 
 export interface OverlayMeta {
   mode: OverlayMode;
@@ -63,6 +63,11 @@ export const ipc = {
   getAccount: () => invoke<Account>("get_account"),
   publishReport: (title: string, issues: unknown, imageBase64: string) =>
     invoke<string>("publish_report", { title, issues, imageBase64 }),
+  storeGet: (key: string) => invoke<string | null>("store_get", { key }),
+  storeSet: (key: string, json: string) => invoke<void>("store_set", { key, json }),
+  addFindings: (items: unknown) => invoke<void>("add_findings", { items }),
+  openToolWindow: (kind: "findings" | "checklist" | "palette") =>
+    invoke<void>("open_tool_window", { kind }),
 };
 
 export interface Account {

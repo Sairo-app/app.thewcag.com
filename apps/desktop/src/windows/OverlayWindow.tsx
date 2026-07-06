@@ -22,6 +22,7 @@ export default function OverlayWindow() {
   const [mouse, setMouse] = useState<{ x: number; y: number } | null>(null);
   const [firstPick, setFirstPick] = useState<PickedColor | null>(null);
   const [drag, setDrag] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const [measures, setMeasures] = useState<{ x1: number; y1: number; x2: number; y2: number }[]>([]);
   const [edgy, setEdgy] = useState(false);
   const loupeRef = useRef<HTMLCanvasElement | null>(null);
   const armedAtRef = useRef(0);
@@ -142,7 +143,7 @@ export default function OverlayWindow() {
         }
         return;
       }
-      if ((e.key === "c" || e.key === "C") && meta.mode !== "shot" && mouse) {
+      if ((e.key === "c" || e.key === "C") && meta.mode !== "shot" && meta.mode !== "measure" && mouse) {
         const loc = physical(mouse.x, mouse.y);
         if (loc) {
           void ipc.copyText(colorAt(loc.px, loc.py).hex).then(() => ipc.closeOverlay(false));
@@ -156,7 +157,7 @@ export default function OverlayWindow() {
 
   // Loupe rendering + anti-aliased-edge heuristic
   useEffect(() => {
-    if (!mouse || !meta || meta.mode === "shot") return;
+    if (!mouse || !meta || meta.mode === "shot" || meta.mode === "measure") return;
     const loc = physical(mouse.x, mouse.y);
     const src = imgCanvasRef.current;
     const canvas = loupeRef.current;
@@ -270,10 +271,29 @@ export default function OverlayWindow() {
     await ipc.storeAnnotation(new Uint8Array(await blob.arrayBuffer()));
   }
 
+  function finishMeasure() {
+    if (!drag || !meta || !armed()) {
+      setDrag(null);
+      return;
+    }
+    const a = physical(Math.min(drag.x1, drag.x2), Math.min(drag.y1, drag.y2));
+    const b = physical(Math.max(drag.x1, drag.x2), Math.max(drag.y1, drag.y2));
+    const rect = {
+      x1: Math.min(drag.x1, drag.x2),
+      y1: Math.min(drag.y1, drag.y2),
+      x2: Math.max(drag.x1, drag.x2),
+      y2: Math.max(drag.y1, drag.y2),
+    };
+    setDrag(null);
+    if (!a || !b || (b.px - a.px < 3 && b.py - a.py < 3)) return;
+    setMeasures((m) => [...m, rect]);
+  }
+
   const isShot = meta?.mode === "shot";
+  const isMeasure = meta?.mode === "measure";
   const canRegionBg = meta?.mode === "pair" && firstPick !== null;
   const currentColor =
-    mouse && !isShot && imgDataRef.current
+    mouse && !isShot && !isMeasure && imgDataRef.current
       ? (() => {
           const loc = physical(mouse.x, mouse.y);
           return loc ? colorAt(loc.px, loc.py) : null;
@@ -308,23 +328,24 @@ export default function OverlayWindow() {
   return (
     <div
       className="fixed inset-0 overflow-hidden"
-      style={{ cursor: isShot ? "crosshair" : "none" }}
+      style={{ cursor: isShot || isMeasure ? "crosshair" : "none" }}
       onMouseMove={(e) => {
         setMouse({ x: e.clientX, y: e.clientY });
         if (drag) setDrag({ ...drag, x2: e.clientX, y2: e.clientY });
       }}
       onMouseDown={(e) => {
         if (!armed()) return;
-        if (isShot || canRegionBg) {
+        if (isShot || canRegionBg || isMeasure) {
           setDrag({ x1: e.clientX, y1: e.clientY, x2: e.clientX, y2: e.clientY });
         }
       }}
       onMouseUp={() => {
         if (isShot) void finishShotRegion();
+        else if (isMeasure) finishMeasure();
         else if (canRegionBg && drag) void finishBgRegion();
       }}
       onClick={(e) => {
-        if (!isShot && !canRegionBg) void pickAt(e.clientX, e.clientY);
+        if (!isShot && !canRegionBg && !isMeasure) void pickAt(e.clientX, e.clientY);
       }}
     >
       {imageUrl && (
@@ -358,7 +379,18 @@ export default function OverlayWindow() {
         </div>
       )}
 
-      {!isShot && mouse && (
+      {isMeasure && (
+        <div className="pointer-events-none absolute inset-0">
+          {measures.map((m, i) => (
+            <MeasureRect key={i} m={m} scale={meta?.scale ?? 1} />
+          ))}
+          {drag && (sel?.width ?? 0) + (sel?.height ?? 0) > 3 && (
+            <MeasureRect m={drag} scale={meta?.scale ?? 1} active />
+          )}
+        </div>
+      )}
+
+      {!isShot && !isMeasure && mouse && (
         <div
           className="fade pointer-events-none absolute z-10 overflow-hidden rounded-xl border border-white/70 bg-black/80 shadow-2xl"
           style={loupeStyle}
@@ -417,12 +449,53 @@ export default function OverlayWindow() {
       <div className="fade pointer-events-none absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-full bg-black/80 px-3 py-1.5 text-[11px] text-white/90 shadow-lg">
         {isShot
           ? "Drag to capture a region · Space for full screen · Esc to cancel"
-          : meta?.mode === "pair"
-            ? firstPick
-              ? "Click the background — or drag across gradients/images for the worst-case pixel"
-              : "Click the text color · arrows nudge · C copies hex · Esc cancels"
-            : `Click to pick the ${meta?.mode === "bg" ? "background" : "text"} color · arrows nudge · C copies hex · Esc cancels`}
+          : isMeasure
+            ? "Drag to measure any element · targets under 24×24 px flag WCAG 2.5.8 · Esc to finish"
+            : meta?.mode === "pair"
+              ? firstPick
+                ? "Click the background — or drag across gradients/images for the worst-case pixel"
+                : "Click the text color · arrows nudge · C copies hex · Esc cancels"
+              : `Click to pick the ${meta?.mode === "bg" ? "background" : "text"} color · arrows nudge · C copies hex · Esc cancels`}
       </div>
+    </div>
+  );
+}
+
+function MeasureRect({
+  m,
+  scale,
+  active,
+}: {
+  m: { x1: number; y1: number; x2: number; y2: number };
+  scale: number;
+  active?: boolean;
+}) {
+  const left = Math.min(m.x1, m.x2);
+  const top = Math.min(m.y1, m.y2);
+  const width = Math.abs(m.x2 - m.x1);
+  const height = Math.abs(m.y2 - m.y1);
+  const wPx = Math.round(width * scale);
+  const hPx = Math.round(height * scale);
+  const fails = wPx < 24 && hPx < 24;
+  return (
+    <div
+      className={`absolute border-2 ${active ? "border-dashed" : ""}`}
+      style={{
+        left,
+        top,
+        width,
+        height,
+        borderColor: fails ? "#F87171" : "#38BDF8",
+        boxShadow: "0 0 0 1px rgba(0,0,0,0.4)",
+      }}
+    >
+      <span
+        className="absolute left-0 rounded-md px-1.5 py-0.5 font-mono text-[10px] font-semibold text-white"
+        style={{ top: top > 24 ? -22 : height + 4, backgroundColor: fails ? "#DC2626" : "rgba(15,23,42,0.9)" }}
+      >
+        {wPx} × {hPx}
+        {fails ? "  ✕ 2.5.8" : ""}
+      </span>
     </div>
   );
 }

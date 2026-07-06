@@ -1,4 +1,4 @@
-export type ShapeKind = "badge" | "arrow" | "rect" | "redact" | "text" | "measure" | "probe";
+export type ShapeKind = "badge" | "arrow" | "rect" | "redact" | "text" | "measure" | "probe" | "focus";
 export type Tool = "select" | ShapeKind;
 
 export const ISSUE_TYPES = [

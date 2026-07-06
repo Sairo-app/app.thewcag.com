@@ -265,6 +265,13 @@ export default function MainWindow() {
         />
       </section>
 
+      <section className="mb-3 grid grid-cols-4 gap-2">
+        <AuditButton label="Measure" hint="24px targets" onClick={() => void ipc.beginOverlay("measure")} />
+        <AuditButton label="Findings" hint="issue log" onClick={() => void ipc.openToolWindow("findings")} />
+        <AuditButton label="Checklist" hint="WCAG 2.2" onClick={() => void ipc.openToolWindow("checklist")} />
+        <AuditButton label="Palette" hint="contrast grid" onClick={() => void ipc.openToolWindow("palette")} />
+      </section>
+
       {history.length > 0 && (
         <section className="card mb-3 p-3">
           <div className="mb-2 flex items-center justify-between">
@@ -344,7 +351,7 @@ export default function MainWindow() {
           />
           Launch at login
         </label>
-        <span className="text-[10px] text-muted-foreground">v1.6.0</span>
+        <span className="text-[10px] text-muted-foreground">v1.7.0</span>
       </footer>
 
       {onboarding && (
@@ -962,6 +969,18 @@ function Swatch(props: {
         </button>
       </div>
     </div>
+  );
+}
+
+function AuditButton(props: { label: string; hint: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={props.onClick}
+      className="card p-2 text-left transition-colors hover:border-primary/50"
+    >
+      <span className="block text-xs font-semibold">{props.label}</span>
+      <span className="block text-[10px] text-muted-foreground">{props.hint}</span>
+    </button>
   );
 }
 

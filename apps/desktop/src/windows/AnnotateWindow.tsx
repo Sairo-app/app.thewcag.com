@@ -34,6 +34,7 @@ import {
   PlusIcon,
   RedactIcon,
   RedoIcon,
+  RouteIcon,
   RulerIcon,
   ShareIcon,
   TypeIcon,
@@ -288,6 +289,19 @@ export default function AnnotateWindow() {
       setSelectedId(shape.id);
       return;
     }
+    if (tool === "focus") {
+      const shape: Shape = {
+        id: nextIdRef.current++,
+        kind: "focus",
+        x1: p.x,
+        y1: p.y,
+        x2: p.x,
+        y2: p.y,
+        color: "#2563EB",
+      };
+      commit((prev) => [...prev, shape]);
+      return;
+    }
     if (tool === "probe") {
       if (!probeFirst) {
         setProbeFirst(p);
@@ -414,6 +428,7 @@ export default function AnnotateWindow() {
       t: "text",
       m: "measure",
       p: "probe",
+      o: "focus",
     };
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -561,11 +576,30 @@ export default function AnnotateWindow() {
     });
   }
 
+  /** Structured findings for the Findings Register (deduped by key in Rust). */
+  function registerItems() {
+    return badges.map((b) => {
+      const type = issueTypeOf(b);
+      return {
+        key: `${docId}:${b.id}`,
+        source: "annotate",
+        captureId: docId,
+        sc: type.sc || undefined,
+        label: type.label,
+        severity: b.severity ?? "major",
+        status: "open",
+        note: (b.note ?? "").replace(/\n/g, " ").trim(),
+        createdAt: Date.now(),
+      };
+    });
+  }
+
   async function onSave() {
     const path = await ipc.savePng(await exportPng(), `a11y-annotated-${docId}.png`);
     if (path) {
       flash(`Saved ${path.split("/").pop()}`);
       void emit("annotate-exported", issueSummaries());
+      if (badges.length) void ipc.addFindings(registerItems());
     }
   }
   async function onCopy() {
@@ -578,6 +612,7 @@ export default function AnnotateWindow() {
     if (path) {
       flash(`Report saved`);
       void emit("annotate-exported", issueSummaries());
+      if (badges.length) void ipc.addFindings(registerItems());
     }
   }
   async function onPublish() {
@@ -604,6 +639,7 @@ export default function AnnotateWindow() {
       await ipc.openSite(url);
       flash("Published — link copied");
       void emit("annotate-exported", issueSummaries());
+      if (badges.length) void ipc.addFindings(registerItems());
     } catch (e) {
       flash(String(e));
     }
@@ -647,6 +683,7 @@ export default function AnnotateWindow() {
                 ["rect", <BoxIcon key="i" />, "", "R"],
                 ["measure", <RulerIcon key="i" />, "24px", "M"],
                 ["probe", <PipetteIcon key="i" />, "Probe", "P"],
+                ["focus", <RouteIcon key="i" />, "Order", "O"],
                 ["redact", <RedactIcon key="i" />, "", "X"],
                 ["text", <TypeIcon key="i" />, "", "T"],
               ] as [Tool, ReactNode, string, string][]

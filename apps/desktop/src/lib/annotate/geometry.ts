@@ -17,7 +17,7 @@ export function distToSegment(p: Point, a: Point, b: Point): number {
 export function hitTest(shapes: Shape[], p: Point, tolerance: number): Shape | null {
   for (let i = shapes.length - 1; i >= 0; i--) {
     const s = shapes[i];
-    if (s.kind === "badge") {
+    if (s.kind === "badge" || s.kind === "focus") {
       if (Math.hypot(p.x - s.x1, p.y - s.y1) <= tolerance + 18) return s;
       continue;
     }
@@ -43,7 +43,7 @@ export function hitTest(shapes: Shape[], p: Point, tolerance: number): Shape | n
 }
 
 export function handlesFor(s: Shape): { key: string; x: number; y: number }[] {
-  if (s.kind === "badge" || s.kind === "text") return [];
+  if (s.kind === "badge" || s.kind === "text" || s.kind === "focus") return [];
   if (s.kind === "arrow" || s.kind === "probe") {
     return [
       { key: "start", x: s.x1, y: s.y1 },

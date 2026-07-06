@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.7.0 — 2026-07-06
+
+Five new tools for logging and auditing issues — all fully local.
+
+- **Findings Register** — a persistent master list of every issue you log,
+  with a status workflow (open / in-progress / fixed / won't-fix), search
+  and severity/status filters, inline editing, manual entries, and CSV /
+  Markdown / HTML export. Issues you tag in Capture & Annotate flow in
+  automatically (deduped) whenever you export or publish.
+- **WCAG 2.2 Checklist** — the full Level A + AA success criteria grouped by
+  principle, each with pass / fail / N-A and a note, a progress bar, and
+  Markdown / HTML export. Persisted between sessions.
+- **Focus-order tool** in the annotation editor (press O) — click elements
+  in sequence to draw a numbered, connected tab-order path for auditing
+  WCAG 2.4.3 Focus Order.
+- **Palette contrast matrix** — paste a design system's hex colors and get
+  the full pairwise WCAG contrast grid with AA/AA-large/fail shading and CSV
+  export.
+- **Measure Screen** — freeze the screen and drag to measure any element in
+  physical pixels, with live WCAG 2.5.8 target-size (24×24) verdicts; drop
+  as many measurements as you like, no capture required.
+
+All three tool windows open from the tray and the main window; the register
+and checklist persist to a local store under Application Support.
+
 ## v1.6.0 — 2026-07-06
 
 Share annotated reports through the Accessibility.build portal.

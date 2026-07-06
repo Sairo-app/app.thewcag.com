@@ -39,6 +39,10 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let shot_delayed =
         MenuItem::with_id(app, "shot3", "Capture in 3s (hover states)", true, None::<&str>)?;
     let full = MenuItem::with_id(app, "full", "Capture Full Screen", true, None::<&str>)?;
+    let measure = MenuItem::with_id(app, "measure", "Measure Screen", true, None::<&str>)?;
+    let findings = MenuItem::with_id(app, "findings", "Findings Register", true, None::<&str>)?;
+    let checklist = MenuItem::with_id(app, "checklist", "WCAG 2.2 Checklist", true, None::<&str>)?;
+    let palette = MenuItem::with_id(app, "palette", "Palette Contrast", true, None::<&str>)?;
     let show = MenuItem::with_id(app, "show", "Open Accessibility.build", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 
@@ -52,6 +56,11 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             &pick_delayed,
             &shot_delayed,
             &full,
+            &measure,
+            &PredefinedMenuItem::separator(app)?,
+            &findings,
+            &checklist,
+            &palette,
             &PredefinedMenuItem::separator(app)?,
             &show,
             &quit,
@@ -85,6 +94,16 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             "shot3" => overlay::begin_delayed(app, "shot", 3000),
             "lens" => lens::toggle(app),
             "full" => actions::full_screenshot(app),
+            "measure" => overlay::begin(app, "measure"),
+            "findings" => {
+                let _ = crate::toolwin::open_tool_window(app.clone(), "findings".into());
+            }
+            "checklist" => {
+                let _ = crate::toolwin::open_tool_window(app.clone(), "checklist".into());
+            }
+            "palette" => {
+                let _ = crate::toolwin::open_tool_window(app.clone(), "palette".into());
+            }
             "show" => actions::show_main(app),
             "quit" => app.exit(0),
             _ => {}

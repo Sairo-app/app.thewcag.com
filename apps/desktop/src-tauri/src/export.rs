@@ -56,11 +56,20 @@ pub async fn save_text(app: AppHandle, request: tauri::ipc::Request<'_>) -> Resu
         .and_then(|v| v.to_str().ok())
         .unwrap_or("export.md")
         .to_string();
+    // Filter follows the suggested name's extension (md / csv / html / …).
+    let ext = suggested.rsplit('.').next().unwrap_or("txt").to_ascii_lowercase();
+    let label = match ext.as_str() {
+        "md" => "Markdown",
+        "csv" => "CSV",
+        "html" => "HTML",
+        "json" => "JSON",
+        _ => "Text",
+    };
     let picked = app
         .dialog()
         .file()
         .set_file_name(&suggested)
-        .add_filter("Markdown", &["md"])
+        .add_filter(label, &[ext.as_str()])
         .blocking_save_file();
     match picked {
         Some(path) => {

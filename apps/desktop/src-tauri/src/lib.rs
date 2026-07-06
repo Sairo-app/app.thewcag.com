@@ -9,6 +9,8 @@ mod permissions;
 mod settings;
 mod shortcuts;
 mod state;
+mod store;
+mod toolwin;
 mod tray;
 mod update;
 
@@ -67,6 +69,10 @@ pub fn run() {
             auth::sign_out,
             auth::get_account,
             auth::publish_report,
+            store::store_get,
+            store::store_set,
+            store::add_findings,
+            toolwin::open_tool_window,
         ])
         .setup(|app| {
             // Menu-bar utility: no Dock icon.
