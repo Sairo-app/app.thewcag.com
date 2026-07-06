@@ -37,16 +37,27 @@ from the `postgres` service and applies the schema on boot (via
 - New resource → **Docker Compose**
 - **Compose file**: `docker-compose.yaml` (repo root)
 - Point `app.thewcag.com` at the `web` service, port `3100`.
-- Set these env vars in Coolify (Postgres is internal, so **no `DATABASE_URL`**):
+
+  **Auto-set by Coolify — you never touch these** (the compose uses Coolify
+  [magic env vars](https://coolify.io/docs/knowledge-base/docker/compose#predefined-variables)):
+
+  | Var | How |
+  |---|---|
+  | `POSTGRES_PASSWORD` / `DATABASE_URL` | `SERVICE_PASSWORD_POSTGRES` — generated + injected into both |
+  | `AUTH_SECRET` | `SERVICE_BASE64_64_AUTHSECRET` — generated |
+  | `NEXT_PUBLIC_APP_URL`, `AUTH_EMAIL_FROM` | baked defaults (`https://app.thewcag.com`, verified Resend sender) |
+
+  **You must set only the external credentials** (Coolify can't generate your
+  Cloudflare/Resend secrets):
 
   | Var | Value |
   |---|---|
-  | `POSTGRES_PASSWORD` | any strong password (used only inside the stack) |
-  | `NEXT_PUBLIC_APP_URL` | `https://app.thewcag.com` |
-  | `AUTH_SECRET` | `openssl rand -base64 32` |
   | `AUTH_RESEND_KEY` | Resend API key |
-  | `AUTH_EMAIL_FROM` | sender on a **Resend-verified domain**, e.g. `TheWCAG <noreply@updates.onchange.app>` (verify `thewcag.com` in Resend to send from `login@thewcag.com`) |
   | `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_URL` | Cloudflare R2 (below) |
+
+  Override `AUTH_EMAIL_FROM` only if you change the sender (must be on a
+  **Resend-verified domain**; verify `thewcag.com` in Resend to send from
+  `login@thewcag.com`). Override `NEXT_PUBLIC_APP_URL` only if the domain changes.
 
 The whole stack (Postgres + web + migrations) was validated locally with
 `docker compose up --build`.
