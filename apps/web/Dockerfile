@@ -9,17 +9,17 @@ FROM node:22-alpine AS base
 RUN corepack enable
 WORKDIR /app
 
-# --- deps ---
-FROM base AS deps
+# --- build ---
+# Install and build in one stage. pnpm workspaces put each package's binaries
+# in <pkg>/node_modules/.bin (e.g. apps/web/node_modules/.bin/next), so deps
+# MUST be installed in the same stage that runs the build - copying only the
+# root node_modules from a separate deps stage leaves `next` unresolved.
+# Manifests are copied first so the install layer caches until they change.
+FROM base AS build
 COPY pnpm-workspace.yaml package.json ./
 COPY apps/web/package.json apps/web/
 COPY packages/a11y-core/package.json packages/a11y-core/
 RUN pnpm install --filter @thewcag/web... --frozen-lockfile=false
-
-# --- build ---
-FROM base AS build
-COPY --from=deps /app/node_modules ./node_modules
-COPY pnpm-workspace.yaml package.json ./
 COPY packages ./packages
 COPY apps/web ./apps/web
 RUN pnpm --filter @thewcag/web build

@@ -1,0 +1,21 @@
+# Keep the build context clean + reproducible: never ship host artifacts into
+# the image. node_modules is installed inside the Dockerfile, so host copies
+# must not leak in (they masked a missing-deps bug on clean checkouts).
+**/node_modules
+**/.next
+**/dist
+**/target
+**/.turbo
+**/*.tsbuildinfo
+**/.DS_Store
+
+# Env + secrets (never build into an image)
+**/.env
+**/.env.*
+!**/.env.example
+
+# VCS / tooling
+.git
+.github
+**/gen
+dist-updater
