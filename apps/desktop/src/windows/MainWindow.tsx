@@ -168,9 +168,9 @@ export default function MainWindow() {
   const bgRgb = hexToRgb(bg);
 
   return (
-    <div className="app-bg min-h-screen px-5 pb-5 font-sans text-[13px] text-foreground">
+    <div className="app-bg flex h-screen flex-col overflow-hidden font-sans text-[13px] text-foreground">
       {/* titlebar overlay: draggable strip under the traffic lights */}
-      <header data-tauri-drag-region className="flex items-center justify-between pb-4 pt-9">
+      <header data-tauri-drag-region className="flex shrink-0 items-center justify-between px-5 pb-4 pt-9">
         <button
           onClick={() => void ipc.openSite(SITE)}
           className="flex items-center gap-2.5 text-left"
@@ -188,6 +188,8 @@ export default function MainWindow() {
         </button>
       </header>
 
+      {/* scroll region: fills the window, scrolls internally (no visible bar) */}
+      <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5 pb-4">
       {error && (
         <div className="rise mb-3 rounded-xl border border-coral/40 bg-coral/10 px-3 py-2 text-xs text-coral">
           {error}
@@ -340,7 +342,9 @@ export default function MainWindow() {
         </section>
       )}
 
-      <footer className="flex items-center justify-between border-t border-border/70 pt-3">
+      </div>
+
+      <footer className="flex shrink-0 items-center justify-between border-t border-border/70 px-5 pb-4 pt-3">
         <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
           <button
             role="switch"

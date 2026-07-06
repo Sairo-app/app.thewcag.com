@@ -68,6 +68,39 @@ body {
   background: transparent;
 }
 
+/*
+ * Desktop app layout contract: the webview fills the OS window, and each
+ * window view (h-screen flex column) owns its internal scrolling. No
+ * document-level scroll, and no scrollbar chrome anywhere in the app -
+ * content stays reachable via trackpad / wheel / keyboard focus. This keeps
+ * every window fully responsive to resizing with no visible scrollbars.
+ */
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  overflow: hidden;
+}
+* {
+  scrollbar-width: none; /* Firefox / Gecko */
+  -ms-overflow-style: none; /* legacy Edge */
+}
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  background: transparent; /* WebKit / WKWebView: no visible bar */
+}
+/* explicit opt-in for scroll regions (scrollbar already hidden globally) */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 body {
   -webkit-user-select: none;
   user-select: none;
