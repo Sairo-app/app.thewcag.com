@@ -6,8 +6,9 @@
   --muted: 215 16% 47%;
   --border: 214 32% 91%;
   --card: 0 0% 100%;
-  --primary: 221 83% 53%;
-  --primary-fg: 210 40% 98%;
+  /* TheWCAG brand orange (from Logo.png) */
+  --primary: 22 88% 52%;
+  --primary-fg: 0 0% 100%;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -17,8 +18,8 @@
     --muted: 215 20% 65%;
     --border: 217 33% 20%;
     --card: 222 47% 9%;
-    --primary: 217 91% 60%;
-    --primary-fg: 222 47% 11%;
+    --primary: 22 90% 55%;
+    --primary-fg: 0 0% 100%;
   }
 }
 

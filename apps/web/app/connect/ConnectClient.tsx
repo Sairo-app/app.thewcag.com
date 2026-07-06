@@ -24,7 +24,7 @@ export function ConnectClient({ state, device, email }: { state: string; device:
       <h1 className="text-2xl font-bold tracking-tight">Connect your desktop app</h1>
       <p className="mt-3 text-sm text-muted">
         Authorize <strong>{device}</strong> to use your TheWCAG account (
-        <span className="font-medium">{email}</span>) to publish and manage shared reports.
+        <span className="font-medium">{email}</span>) to publish and manage shared screenshots.
       </p>
 
       {status !== "done" && (

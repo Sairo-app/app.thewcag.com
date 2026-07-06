@@ -1,15 +1,20 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { deleteReport } from "./actions";
+import { deleteScreenshot } from "@/app/screenshots/actions";
+import { TrashIcon } from "./icons";
 
-export function DeleteReportButton({ slug }: { slug: string }) {
+export function DeleteButton({ slug }: { slug: string }) {
   const [confirming, setConfirming] = useState(false);
   const [pending, startTransition] = useTransition();
 
   if (!confirming) {
     return (
-      <button onClick={() => setConfirming(true)} className="text-xs text-muted hover:text-red-600">
+      <button
+        onClick={() => setConfirming(true)}
+        className="inline-flex items-center gap-1 text-xs text-muted hover:text-red-600"
+      >
+        <TrashIcon size={13} />
         Delete
       </button>
     );
@@ -18,10 +23,10 @@ export function DeleteReportButton({ slug }: { slug: string }) {
     <span className="flex items-center gap-2 text-xs">
       <button
         disabled={pending}
-        onClick={() => startTransition(() => deleteReport(slug))}
+        onClick={() => startTransition(() => deleteScreenshot(slug))}
         className="font-medium text-red-600 hover:underline disabled:opacity-60"
       >
-        {pending ? "Deleting…" : "Confirm"}
+        {pending ? "Deleting" : "Confirm"}
       </button>
       <button onClick={() => setConfirming(false)} className="text-muted hover:underline">
         Cancel

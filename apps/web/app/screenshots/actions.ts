@@ -7,8 +7,8 @@ import { db } from "@/lib/db";
 import { reports } from "@/lib/schema";
 import { deleteImage } from "@/lib/r2";
 
-/** Delete a shared report the signed-in user owns (removes image + metadata). */
-export async function deleteReport(slug: string): Promise<void> {
+/** Delete a shared screenshot the signed-in user owns (image + metadata). */
+export async function deleteScreenshot(slug: string): Promise<void> {
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) throw new Error("Not signed in");
@@ -22,5 +22,5 @@ export async function deleteReport(slug: string): Promise<void> {
 
   await deleteImage(row.imageKey);
   await db.delete(reports).where(and(eq(reports.slug, slug), eq(reports.userId, userId)));
-  revalidatePath("/reports");
+  revalidatePath("/screenshots");
 }

@@ -5,3 +5,8 @@ target/
 *.local
 apps/desktop/src-tauri/gen/
 dist-updater/
+
+# Next.js build output
+.next/
+next-env.d.ts
+*.tsbuildinfo

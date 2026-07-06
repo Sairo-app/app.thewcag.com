@@ -449,7 +449,7 @@ function AccountCard({ account }: { account: Account | null }) {
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
         <button
-          onClick={() => void ipc.openSite("https://app.thewcag.com/reports")}
+          onClick={() => void ipc.openSite("https://app.thewcag.com/screenshots")}
           className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted"
         >
           Account

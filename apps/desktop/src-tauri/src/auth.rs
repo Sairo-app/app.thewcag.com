@@ -118,7 +118,7 @@ pub async fn publish_report(
     };
     let client = reqwest::Client::new();
     let resp = client
-        .post(format!("{SITE}/api/device/reports"))
+        .post(format!("{SITE}/api/device/screenshots"))
         .bearer_auth(&token)
         .json(&serde_json::json!({
             "title": title,

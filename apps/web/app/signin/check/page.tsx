@@ -1,4 +1,4 @@
-export const metadata = { title: "Check your email — TheWCAG", robots: { index: false } };
+export const metadata = { title: "Check your email - TheWCAG", robots: { index: false } };
 
 export default function CheckEmailPage() {
   return (

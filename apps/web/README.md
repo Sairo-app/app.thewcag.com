@@ -40,8 +40,26 @@ pnpm db:migrate        # applies drizzle/0000_init.sql
 - Port: `3100`
 - Set the env vars above; point `app.thewcag.com` at the service.
 
-R2: create a bucket (`thewcag-reports`), an API token with Object
-Read/Write, and use the S3 endpoint `https://<accountid>.r2.cloudflarestorage.com`.
+## Cloudflare R2 (image storage)
+
+Screenshot images live entirely in R2; only metadata is in Postgres.
+
+1. **Create a bucket** (e.g. `thewcag-reports`).
+2. **API token**: R2 → Manage API Tokens → create a token with **Object Read &
+   Write** scoped to the bucket. Set `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`
+   and `R2_ENDPOINT=https://<accountid>.r2.cloudflarestorage.com`.
+3. **Public access for reads** (so Cloudflare's CDN serves images, not the app):
+   - Best: connect a **custom domain** (e.g. `cdn.thewcag.com`) to the bucket,
+     then set `R2_PUBLIC_URL=https://cdn.thewcag.com`.
+   - Or enable the managed **r2.dev** URL and set `R2_PUBLIC_URL` to it.
+   - No CORS config is needed (images are used via `<img>` and `og:image`).
+
+How it works: writes and deletes go through the S3 API (`lib/r2.ts`); reads go
+through `/api/s/[slug]/image`, which **302-redirects to `R2_PUBLIC_URL`** so the
+bytes come from Cloudflare, never the app server. `og:image` points straight at
+the CDN URL. If `R2_PUBLIC_URL` is unset (local dev), the route streams the
+object instead. The client is validated at first use and fails fast with a
+clear error if any R2 var is missing.
 
 ## Routes
 

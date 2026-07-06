@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CheckIcon, LinkIcon } from "./icons";
 
 export function CopyLinkButton({ url, className }: { url: string; className?: string }) {
   const [copied, setCopied] = useState(false);
@@ -11,9 +12,13 @@ export function CopyLinkButton({ url, className }: { url: string; className?: st
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       }}
-      className={className ?? "rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-card"}
+      className={
+        className ??
+        "inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-card"
+      }
     >
-      {copied ? "Link copied" : "Copy link"}
+      {copied ? <CheckIcon size={14} /> : <LinkIcon size={14} />}
+      {copied ? "Copied" : "Copy link"}
     </button>
   );
 }
