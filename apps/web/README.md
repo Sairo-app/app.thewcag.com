@@ -45,7 +45,7 @@ from the `postgres` service and applies the schema on boot (via
   | `NEXT_PUBLIC_APP_URL` | `https://app.thewcag.com` |
   | `AUTH_SECRET` | `openssl rand -base64 32` |
   | `AUTH_RESEND_KEY` | Resend API key |
-  | `AUTH_EMAIL_FROM` | `TheWCAG <login@thewcag.com>` (verified in Resend) |
+  | `AUTH_EMAIL_FROM` | sender on a **Resend-verified domain**, e.g. `TheWCAG <noreply@updates.onchange.app>` (verify `thewcag.com` in Resend to send from `login@thewcag.com`) |
   | `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_URL` | Cloudflare R2 (below) |
 
 The whole stack (Postgres + web + migrations) was validated locally with
