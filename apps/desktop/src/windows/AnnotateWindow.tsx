@@ -514,7 +514,7 @@ export default function AnnotateWindow() {
     ctx.fillText("Accessibility findings", pad, 58);
     ctx.font = "400 16px -apple-system, system-ui, sans-serif";
     ctx.fillStyle = "#64748B";
-    ctx.fillText(`${new Date().toDateString()} · ${badges.length} issue${badges.length === 1 ? "" : "s"} · accessibility.build`, pad, 84);
+    ctx.fillText(`${new Date().toDateString()} · ${badges.length} issue${badges.length === 1 ? "" : "s"} · thewcag.com`, pad, 84);
 
     const annotated = document.createElement("canvas");
     annotated.width = img.naturalWidth;
@@ -662,7 +662,7 @@ export default function AnnotateWindow() {
       return `${i + 1}. **${type.sc ? `WCAG ${type.sc} ` : ""}${type.label}** · \`${b.severity ?? "major"}\` — ${b.note?.trim() || "(add note)"}`;
     });
     await ipc.copyText(
-      ["## Accessibility issues", "", "_Annotated screenshot attached._", "", ...lines, "", "Found with [Accessibility.build](https://accessibility.build) desktop."].join("\n"),
+      ["## Accessibility issues", "", "_Annotated screenshot attached._", "", ...lines, "", "Found with [TheWCAG](https://thewcag.com) desktop."].join("\n"),
     );
     flash("Markdown copied");
   }
@@ -672,7 +672,7 @@ export default function AnnotateWindow() {
       return `# *${type.sc ? `WCAG ${type.sc} ` : ""}${type.label}* {{${b.severity ?? "major"}}} — ${b.note?.trim() || "(add note)"}`;
     });
     await ipc.copyText(
-      ["h2. Accessibility issues", "", "_Annotated screenshot attached._", "", ...lines, "", "Found with [Accessibility.build|https://accessibility.build] desktop."].join("\n"),
+      ["h2. Accessibility issues", "", "_Annotated screenshot attached._", "", ...lines, "", "Found with [TheWCAG|https://thewcag.com] desktop."].join("\n"),
     );
     flash("Jira markup copied");
   }
@@ -769,7 +769,7 @@ export default function AnnotateWindow() {
           <button
             onClick={() => void onPublish()}
             className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted"
-            title="Publish a shareable link on accessibility.build (requires sign-in)"
+            title="Publish a shareable link on thewcag.com (requires sign-in)"
           >
             <ShareIcon size={13} />
             Share

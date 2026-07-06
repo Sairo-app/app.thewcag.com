@@ -1,0 +1,37 @@
+export const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://app.thewcag.com";
+
+const ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+/** Short, unguessable, URL-safe slug for a shared report. */
+export function generateSlug(len = 10): string {
+  let out = "";
+  const bytes = new Uint8Array(len);
+  crypto.getRandomValues(bytes);
+  for (let i = 0; i < len; i++) out += ALPHABET[bytes[i] % ALPHABET.length];
+  return out;
+}
+
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+/** Validate a base64 string decodes to a PNG within a size cap; return bytes. */
+export function decodePngBase64(
+  base64: string,
+  maxBytes = 4_000_000,
+): { ok: true; buffer: Buffer } | { ok: false; error: string } {
+  if (!base64) return { ok: false, error: "missing image" };
+  let buffer: Buffer;
+  try {
+    buffer = Buffer.from(base64, "base64");
+  } catch {
+    return { ok: false, error: "invalid base64" };
+  }
+  if (buffer.length < 8 || !buffer.subarray(0, 8).equals(PNG_SIGNATURE)) {
+    return { ok: false, error: "not a PNG image" };
+  }
+  if (buffer.length > maxBytes) return { ok: false, error: "image too large" };
+  return { ok: true, buffer };
+}
+
+export function isUniqueViolation(err: unknown): boolean {
+  return typeof err === "object" && err !== null && (err as { code?: string }).code === "23505";
+}

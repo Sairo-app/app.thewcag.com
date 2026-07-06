@@ -5,8 +5,8 @@ use tauri_plugin_opener::OpenerExt;
 
 use crate::state::AppState;
 
-const SITE: &str = "https://accessibility.build";
-const KEYCHAIN_SERVICE: &str = "build.accessibility.desktop";
+const SITE: &str = "https://app.thewcag.com";
+const KEYCHAIN_SERVICE: &str = "com.thewcag.app";
 const KEYCHAIN_USER: &str = "device-token";
 
 fn entry() -> Result<keyring::Entry, String> {
@@ -58,7 +58,7 @@ pub fn sign_in(app: AppHandle) -> Result<(), String> {
     *app.state::<AppState>().auth_state.lock().unwrap() = Some(state.clone());
 
     let device = sanitize(&whoami::devicename());
-    let url = format!("{SITE}/desktop/connect?state={state}&device={device}");
+    let url = format!("{SITE}/connect?state={state}&device={device}");
     app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
 }
 
@@ -75,7 +75,7 @@ pub async fn get_account() -> Result<Account, String> {
     };
     let client = reqwest::Client::new();
     let resp = client
-        .get(format!("{SITE}/api/desktop/entitlements"))
+        .get(format!("{SITE}/api/device/entitlements"))
         .bearer_auth(&token)
         .send()
         .await
@@ -118,7 +118,7 @@ pub async fn publish_report(
     };
     let client = reqwest::Client::new();
     let resp = client
-        .post(format!("{SITE}/api/desktop/reports"))
+        .post(format!("{SITE}/api/device/reports"))
         .bearer_auth(&token)
         .json(&serde_json::json!({
             "title": title,

@@ -5,7 +5,7 @@
 //   node scripts/make-latest-json.mjs
 //
 // Upload the printed artifact and dist-updater/latest.json to
-// https://accessibility.build/downloads/desktop/
+// https://app.thewcag.com/downloads/desktop/
 import { readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,19 +23,19 @@ const sigFile = files.find((f) => f.endsWith(".app.tar.gz.sig"));
 if (!archive || !sigFile) {
   console.error(
     "No updater artifact found. Build with TAURI_SIGNING_PRIVATE_KEY set:\n" +
-      '  TAURI_SIGNING_PRIVATE_KEY_PATH="$HOME/.tauri/accessibility-build.key" pnpm tauri build',
+      '  TAURI_SIGNING_PRIVATE_KEY_PATH="$HOME/.tauri/thewcag-updater.key" pnpm tauri build',
   );
   process.exit(1);
 }
 
 const manifest = {
   version,
-  notes: `Accessibility Build ${version} — see https://accessibility.build/desktop#changelog`,
+  notes: `TheWCAG ${version}`,
   pub_date: new Date().toISOString(),
   platforms: {
     "darwin-aarch64": {
       signature: readFileSync(join(bundleDir, sigFile), "utf8"),
-      url: `https://accessibility.build/downloads/desktop/${encodeURIComponent(archive)}`,
+      url: `https://app.thewcag.com/downloads/desktop/${encodeURIComponent(archive)}`,
     },
   },
 };

@@ -1,5 +1,21 @@
 # Changelog
 
+## v2.0.0 — 2026-07-06 — TheWCAG
+
+Rebrand to **TheWCAG**, with a dedicated backend at **app.thewcag.com**.
+
+- Product renamed to TheWCAG (window title, wordmark, tray, copy). New bundle
+  identifier `com.thewcag.app` and `thewcag://` deep-link scheme — a fresh
+  install (re-grant Screen Recording once).
+- Account + sharing now point at **app.thewcag.com** (was accessibility.build):
+  magic-link sign-in, device authorization, and report publishing hit the new
+  `/api/device/*` endpoints; the auto-updater reads
+  `app.thewcag.com/downloads/desktop/latest.json`.
+- New **apps/web** in the monorepo: a lean Next.js service (Auth.js magic-link
+  via Resend · Postgres for metadata + auth · Cloudflare R2 for image blobs ·
+  Docker/Coolify) that does exactly two things — authenticate the app and
+  store/share report images at public `/reports/<slug>` links.
+
 ## v1.7.2 — 2026-07-06
 
 - App icon is now the real Accessibility.build brand mark (the white "A"),

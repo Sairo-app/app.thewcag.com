@@ -43,7 +43,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let findings = MenuItem::with_id(app, "findings", "Findings Register", true, None::<&str>)?;
     let checklist = MenuItem::with_id(app, "checklist", "WCAG 2.2 Checklist", true, None::<&str>)?;
     let palette = MenuItem::with_id(app, "palette", "Palette Contrast", true, None::<&str>)?;
-    let show = MenuItem::with_id(app, "show", "Open Accessibility.build", true, None::<&str>)?;
+    let show = MenuItem::with_id(app, "show", "Open TheWCAG", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 
     Menu::with_items(
@@ -84,7 +84,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     TrayIconBuilder::with_id("main")
         .icon(tray_icon)
         .icon_as_template(true)
-        .tooltip("Accessibility.build")
+        .tooltip("TheWCAG")
         .menu(&menu)
         .show_menu_on_left_click(true)
         .on_menu_event(|app, event| match event.id.as_ref() {

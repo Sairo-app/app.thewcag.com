@@ -91,7 +91,7 @@ pub fn run() {
 
             // Register the accessibility-build:// scheme at runtime (dev
             // builds); production registration comes from the bundle plist.
-            let _ = app.deep_link().register("accessibility-build");
+            let _ = app.deep_link().register("thewcag");
             let auth_handle = handle.clone();
             app.deep_link().on_open_url(move |event| {
                 for url in event.urls() {

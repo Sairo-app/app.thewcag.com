@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Accessibility Build",
-  "version": "1.7.2",
-  "identifier": "build.accessibility.desktop",
+  "productName": "TheWCAG",
+  "version": "2.0.0",
+  "identifier": "com.thewcag.app",
   "build": {
     "beforeDevCommand": "pnpm dev:vite",
     "devUrl": "http://localhost:5173",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Accessibility.build",
+        "title": "TheWCAG",
         "width": 460,
         "height": 720,
         "minWidth": 420,
@@ -37,12 +37,12 @@
   },
   "plugins": {
     "updater": {
-      "endpoints": ["https://accessibility.build/downloads/desktop/latest.json"],
+      "endpoints": ["https://app.thewcag.com/downloads/desktop/latest.json"],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQyMTQ0MkNERTBBOTk0RgpSV1JQbVFyZUxFUWhCSjdZVTlPMkg2clJJYWtDZU1KeURRLzlYaWUwZVF6VmtZTXFleWVoQ3ZZbAo="
     },
     "deep-link": {
       "desktop": {
-        "schemes": ["accessibility-build"]
+        "schemes": ["thewcag"]
       }
     }
   },

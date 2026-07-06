@@ -141,7 +141,7 @@ export default function FindingsWindow() {
         (r, i) => `| ${i + 1} | ${r.sc} | ${r.label} | ${r.severity} | ${r.status} | ${r.note.replace(/\|/g, "\\|")} |`,
       ),
       "",
-      "Logged with Accessibility.build desktop.",
+      "Logged with TheWCAG desktop.",
     ].join("\n");
     const path = await ipc.saveText(md, `findings-${today()}.md`);
     if (path) flash("Markdown saved");
@@ -164,7 +164,7 @@ th{background:#f8fafc;font-size:12px;text-transform:uppercase;letter-spacing:.05
 footer{margin-top:24px;color:#64748b;font-size:12px}</style></head>
 <body><h1>Accessibility findings <small style="color:#64748b">(${rows.length})</small></h1>
 <table><thead><tr><th>#</th><th>WCAG</th><th>Issue</th><th>Severity</th><th>Status</th><th>Note</th></tr></thead>
-<tbody>${body}</tbody></table><footer>Logged with Accessibility.build desktop · ${today()}</footer></body></html>`;
+<tbody>${body}</tbody></table><footer>Logged with TheWCAG desktop · ${today()}</footer></body></html>`;
     const path = await ipc.saveText(html, `findings-${today()}.html`);
     if (path) flash("HTML saved");
   }

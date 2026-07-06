@@ -39,7 +39,7 @@ pub fn open_annotate_window(app: &AppHandle) -> Result<(), String> {
         let _ = existing.close();
     }
     WebviewWindowBuilder::new(app, "annotate", WebviewUrl::App(Default::default()))
-        .title("Annotate — Accessibility.build")
+        .title("Annotate — TheWCAG")
         .inner_size(1120.0, 760.0)
         .min_inner_size(840.0, 560.0)
         .center()

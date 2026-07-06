@@ -175,7 +175,7 @@ export default function ChecklistWindow() {
       "|----|-------|-----------|--------|------|",
       ...rows.map((r) => `| ${r.sc} | ${r.level} | ${r.name} | ${r.result} | ${r.note.replace(/\|/g, "\\|")} |`),
       "",
-      "Audited with Accessibility.build desktop.",
+      "Audited with TheWCAG desktop.",
     ].join("\n");
     const path = await ipc.saveText(md, `wcag-audit-${today()}.md`);
     if (path) flash("Markdown saved");

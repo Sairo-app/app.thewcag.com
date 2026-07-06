@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
- * Brand tokens mirrored from Accessibility.build (app/globals.css on the
+ * Brand tokens (TheWCAG) — mirrored from the site's globals.css (the
  * site). Light-first with automatic dark mode, same HSL variables. The main
  * window sits on an NSVisualEffectView (vibrancy), so surfaces here are
  * translucent and the OS blurs whatever is behind the window.

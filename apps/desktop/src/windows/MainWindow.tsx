@@ -13,7 +13,7 @@ import {
 import { displayShortcut, events, ipc, type Account, type Shortcuts } from "../lib/ipc";
 import { CheckIcon, CopyIcon, FolderIcon, SwapIcon, TimerIcon } from "../lib/icons";
 
-const SITE = "https://accessibility.build";
+const SITE = "https://thewcag.com";
 const HISTORY_KEY = "contrast-history-v1";
 
 type TextMode = "normal" | "large" | "ui";
@@ -174,10 +174,10 @@ export default function MainWindow() {
         <button
           onClick={() => void ipc.openSite(SITE)}
           className="text-left"
-          title="Open accessibility.build"
+          title="Open thewcag.com"
         >
           <h1 className="text-[17px] font-bold tracking-tight">
-            Accessibility<span className="text-primary">.build</span>
+            The<span className="text-primary">WCAG</span>
           </h1>
           <p className="text-[11px] text-muted-foreground">Instant checks, anywhere on screen</p>
         </button>
@@ -350,7 +350,7 @@ export default function MainWindow() {
           />
           Launch at login
         </label>
-        <span className="text-[10px] text-muted-foreground">v1.7.2</span>
+        <span className="text-[10px] text-muted-foreground">v2.0.0</span>
       </footer>
 
       {onboarding && (
@@ -421,9 +421,9 @@ function AccountCard({ account }: { account: Account | null }) {
     return (
       <section className="card mb-3 flex items-center justify-between p-3">
         <div>
-          <h2 className="text-xs font-semibold">Accessibility.build account</h2>
+          <h2 className="text-xs font-semibold">TheWCAG account</h2>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
-            Sign in to sync credits and unlock scans & reports
+            Sign in to publish & share reports
           </p>
         </div>
         <button
@@ -449,7 +449,7 @@ function AccountCard({ account }: { account: Account | null }) {
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
         <button
-          onClick={() => void ipc.openSite("https://accessibility.build/dashboard")}
+          onClick={() => void ipc.openSite("https://app.thewcag.com/reports")}
           className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted"
         >
           Account
@@ -479,7 +479,7 @@ function SessionLogCard(props: { log: LogEntry[]; onClear: () => void }) {
       "",
       ...lines,
       "",
-      "Generated with [Accessibility.build](https://accessibility.build) desktop.",
+      "Generated with [TheWCAG](https://thewcag.com) desktop.",
     ].join("\n");
   }
 
