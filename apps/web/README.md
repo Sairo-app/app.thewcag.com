@@ -27,18 +27,29 @@ Copy `.env.example` and fill in:
 
 ## Database
 
-```sh
-# from apps/web, with DATABASE_URL set
-pnpm db:migrate        # applies drizzle/0000_init.sql
-```
+Postgres runs **co-located in the stack** (see `docker-compose.yaml` at the
+repo root) — no third-party database. The web container derives `DATABASE_URL`
+from the `postgres` service and applies the schema on boot (via
+`instrumentation.ts` → `lib/migrate.ts`, idempotent). Nothing to run by hand.
 
 ## Deploy (Coolify)
 
-- New resource → **Dockerfile**
-- **Dockerfile Location**: `apps/web/Dockerfile`
-- **Base Directory**: `/` (build context = monorepo root, so packages resolve)
-- Port: `3100`
-- Set the env vars above; point `app.thewcag.com` at the service.
+- New resource → **Docker Compose**
+- **Compose file**: `docker-compose.yaml` (repo root)
+- Point `app.thewcag.com` at the `web` service, port `3100`.
+- Set these env vars in Coolify (Postgres is internal, so **no `DATABASE_URL`**):
+
+  | Var | Value |
+  |---|---|
+  | `POSTGRES_PASSWORD` | any strong password (used only inside the stack) |
+  | `NEXT_PUBLIC_APP_URL` | `https://app.thewcag.com` |
+  | `AUTH_SECRET` | `openssl rand -base64 32` |
+  | `AUTH_RESEND_KEY` | Resend API key |
+  | `AUTH_EMAIL_FROM` | `TheWCAG <login@thewcag.com>` (verified in Resend) |
+  | `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_URL` | Cloudflare R2 (below) |
+
+The whole stack (Postgres + web + migrations) was validated locally with
+`docker compose up --build`.
 
 ## Cloudflare R2 (image storage)
 
