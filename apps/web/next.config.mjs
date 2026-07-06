@@ -12,6 +12,11 @@ const nextConfig = {
   outputFileTracingRoot: path.join(__dirname, '../../'),
   reactStrictMode: true,
   poweredByHeader: false,
+  // Types + lint are verified in dev and CI; skip the in-container passes so
+  // `next build` stays within a small deploy server's RAM (they're the two
+  // most memory-hungry steps and OOM the build on constrained hosts).
+  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: true },
   async headers() {
     return [
       {
