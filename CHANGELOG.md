@@ -1,5 +1,22 @@
 # Changelog
 
+## v2.1.0 — 2026-07-06
+
+Production release pipeline + React 19.
+
+- **Distribution via GitHub Releases**: tagging `v*` builds the signed DMG +
+  updater artifacts and publishes a GitHub Release with them. The
+  auto-updater reads `releases/latest/download/latest.json`; the DMG is a
+  public download. `app.thewcag.com/api/desktop/download` is a stable
+  "always latest" link.
+- Publish endpoint and account link now target `/screenshots` on
+  app.thewcag.com.
+- Monorepo unified on **React 19** (desktop upgraded from 18).
+
+Note: until an Apple Developer ID cert is in the repo secrets, the DMG is
+ad-hoc signed and macOS shows an "unidentified developer" prompt on first
+launch. The CI notarizes automatically once the secrets are present.
+
 ## v2.0.0 — 2026-07-06 — TheWCAG
 
 Rebrand to **TheWCAG**, with a dedicated backend at **app.thewcag.com**.

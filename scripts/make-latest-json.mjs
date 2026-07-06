@@ -35,7 +35,7 @@ const manifest = {
   platforms: {
     "darwin-aarch64": {
       signature: readFileSync(join(bundleDir, sigFile), "utf8"),
-      url: `https://app.thewcag.com/downloads/desktop/${encodeURIComponent(archive)}`,
+      url: `https://github.com/Sairo-app/app.thewcag.com/releases/download/v${version}/${encodeURIComponent(archive)}`,
     },
   },
 };

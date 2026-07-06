@@ -21,10 +21,10 @@ export default function Home() {
             My screenshots
           </Link>
           <a
-            href="https://thewcag.com"
+            href="/api/desktop/download"
             className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
           >
-            Get the app
+            Download for macOS
           </a>
         </div>
       </main>

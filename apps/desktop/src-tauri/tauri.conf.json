@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "TheWCAG",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "identifier": "com.thewcag.app",
   "build": {
     "beforeDevCommand": "pnpm dev:vite",
@@ -37,7 +37,7 @@
   },
   "plugins": {
     "updater": {
-      "endpoints": ["https://app.thewcag.com/downloads/desktop/latest.json"],
+      "endpoints": ["https://github.com/Sairo-app/app.thewcag.com/releases/latest/download/latest.json"],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQyMTQ0MkNERTBBOTk0RgpSV1JQbVFyZUxFUWhCSjdZVTlPMkg2clJJYWtDZU1KeURRLzlYaWUwZVF6VmtZTXFleWVoQ3ZZbAo="
     },
     "deep-link": {
