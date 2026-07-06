@@ -1,4 +1,5 @@
 mod actions;
+mod auth;
 mod capture;
 mod export;
 mod lens;
@@ -12,6 +13,7 @@ mod tray;
 mod update;
 
 use tauri::Manager;
+use tauri_plugin_deep_link::DeepLinkExt;
 
 pub fn run() {
     tauri::Builder::default()
@@ -26,6 +28,7 @@ pub fn run() {
             None,
         ))
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_deep_link::init())
         .invoke_handler(tauri::generate_handler![
             permissions::screen_permission_status,
             permissions::request_screen_permission,
@@ -60,6 +63,9 @@ pub fn run() {
             settings::get_shortcuts,
             settings::set_shortcut,
             settings::reset_shortcuts,
+            auth::sign_in,
+            auth::sign_out,
+            auth::get_account,
         ])
         .setup(|app| {
             // Menu-bar utility: no Dock icon.
@@ -75,6 +81,17 @@ pub fn run() {
             // A failed registration (combo taken by another app) must not
             // prevent startup; the settings UI surfaces it instead.
             let _ = settings::apply(handle);
+
+            // Register the accessibility-build:// scheme at runtime (dev
+            // builds); production registration comes from the bundle plist.
+            let _ = app.deep_link().register("accessibility-build");
+            let auth_handle = handle.clone();
+            app.deep_link().on_open_url(move |event| {
+                for url in event.urls() {
+                    auth::handle_deep_link(&auth_handle, url.as_str());
+                }
+            });
+
             tray::create(handle)?;
             Ok(())
         })

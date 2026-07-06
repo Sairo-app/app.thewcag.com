@@ -15,4 +15,6 @@ pub struct AppState {
     pub overlays: Mutex<HashMap<String, OverlayPayload>>,
     /// (capture id, png) for the annotate window currently opening
     pub annotation: Mutex<Option<(String, Vec<u8>)>>,
+    /// pending sign-in nonce; the deep link must echo it back
+    pub auth_state: Mutex<Option<String>>,
 }

@@ -10,7 +10,7 @@ import {
   type ColorblindType,
   type Rgb,
 } from "@accessibility-build/a11y-core";
-import { displayShortcut, events, ipc, type Shortcuts } from "../lib/ipc";
+import { displayShortcut, events, ipc, type Account, type Shortcuts } from "../lib/ipc";
 import { CheckIcon, CopyIcon, FolderIcon, SwapIcon, TimerIcon } from "../lib/icons";
 
 const SITE = "https://accessibility.build";
@@ -73,6 +73,7 @@ export default function MainWindow() {
   const [update, setUpdate] = useState<{ version: string } | null>(null);
   const [installing, setInstalling] = useState(false);
   const [onboarding, setOnboarding] = useState(() => !localStorage.getItem("onboarded-v1"));
+  const [account, setAccount] = useState<Account | null>(null);
 
   function appendLog(kind: LogEntry["kind"], text: string) {
     setLog((prev) => {
@@ -88,6 +89,7 @@ export default function MainWindow() {
     void ipc.getShortcuts().then(setShortcuts).catch(() => {});
     // silent: dev builds have no manifest yet; failures are expected offline
     void ipc.checkUpdate().then(setUpdate).catch(() => {});
+    void ipc.getAccount().then(setAccount).catch(() => {});
     const unlisteners = [
       events.onPicked((p) => {
         setError(null);
@@ -115,6 +117,7 @@ export default function MainWindow() {
             : "Annotated capture exported",
         );
       }),
+      events.onAccountChanged(() => void ipc.getAccount().then(setAccount).catch(() => {})),
     ];
     const onFocus = () => void refreshPermission();
     window.addEventListener("focus", onFocus);
@@ -305,6 +308,8 @@ export default function MainWindow() {
         localStorage.removeItem(LOG_KEY);
       }} />}
 
+      <AccountCard account={account} />
+
       {shortcuts && (
         <ShortcutsCard shortcuts={shortcuts} onChanged={setShortcuts} onError={setError} />
       )}
@@ -339,7 +344,7 @@ export default function MainWindow() {
           />
           Launch at login
         </label>
-        <span className="text-[10px] text-muted-foreground">v1.4.0</span>
+        <span className="text-[10px] text-muted-foreground">v1.5.0</span>
       </footer>
 
       {onboarding && (
@@ -399,6 +404,56 @@ function CapturesCard() {
             </button>
           </div>
         ))}
+      </div>
+    </section>
+  );
+}
+
+function AccountCard({ account }: { account: Account | null }) {
+  if (account === null) return null; // still loading
+  if (!account.signedIn) {
+    return (
+      <section className="card mb-3 flex items-center justify-between p-3">
+        <div>
+          <h2 className="text-xs font-semibold">Accessibility.build account</h2>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            Sign in to sync credits and unlock scans & reports
+          </p>
+        </div>
+        <button
+          onClick={() => void ipc.signIn()}
+          className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90"
+        >
+          Sign in
+        </button>
+      </section>
+    );
+  }
+  return (
+    <section className="card mb-3 flex items-center justify-between p-3">
+      <div className="min-w-0">
+        <p className="truncate text-xs font-semibold" title={account.email}>
+          {account.email || "Signed in"}
+        </p>
+        <p className="mt-0.5 text-[11px] text-muted-foreground">
+          {typeof account.credits === "number"
+            ? `${account.credits} credit${account.credits === 1 ? "" : "s"}`
+            : "Connected"}
+        </p>
+      </div>
+      <div className="flex shrink-0 items-center gap-1.5">
+        <button
+          onClick={() => void ipc.openSite("https://accessibility.build/dashboard")}
+          className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted"
+        >
+          Account
+        </button>
+        <button
+          onClick={() => void ipc.signOut()}
+          className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          Sign out
+        </button>
       </div>
     </section>
   );

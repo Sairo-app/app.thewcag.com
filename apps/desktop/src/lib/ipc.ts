@@ -58,7 +58,17 @@ export const ipc = {
   setShortcut: (action: keyof Shortcuts, shortcut: string) =>
     invoke<void>("set_shortcut", { action, shortcut }),
   resetShortcuts: () => invoke<Shortcuts>("reset_shortcuts"),
+  signIn: () => invoke<void>("sign_in"),
+  signOut: () => invoke<void>("sign_out"),
+  getAccount: () => invoke<Account>("get_account"),
 };
+
+export interface Account {
+  signedIn: boolean;
+  email?: string;
+  credits?: number;
+  plan?: string;
+}
 
 export interface Shortcuts {
   pick: string;
@@ -120,4 +130,6 @@ export const events = {
     listen("permission-needed", () => cb()),
   onAnnotateExported: (cb: (issues: string[]) => void): Promise<UnlistenFn> =>
     listen<string[]>("annotate-exported", (e) => cb(e.payload)),
+  onAccountChanged: (cb: () => void): Promise<UnlistenFn> =>
+    listen("account-changed", () => cb()),
 };

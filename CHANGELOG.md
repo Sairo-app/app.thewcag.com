@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.5.0 — 2026-07-06
+
+Sign in with your Accessibility.build account.
+
+- **Account sign-in** via the browser: the app opens the site's Clerk-authed
+  connect page, which hands a device token back through the
+  `accessibility-build://` deep link. The token is stored in the macOS
+  Keychain — never on disk in plaintext.
+- **Shared credits**: the main window shows your email and live credit
+  balance pulled from the site; the same balance you top up on the web.
+- **Entitlements** endpoint tells the app which paid features are unlocked
+  (URL scans, AI alt-text, cloud reports) — the backbone for the paid tier.
+- **Revocable devices**: each connection is a row you can kill from the
+  site; the app falls back to signed-out if its token is revoked.
+- Sign out clears the Keychain token.
+
+Site side (separate repo, branch `feat/desktop-integration`): `desktopDevices`
+table + migration, `/desktop/connect` page, `/api/desktop/entitlements`,
+`/api/desktop/devices`, `/api/desktop/download`, `latest.json` no-cache
+header, `/desktop` page + JSON-LD. See docs/SITE-INTEGRATION.md.
+
 ## v1.4.0 — 2026-07-06
 
 The annotation editor, rebuilt properly.
