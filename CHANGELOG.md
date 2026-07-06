@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.2.0 — 2026-07-06
+
+Bold, clean, professional UI pass.
+
+- Brand accent switched to the **TheWCAG orange** (from the TW logo) across
+  buttons, active states, focus rings and the contrast wash; white text on
+  orange for strong, confident primary actions.
+- The **TW logo** now sits in the main-window header beside a heavier
+  wordmark.
+- The contrast ratio is the hero: rendered much larger and extra-bold.
+- Cards are crisper with a defined border and soft depth shadow; larger
+  radius for a more premium feel.
+
 ## v2.1.0 — 2026-07-06
 
 Production release pipeline + React 19.

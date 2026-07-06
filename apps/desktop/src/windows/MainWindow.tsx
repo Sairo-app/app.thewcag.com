@@ -170,16 +170,21 @@ export default function MainWindow() {
   return (
     <div className="app-bg min-h-screen px-5 pb-5 font-sans text-[13px] text-foreground">
       {/* titlebar overlay: draggable strip under the traffic lights */}
-      <header data-tauri-drag-region className="flex items-center justify-between pb-3 pt-9">
+      <header data-tauri-drag-region className="flex items-center justify-between pb-4 pt-9">
         <button
           onClick={() => void ipc.openSite(SITE)}
-          className="text-left"
+          className="flex items-center gap-2.5 text-left"
           title="Open thewcag.com"
         >
-          <h1 className="text-[17px] font-bold tracking-tight">
-            The<span className="text-primary">WCAG</span>
-          </h1>
-          <p className="text-[11px] text-muted-foreground">Instant checks, anywhere on screen</p>
+          <img src="/logo.png" alt="" className="h-9 w-9 shrink-0" draggable={false} />
+          <span>
+            <span className="block text-[19px] font-extrabold leading-none tracking-tight">
+              The<span className="text-primary">WCAG</span>
+            </span>
+            <span className="mt-1 block text-[11px] font-medium text-muted-foreground">
+              Accessibility, anywhere on screen
+            </span>
+          </span>
         </button>
       </header>
 
@@ -350,7 +355,7 @@ export default function MainWindow() {
           />
           Launch at login
         </label>
-        <span className="text-[10px] text-muted-foreground">v2.1.0</span>
+        <span className="text-[10px] text-muted-foreground">v2.2.0</span>
       </footer>
 
       {onboarding && (
@@ -802,10 +807,10 @@ function ContrastPanel(props: {
 
       <div className="mb-2 flex items-end justify-between">
         <div className="flex items-baseline gap-2">
-          <span className="font-mono text-3xl font-bold tabular-nums">
+          <span className="font-mono text-[2.6rem] font-extrabold leading-none tracking-tight tabular-nums">
             {wcag.ratio.toFixed(2)}
           </span>
-          <span className="text-sm text-muted-foreground">: 1</span>
+          <span className="text-sm font-medium text-muted-foreground">: 1</span>
           <span
             className={`rounded-md px-1.5 py-0.5 text-[11px] font-bold ${
               passes ? "bg-ok/15 text-ok" : "bg-coral/15 text-coral"
