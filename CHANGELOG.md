@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.7.2 — 2026-07-06
+
+- App icon is now the real Accessibility.build brand mark (the white "A"),
+  regenerated from the site's `android-chrome-512x512.png` for the Dock,
+  Finder and installer. The menu-bar tray icon is derived from the same
+  mark as a monochrome template that adapts to light/dark menu bars
+  (`scripts/make-tray-from-brand.mjs`).
+- Removed the permission status dot from the header — the setup card
+  already communicates whether Screen Recording is granted.
+
 ## v1.7.1 — 2026-07-06
 
 Hardened the shared-report portal.

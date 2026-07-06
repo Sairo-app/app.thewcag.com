@@ -181,7 +181,6 @@ export default function MainWindow() {
           </h1>
           <p className="text-[11px] text-muted-foreground">Instant checks, anywhere on screen</p>
         </button>
-        <PermissionDot granted={permission} />
       </header>
 
       {error && (
@@ -351,7 +350,7 @@ export default function MainWindow() {
           />
           Launch at login
         </label>
-        <span className="text-[10px] text-muted-foreground">v1.7.1</span>
+        <span className="text-[10px] text-muted-foreground">v1.7.2</span>
       </footer>
 
       {onboarding && (
@@ -671,17 +670,6 @@ function ShortcutsCard(props: {
         </div>
       ))}
     </section>
-  );
-}
-
-function PermissionDot({ granted }: { granted: boolean | null }) {
-  return (
-    <span
-      title={granted ? "Screen Recording granted" : "Screen Recording needed"}
-      className={`inline-block h-2.5 w-2.5 rounded-full ${
-        granted === null ? "bg-muted" : granted ? "bg-ok" : "bg-yellow"
-      }`}
-    />
   );
 }
 
