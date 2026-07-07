@@ -973,7 +973,7 @@ function AuditButton(props: { label: string; hint: string; onClick: () => void }
   return (
     <button
       onClick={props.onClick}
-      className="card p-2 text-left transition-colors hover:border-primary/50"
+      className="card tile p-2.5 text-left"
     >
       <span className="block text-xs font-semibold">{props.label}</span>
       <span className="block text-[10px] text-muted-foreground">{props.hint}</span>
@@ -989,7 +989,7 @@ function ToolCard(props: {
   onDelayed?: () => void;
 }) {
   return (
-    <div className="card group relative p-3 transition-colors hover:border-primary/50">
+    <div className="card tile group relative p-3">
       <button onClick={props.onClick} className="w-full text-left">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold">{props.title}</span>
