@@ -4,6 +4,7 @@ import { reports, type ReportIssue } from "@/lib/schema";
 import { verifyDeviceToken } from "@/lib/device-auth";
 import { decodePngBase64, generateSlug, isUniqueViolation, SITE_URL } from "@/lib/reports";
 import { deleteImage, putImage } from "@/lib/r2";
+import { STORAGE_QUOTA_BYTES, formatBytes, userStorageBytes } from "@/lib/quota";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,6 +32,20 @@ export async function POST(req: NextRequest) {
     typeof b.description === "string" && b.description.trim() ? b.description.slice(0, 500) : null;
   const issues: ReportIssue[] = Array.isArray(b.issues) ? (b.issues as ReportIssue[]).slice(0, 100) : [];
 
+  // Per-user 1 GiB image cap: reject before writing anything to R2.
+  const used = await userStorageBytes(ctx.userId);
+  if (used + decoded.buffer.length > STORAGE_QUOTA_BYTES) {
+    return NextResponse.json(
+      {
+        error: "storage_quota_exceeded",
+        message: `Image storage limit reached (${formatBytes(used)} of ${formatBytes(STORAGE_QUOTA_BYTES)} used). Delete some shared screenshots to free space.`,
+        usedBytes: used,
+        quotaBytes: STORAGE_QUOTA_BYTES,
+      },
+      { status: 413 },
+    );
+  }
+
   for (let attempt = 0; attempt < 5; attempt++) {
     const slug = generateSlug();
     const imageKey = `screenshots/${slug}.png`;
@@ -44,6 +59,7 @@ export async function POST(req: NextRequest) {
         issues,
         imageKey,
         imageContentType: "image/png",
+        sizeBytes: decoded.buffer.length,
       });
       return NextResponse.json({ url: `${SITE_URL}/s/${slug}`, slug });
     } catch (err) {

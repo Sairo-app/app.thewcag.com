@@ -60,10 +60,13 @@ CREATE TABLE IF NOT EXISTS "report" (
 	"issues" jsonb NOT NULL,
 	"image_key" text NOT NULL,
 	"image_content_type" text DEFAULT 'image/png' NOT NULL,
+	"size_bytes" integer DEFAULT 0 NOT NULL,
 	"view_count" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	CONSTRAINT "report_slug_unique" UNIQUE("slug")
 );
+--> statement-breakpoint
+ALTER TABLE "report" ADD COLUMN IF NOT EXISTS "size_bytes" integer DEFAULT 0 NOT NULL;
 --> statement-breakpoint
 DO $$ BEGIN ALTER TABLE "account" ADD CONSTRAINT "account_userId_user_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."user"("id") ON DELETE cascade; EXCEPTION WHEN duplicate_object THEN null; END $$;
 --> statement-breakpoint

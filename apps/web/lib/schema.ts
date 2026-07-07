@@ -87,6 +87,7 @@ export const reports = pgTable(
     issues: jsonb("issues").$type<ReportIssue[]>().notNull(),
     imageKey: text("image_key").notNull(),
     imageContentType: text("image_content_type").notNull().default("image/png"),
+    sizeBytes: integer("size_bytes").notNull().default(0),
     viewCount: integer("view_count").notNull().default(0),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
