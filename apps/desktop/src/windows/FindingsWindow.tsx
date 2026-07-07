@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ipc } from "../lib/ipc";
+import { CloseIcon, PlusIcon } from "../lib/icons";
 
 const STORE_KEY = "findings";
 
@@ -164,7 +165,7 @@ th{background:#f8fafc;font-size:12px;text-transform:uppercase;letter-spacing:.05
 footer{margin-top:24px;color:#64748b;font-size:12px}</style></head>
 <body><h1>Accessibility findings <small style="color:#64748b">(${rows.length})</small></h1>
 <table><thead><tr><th>#</th><th>WCAG</th><th>Issue</th><th>Severity</th><th>Status</th><th>Note</th></tr></thead>
-<tbody>${body}</tbody></table><footer>Logged with TheWCAG desktop · ${today()}</footer></body></html>`;
+<tbody>${body}</tbody></table><footer>Logged with TheWCAG desktop, ${today()}</footer></body></html>`;
     const path = await ipc.saveText(html, `findings-${today()}.html`);
     if (path) flash("HTML saved");
   }
@@ -174,20 +175,21 @@ footer{margin-top:24px;color:#64748b;font-size:12px}</style></head>
       <header className="flex flex-wrap items-center gap-2 border-b border-border bg-card/80 px-3 py-2 backdrop-blur-xl">
         <h1 className="mr-2 text-sm font-bold">Findings Register</h1>
         <span className="text-[11px] text-muted-foreground">
-          {counts.total} total · {counts.open} open · {counts.fixed} fixed
+          {counts.total} total, {counts.open} open, {counts.fixed} fixed
         </span>
         <div className="ml-auto flex items-center gap-1.5">
           {status && <span className="rise mr-1 text-[11px] text-ok">{status}</span>}
-          <button onClick={addManual} className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted">
-            + Add
+          <button onClick={addManual} className="btn flex items-center gap-1 px-2.5 py-1.5 text-xs">
+            <PlusIcon size={11} />
+            Add
           </button>
-          <button onClick={() => void exportCsv()} disabled={!findings.length} className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-40">
+          <button onClick={() => void exportCsv()} disabled={!findings.length} className="btn px-2.5 py-1.5 text-xs disabled:opacity-40">
             CSV
           </button>
-          <button onClick={() => void exportMarkdown()} disabled={!findings.length} className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-40">
+          <button onClick={() => void exportMarkdown()} disabled={!findings.length} className="btn px-2.5 py-1.5 text-xs disabled:opacity-40">
             Markdown
           </button>
-          <button onClick={() => void exportHtml()} disabled={!findings.length} className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-40">
+          <button onClick={() => void exportHtml()} disabled={!findings.length} className="btn-primary px-3 py-1.5 text-xs disabled:opacity-40">
             HTML
           </button>
         </div>
@@ -224,7 +226,7 @@ footer{margin-top:24px;color:#64748b;font-size:12px}</style></head>
         ) : (
           <div className="space-y-1.5">
             {filtered.map((f) => (
-              <div key={f.key} className="rise grid grid-cols-[auto_1fr_auto] items-start gap-2 rounded-lg border border-border bg-card p-2">
+              <div key={f.key} className="rise card tile grid grid-cols-[auto_1fr_auto] items-start gap-2 p-2">
                 <span className="mt-1 h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: SEVERITY_COLOR[f.severity] }} title={f.severity} />
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -263,8 +265,8 @@ footer{margin-top:24px;color:#64748b;font-size:12px}</style></head>
                       <option key={s} value={s}>{s}</option>
                     ))}
                   </select>
-                  <button onClick={() => remove(f.key)} title="Delete" className="rounded px-1.5 py-1 text-[10px] text-muted-foreground hover:text-coral">
-                    ✕
+                  <button onClick={() => remove(f.key)} title="Delete" className="rounded px-1.5 py-1 text-muted-foreground hover:text-coral">
+                    <CloseIcon size={12} />
                   </button>
                 </div>
               </div>

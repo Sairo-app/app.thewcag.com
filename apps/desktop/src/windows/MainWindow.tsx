@@ -914,7 +914,7 @@ function FixButton(props: {
       <span className="text-left">
         <span className="block font-mono text-[11px]">{props.hex}</span>
         <span className="block text-[10px] text-muted-foreground">
-          {props.ratio.toFixed(2)}:1 · {props.which}
+          {props.ratio.toFixed(2)}:1, {props.which}
         </span>
       </span>
     </button>

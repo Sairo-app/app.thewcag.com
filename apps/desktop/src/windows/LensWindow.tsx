@@ -33,7 +33,7 @@ export default function LensWindow() {
   const stateRef = useRef({ filter, frozen, split, severity });
   stateRef.current = { filter, frozen, split, severity };
 
-  // 1-5 filter · Space freeze · D split · B blur · L low contrast
+  // 1-5 filter, Space freeze, D split, B blur, L low contrast
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).tagName === "INPUT") return;

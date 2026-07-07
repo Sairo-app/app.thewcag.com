@@ -169,7 +169,7 @@ export default function ChecklistWindow() {
     const md = [
       `# WCAG 2.2 audit - ${today()}`,
       "",
-      `${stats.pass} pass · ${stats.fail} fail · ${stats.na} N/A · ${stats.total - stats.tested} untested`,
+      `${stats.pass} pass, ${stats.fail} fail, ${stats.na} N/A, ${stats.total - stats.tested} untested`,
       "",
       "| SC | Level | Criterion | Result | Note |",
       "|----|-------|-----------|--------|------|",
@@ -195,7 +195,7 @@ table{border-collapse:collapse;width:100%;margin-top:16px}th,td{border:1px solid
 th{background:#f8fafc;font-size:12px;text-transform:uppercase;color:#64748b}
 .r-pass{color:#16a34a;font-weight:600}.r-fail{color:#dc2626;font-weight:600}.r-na{color:#64748b}.r-untested{color:#94a3b8}</style></head>
 <body><h1>WCAG 2.2 audit <small style="color:#64748b">${today()}</small></h1>
-<p>${stats.pass} pass · ${stats.fail} fail · ${stats.na} N/A · ${stats.total - stats.tested} untested</p>
+<p>${stats.pass} pass, ${stats.fail} fail, ${stats.na} N/A, ${stats.total - stats.tested} untested</p>
 <table><thead><tr><th>SC</th><th>Level</th><th>Criterion</th><th>Result</th><th>Note</th></tr></thead>
 <tbody>${body}</tbody></table></body></html>`;
     const path = await ipc.saveText(html, `wcag-audit-${today()}.html`);
@@ -225,8 +225,8 @@ th{background:#f8fafc;font-size:12px;text-transform:uppercase;color:#64748b}
             <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
           </div>
           <span className="text-[11px] text-muted-foreground">
-            <span className="text-ok">{stats.pass}✓</span> · <span className="text-coral">{stats.fail}✕</span> ·{" "}
-            {stats.na} N/A · {stats.total - stats.tested} left
+            <span className="text-ok">{stats.pass}✓</span>, <span className="text-coral">{stats.fail}✕</span>,{" "}
+            {stats.na} N/A, {stats.total - stats.tested} left
           </span>
         </div>
       </header>

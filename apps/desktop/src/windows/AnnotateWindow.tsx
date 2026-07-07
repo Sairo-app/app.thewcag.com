@@ -514,7 +514,7 @@ export default function AnnotateWindow() {
     ctx.fillText("Accessibility findings", pad, 58);
     ctx.font = "400 16px -apple-system, system-ui, sans-serif";
     ctx.fillStyle = "#64748B";
-    ctx.fillText(`${new Date().toDateString()} · ${badges.length} issue${badges.length === 1 ? "" : "s"} · thewcag.com`, pad, 84);
+    ctx.fillText(`${new Date().toDateString()}, ${badges.length} issue${badges.length === 1 ? "" : "s"}, thewcag.com`, pad, 84);
 
     const annotated = document.createElement("canvas");
     annotated.width = img.naturalWidth;
@@ -659,7 +659,7 @@ export default function AnnotateWindow() {
   async function onCopyMarkdown() {
     const lines = badges.map((b, i) => {
       const type = issueTypeOf(b);
-      return `${i + 1}. **${type.sc ? `WCAG ${type.sc} ` : ""}${type.label}** · \`${b.severity ?? "major"}\` - ${b.note?.trim() || "(add note)"}`;
+      return `${i + 1}. **${type.sc ? `WCAG ${type.sc} ` : ""}${type.label}**, \`${b.severity ?? "major"}\` - ${b.note?.trim() || "(add note)"}`;
     });
     await ipc.copyText(
       ["## Accessibility issues", "", "_Annotated screenshot attached._", "", ...lines, "", "Found with [TheWCAG](https://thewcag.com) desktop."].join("\n"),
@@ -800,7 +800,7 @@ export default function AnnotateWindow() {
           />
           {shapes.length === 0 && !draft && (
             <div className="fade pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-card/90 px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur">
-              Press <kbd className="font-mono">I</kbd> and click to drop issue #1 · scroll to pan · pinch or ⌘scroll to zoom
+              Press <kbd className="font-mono">I</kbd> and click to drop issue #1, scroll to pan, pinch or ⌘scroll to zoom
             </div>
           )}
           {tool === "probe" && (
@@ -884,7 +884,7 @@ export default function AnnotateWindow() {
                     >
                       {ISSUE_TYPES.map((t) => (
                         <option key={t.id} value={t.id}>
-                          {t.sc ? `${t.sc} · ` : ""}
+                          {t.sc ? `${t.sc}, ` : ""}
                           {t.label}
                         </option>
                       ))}

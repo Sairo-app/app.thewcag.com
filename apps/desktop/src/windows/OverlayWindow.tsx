@@ -110,8 +110,8 @@ export default function OverlayWindow() {
     return { color: worst!, ratio: worstRatio };
   }
 
-  // Keyboard: Esc cancel · arrows nudge one physical px (⇧ = 10) ·
-  // Enter/Space pick or full-screen capture · C copy hex.
+  // Keyboard: Esc cancel, arrows nudge one physical px (⇧ = 10),
+  // Enter/Space pick or full-screen capture, C copy hex.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -448,14 +448,14 @@ export default function OverlayWindow() {
 
       <div className="fade pointer-events-none absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-full bg-black/80 px-3 py-1.5 text-[11px] text-white/90 shadow-lg">
         {isShot
-          ? "Drag to capture a region · Space for full screen · Esc to cancel"
+          ? "Drag to capture a region, Space for full screen, Esc to cancel"
           : isMeasure
-            ? "Drag to measure any element · targets under 24×24 px flag WCAG 2.5.8 · Esc to finish"
+            ? "Drag to measure any element, targets under 24×24 px flag WCAG 2.5.8, Esc to finish"
             : meta?.mode === "pair"
               ? firstPick
                 ? "Click the background - or drag across gradients/images for the worst-case pixel"
-                : "Click the text color · arrows nudge · C copies hex · Esc cancels"
-              : `Click to pick the ${meta?.mode === "bg" ? "background" : "text"} color · arrows nudge · C copies hex · Esc cancels`}
+                : "Click the text color, arrows nudge, C copies hex, Esc cancels"
+              : `Click to pick the ${meta?.mode === "bg" ? "background" : "text"} color, arrows nudge, C copies hex, Esc cancels`}
       </div>
     </div>
   );
