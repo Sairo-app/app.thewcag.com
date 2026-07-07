@@ -2,9 +2,11 @@ import Link from "next/link";
 
 const LINKS: { href: string; label: string }[] = [
   { href: "/download", label: "Download" },
+  { href: "/screenshot-tool", label: "Screenshot tool" },
   { href: "/color-contrast-checker", label: "Contrast checker" },
   { href: "/wcag-contrast", label: "WCAG contrast guide" },
   { href: "/color-blindness-simulator", label: "Color blindness simulator" },
+  { href: "/accessibility-statement", label: "Accessibility statement" },
 ];
 
 export function Footer() {

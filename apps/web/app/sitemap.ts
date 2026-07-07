@@ -8,9 +8,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const routes: { path: string; priority: number }[] = [
     { path: "", priority: 1 },
     { path: "/download", priority: 0.9 },
+    { path: "/screenshot-tool", priority: 0.8 },
     { path: "/color-contrast-checker", priority: 0.8 },
     { path: "/wcag-contrast", priority: 0.8 },
     { path: "/color-blindness-simulator", priority: 0.7 },
+    { path: "/accessibility-statement", priority: 0.5 },
   ];
   return routes.map(({ path, priority }) => ({
     url: `${SITE}${path}`,

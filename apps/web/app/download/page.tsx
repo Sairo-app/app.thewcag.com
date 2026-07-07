@@ -9,7 +9,7 @@ const SITE = process.env.NEXT_PUBLIC_APP_URL || "https://app.thewcag.com";
 export const metadata: Metadata = {
   title: "Download TheWCAG for macOS & Windows",
   description:
-    "Download TheWCAG — the free desktop accessibility toolkit for macOS and Windows. Check WCAG color contrast anywhere on screen, simulate color blindness, and share annotated reports.",
+    "Download TheWCAG - the free desktop accessibility toolkit for macOS and Windows. Check WCAG color contrast anywhere on screen, simulate color blindness, and share annotated reports.",
   alternates: { canonical: "/download" },
   openGraph: {
     title: "Download TheWCAG for macOS & Windows",
@@ -24,14 +24,14 @@ const PLATFORMS = [
     os: "mac" as const,
     name: "macOS",
     icon: AppleIcon,
-    note: "macOS 13 Ventura or later · Apple Silicon & Intel",
+    note: "macOS 13 Ventura or later, Apple Silicon & Intel",
     cta: "Download for macOS",
   },
   {
     os: "windows" as const,
     name: "Windows",
     icon: WindowsIcon,
-    note: "Windows 10 & 11 · 64-bit",
+    note: "Windows 10 & 11, 64-bit",
     cta: "Download for Windows",
   },
 ];
@@ -57,7 +57,7 @@ export default function DownloadPage() {
         <p className="mt-3 max-w-2xl text-muted">
           The free desktop accessibility toolkit. Pick a color pair from anywhere on screen, get the
           exact WCAG contrast ratio, simulate color blindness, and turn annotated screenshots into
-          shareable reports — natively on your Mac or PC.
+          shareable reports - natively on your Mac or PC.
         </p>
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2">
@@ -94,7 +94,7 @@ export default function DownloadPage() {
               ["On-screen contrast picker", "Sample any two pixels and read the WCAG 2.1/2.2 ratio, AA/AAA verdict, and APCA Lc instantly."],
               ["Color-blindness lens", "See any app through protanopia, deuteranopia, tritanopia, and low-acuity filters, live."],
               ["Annotate & measure", "Capture a region, flag issues against WCAG success criteria, and check 24px target sizes."],
-              ["Shareable reports", "Publish an annotated screenshot to a link your team can open — no account needed to view."],
+              ["Shareable reports", "Publish an annotated screenshot to a link your team can open - no account needed to view."],
             ].map(([t, d]) => (
               <li key={t} className="rounded-lg border border-border p-4">
                 <h3 className="text-sm font-semibold">{t}</h3>

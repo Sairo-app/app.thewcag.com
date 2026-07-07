@@ -5,7 +5,7 @@ import { Footer } from "@/components/Footer";
 const FEATURES = [
   {
     title: "Contrast anywhere on screen",
-    body: "Pick any two pixels and read the exact WCAG 2.2 ratio, AA/AAA verdict, and APCA — in any app, not just the browser.",
+    body: "Pick any two pixels and read the exact WCAG 2.2 ratio, AA/AAA verdict, and APCA - in any app, not just the browser.",
     href: "/color-contrast-checker",
     cta: "Contrast checker",
   },

@@ -8,8 +8,8 @@ const DESCRIPTION =
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),
   title: {
-    default: "TheWCAG — Color contrast checker & accessibility screenshot tool",
-    template: "%s — TheWCAG",
+    default: "TheWCAG - Color contrast checker & accessibility screenshot tool",
+    template: "%s - TheWCAG",
   },
   description: DESCRIPTION,
   applicationName: "TheWCAG",
@@ -30,12 +30,12 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "TheWCAG",
     url: SITE,
-    title: "TheWCAG — Color contrast checker & accessibility screenshot tool",
+    title: "TheWCAG - Color contrast checker & accessibility screenshot tool",
     description: DESCRIPTION,
   },
   twitter: {
     card: "summary_large_image",
-    title: "TheWCAG — Color contrast checker for macOS & Windows",
+    title: "TheWCAG - Color contrast checker for macOS & Windows",
     description: DESCRIPTION,
   },
   robots: { index: true, follow: true },

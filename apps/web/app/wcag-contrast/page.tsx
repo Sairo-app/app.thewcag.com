@@ -53,7 +53,7 @@ export default function WcagContrastPage() {
           WCAG color contrast requirements, explained
         </h1>
         <p className="mt-3 max-w-2xl text-muted">
-          Color contrast is one of the most common accessibility failures — and one of the easiest
+          Color contrast is one of the most common accessibility failures - and one of the easiest
           to fix. Here is exactly what WCAG 2.1 and 2.2 require, why, and how the numbers are
           derived.
         </p>
@@ -73,7 +73,7 @@ export default function WcagContrastPage() {
                 {[
                   ["Normal text", "4.5:1", "7:1"],
                   ["Large text (≥ 24px / 18.66px bold)", "3:1", "4.5:1"],
-                  ["UI components & graphics (1.4.11)", "3:1", "—"],
+                  ["UI components & graphics (1.4.11)", "3:1", "-"],
                   ["Incidental / disabled / logos", "exempt", "exempt"],
                 ].map(([w, aa, aaa]) => (
                   <tr key={w} className="border-b border-border">
@@ -109,7 +109,7 @@ export default function WcagContrastPage() {
         <section className="mt-12 rounded-xl border border-border bg-card p-6">
           <h2 className="text-lg font-bold tracking-tight">Check any pixel on your screen</h2>
           <p className="mt-2 text-sm text-muted">
-            TheWCAG computes all of the above live as you pick colors from any app — with the
+            TheWCAG computes all of the above live as you pick colors from any app - with the
             worst-case pixel across gradients, AA/AAA verdicts, and APCA.
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
