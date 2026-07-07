@@ -26,15 +26,22 @@ xcap = "0.9"
 image = "0.25"
 mouse_position = "0.1"
 chrono = "0.4"
-keyring = { version = "3", features = ["apple-native"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 rand = "0.8"
 whoami = "1"
 url = "2"
 
+# keyring backend is per-OS: Keychain on macOS, Credential Manager on Windows.
 [target.'cfg(target_os = "macos")'.dependencies]
 core-graphics = "0.24"
 objc2 = "0.6"
+keyring = { version = "3", features = ["apple-native"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "3", features = ["windows-native"] }
+# SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE) keeps the live lens window
+# out of its own screen capture (no hide/show flicker).
+windows = { version = "0.58", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
 
 [profile.release]
 strip = true

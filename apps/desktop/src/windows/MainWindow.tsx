@@ -167,10 +167,17 @@ export default function MainWindow() {
   const fgRgb = hexToRgb(fg);
   const bgRgb = hexToRgb(bg);
 
+  // macOS uses an overlay titlebar (traffic lights sit over the content, so we
+  // pad the top). Windows shows a real titlebar, so no extra top padding.
+  const isMac = typeof navigator !== "undefined" && /Mac/i.test(navigator.userAgent);
+
   return (
     <div className="app-bg flex h-screen flex-col overflow-hidden font-sans text-[13px] text-foreground">
-      {/* titlebar overlay: draggable strip under the traffic lights */}
-      <header data-tauri-drag-region className="flex shrink-0 items-center justify-between px-5 pb-4 pt-9">
+      {/* titlebar overlay: draggable strip under the traffic lights (macOS) */}
+      <header
+        data-tauri-drag-region
+        className={`flex shrink-0 items-center justify-between px-5 pb-4 ${isMac ? "pt-9" : "pt-4"}`}
+      >
         <button
           onClick={() => void ipc.openSite(SITE)}
           className="flex items-center gap-2.5 text-left"
