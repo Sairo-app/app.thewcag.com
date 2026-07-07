@@ -22,7 +22,8 @@ const bundleRoot = join(root, "apps/desktop/src-tauri/target/release/bundle");
 // updater target key the Tauri updater looks up at runtime.
 const SPECS = {
   mac: { dir: "macos", ext: ".app.tar.gz", key: "darwin-aarch64" },
-  windows: { dir: "nsis", ext: "-setup.nsis.zip", key: "windows-x86_64" },
+  // Tauri's NSIS updater target is the installer itself (-setup.exe) + .sig.
+  windows: { dir: "nsis", ext: "-setup.exe", key: "windows-x86_64" },
 };
 const spec = SPECS[platform];
 if (!spec) {
