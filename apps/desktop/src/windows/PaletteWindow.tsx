@@ -67,7 +67,7 @@ export default function PaletteWindow() {
             spellCheck={false}
             className="w-52 rounded-md border border-border bg-card-2/70 px-2 py-1.5 font-mono text-xs outline-none focus:ring-1 focus:ring-ring"
           />
-          <button type="submit" className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted">
+          <button type="submit" className="btn px-2.5 py-1.5 text-xs">
             Add
           </button>
         </form>
@@ -75,10 +75,10 @@ export default function PaletteWindow() {
           {status && <span className="rise mr-1 text-[11px] text-ok">{status}</span>}
           {colors.length > 0 && (
             <>
-              <button onClick={() => void copyCsv()} className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted">
+              <button onClick={() => void copyCsv()} className="btn px-2.5 py-1.5 text-xs">
                 Copy CSV
               </button>
-              <button onClick={() => setColors([])} className="rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted">
+              <button onClick={() => setColors([])} className="btn px-2.5 py-1.5 text-xs text-muted-foreground">
                 Clear
               </button>
             </>

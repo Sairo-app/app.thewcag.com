@@ -96,9 +96,9 @@ interface Entry {
 type State = Record<string, Entry>;
 
 const RESULT_COLOR: Record<Exclude<Result, "untested">, string> = {
-  pass: "#16A34A",
-  fail: "#DC2626",
-  na: "#64748B",
+  pass: "hsl(var(--ok))",
+  fail: "hsl(var(--coral))",
+  na: "hsl(var(--muted-foreground))",
 };
 
 export default function ChecklistWindow() {
@@ -216,8 +216,8 @@ th{background:#f8fafc;font-size:12px;text-transform:uppercase;color:#64748b}
           </select>
           <div className="ml-auto flex items-center gap-1.5">
             {saved && <span className="rise mr-1 text-[11px] text-ok">{saved}</span>}
-            <button onClick={() => void exportMarkdown()} className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted">Markdown</button>
-            <button onClick={() => void exportHtml()} className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90">HTML</button>
+            <button onClick={() => void exportMarkdown()} className="btn px-2.5 py-1.5 text-xs">Markdown</button>
+            <button onClick={() => void exportHtml()} className="btn-primary px-3 py-1.5 text-xs">HTML</button>
           </div>
         </div>
         <div className="mt-2 flex items-center gap-3">
