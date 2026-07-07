@@ -137,7 +137,7 @@ export default function MainWindow() {
       const v = wcagVerdict(a, b);
       appendLog(
         "pair",
-        `${newFg} on ${newBg} — ${v.ratio.toFixed(2)}:1 — ${v.normalAA ? "passes" : "fails"} WCAG 1.4.3 AA (normal text)`,
+        `${newFg} on ${newBg} - ${v.ratio.toFixed(2)}:1 - ${v.normalAA ? "passes" : "fails"} WCAG 1.4.3 AA (normal text)`,
       );
     }
     setHistory((prev) => {
@@ -391,7 +391,7 @@ function CapturesCard() {
   return (
     <section className="card mb-3 p-3">
       <h2 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        Captures — click to re-edit
+        Captures - click to re-edit
       </h2>
       <div className="max-h-36 space-y-1 overflow-y-auto">
         {docs.slice(0, 8).map((d) => (
@@ -484,7 +484,7 @@ function SessionLogCard(props: { log: LogEntry[]; onClear: () => void }) {
       return `- **${time}** ${e.text}`;
     });
     return [
-      `# Accessibility audit session — ${day}`,
+      `# Accessibility audit session - ${day}`,
       "",
       ...lines,
       "",
@@ -547,7 +547,7 @@ function Onboarding(props: {
   const steps = [
     {
       title: "Check contrast anywhere",
-      body: `Press ${s ? displayShortcut(s.pick) : "the pick shortcut"} — the screen freezes with a magnified loupe. Click the text color, then the background. Drag across gradients to find the worst-case pixel.`,
+      body: `Press ${s ? displayShortcut(s.pick) : "the pick shortcut"} - the screen freezes with a magnified loupe. Click the text color, then the background. Drag across gradients to find the worst-case pixel.`,
     },
     {
       title: "Capture and annotate issues",
@@ -577,7 +577,7 @@ function Onboarding(props: {
             onClick={props.onGrant}
             className="mb-3 w-full rounded-lg border border-yellow/50 bg-yellow/10 px-3 py-2 text-xs font-medium text-foreground hover:bg-yellow/20"
           >
-            Grant Screen Recording first — everything needs it
+            Grant Screen Recording first - everything needs it
           </button>
         )}
         <div className="flex items-center justify-between">
@@ -712,7 +712,7 @@ function PermissionCard(props: { onGrant: () => void; onOpenSettings: () => void
         </button>
       </div>
       <p className="mt-2 text-[10px] text-muted-foreground">
-        macOS applies this permission only when the app relaunches — if the
+        macOS applies this permission only when the app relaunches - if the
         toggle is already on in System Settings, use Restart. If it still
         asks after restarting, remove the stale entry in System Settings
         with the − button and grant again.
@@ -764,7 +764,7 @@ function ContrastPanel(props: {
 
   async function copyFinding() {
     const verdict = passes ? "passes" : "fails";
-    const text = `${props.fg} on ${props.bg}${props.worst ? " (worst-case pixel of sampled region)" : ""} — ${wcag.ratio.toFixed(2)}:1 — ${verdict} WCAG ${modeInfo.sc} AA (${modeInfo.label.toLowerCase()}); APCA Lc ${lc.toFixed(1)}`;
+    const text = `${props.fg} on ${props.bg}${props.worst ? " (worst-case pixel of sampled region)" : ""} - ${wcag.ratio.toFixed(2)}:1 - ${verdict} WCAG ${modeInfo.sc} AA (${modeInfo.label.toLowerCase()}); APCA Lc ${lc.toFixed(1)}`;
     await ipc.copyText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
@@ -851,7 +851,7 @@ function ContrastPanel(props: {
                 className={`rounded-md px-1.5 py-0.5 font-mono text-[9px] ${
                   bad ? "bg-coral/15 font-bold text-coral" : "bg-muted/70 text-muted-foreground"
                 }`}
-                title={`${row.key}: ${row.ratio.toFixed(2)}:1${bad ? " — passes normally but fails under this CVD" : ""}`}
+                title={`${row.key}: ${row.ratio.toFixed(2)}:1${bad ? " - passes normally but fails under this CVD" : ""}`}
               >
                 {row.label} {row.ratio.toFixed(1)}
               </span>
@@ -870,7 +870,7 @@ function ContrastPanel(props: {
       {(fgFixes.length > 0 || bgFixes.length > 0) && (
         <div className="mt-3 border-t border-border/70 pt-3">
           <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Make it pass — nearest {modeInfo.target}:1 fixes
+            Make it pass - nearest {modeInfo.target}:1 fixes
           </h3>
           <div className="flex flex-wrap gap-2">
             {fgFixes.map((s) => (
@@ -1006,7 +1006,7 @@ function ToolCard(props: {
       {props.onDelayed && (
         <button
           onClick={props.onDelayed}
-          title="Start after a 3s delay — time to open hover states and menus"
+          title="Start after a 3s delay - time to open hover states and menus"
           className="absolute bottom-2 right-2 flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[9px] text-muted-foreground opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
         >
           <TimerIcon size={10} />

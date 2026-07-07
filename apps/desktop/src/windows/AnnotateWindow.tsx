@@ -403,7 +403,7 @@ export default function AnnotateWindow() {
         const shape: Shape = { ...draft, ...bounds };
         commit((prev) => [...prev, shape]);
       } else {
-        flash("Couldn't detect an element here — drag to measure manually");
+        flash("Couldn't detect an element here - drag to measure manually");
       }
     }
     setDraft(null);
@@ -572,7 +572,7 @@ export default function AnnotateWindow() {
   function issueSummaries(): string[] {
     return badges.map((b) => {
       const type = issueTypeOf(b);
-      return `${type.sc ? `[WCAG ${type.sc}] ` : ""}${type.label} (${b.severity ?? "major"}) — ${b.note?.trim() || "(no note)"}`;
+      return `${type.sc ? `[WCAG ${type.sc}] ` : ""}${type.label} (${b.severity ?? "major"}) - ${b.note?.trim() || "(no note)"}`;
     });
   }
 
@@ -649,7 +649,7 @@ export default function AnnotateWindow() {
       const url = await ipc.publishReport(title, description, issues, base64);
       await ipc.copyText(url);
       await ipc.openSite(url);
-      flash("Published — link copied");
+      flash("Published - link copied");
       void emit("annotate-exported", issueSummaries());
       if (badges.length) void ipc.addFindings(registerItems());
     } catch (e) {
@@ -659,7 +659,7 @@ export default function AnnotateWindow() {
   async function onCopyMarkdown() {
     const lines = badges.map((b, i) => {
       const type = issueTypeOf(b);
-      return `${i + 1}. **${type.sc ? `WCAG ${type.sc} ` : ""}${type.label}** · \`${b.severity ?? "major"}\` — ${b.note?.trim() || "(add note)"}`;
+      return `${i + 1}. **${type.sc ? `WCAG ${type.sc} ` : ""}${type.label}** · \`${b.severity ?? "major"}\` - ${b.note?.trim() || "(add note)"}`;
     });
     await ipc.copyText(
       ["## Accessibility issues", "", "_Annotated screenshot attached._", "", ...lines, "", "Found with [TheWCAG](https://thewcag.com) desktop."].join("\n"),
@@ -669,7 +669,7 @@ export default function AnnotateWindow() {
   async function onCopyJira() {
     const lines = badges.map((b) => {
       const type = issueTypeOf(b);
-      return `# *${type.sc ? `WCAG ${type.sc} ` : ""}${type.label}* {{${b.severity ?? "major"}}} — ${b.note?.trim() || "(add note)"}`;
+      return `# *${type.sc ? `WCAG ${type.sc} ` : ""}${type.label}* {{${b.severity ?? "major"}}} - ${b.note?.trim() || "(add note)"}`;
     });
     await ipc.copyText(
       ["h2. Accessibility issues", "", "_Annotated screenshot attached._", "", ...lines, "", "Found with [TheWCAG|https://thewcag.com] desktop."].join("\n"),
@@ -716,10 +716,10 @@ export default function AnnotateWindow() {
           </div>
           {tool === "redact" && (
             <div className="seg">
-              <button data-active={redactStyle === "solid"} onClick={() => setRedactStyle("solid")} title="Solid block — safe redaction">
+              <button data-active={redactStyle === "solid"} onClick={() => setRedactStyle("solid")} title="Solid block - safe redaction">
                 Solid
               </button>
-              <button data-active={redactStyle === "pixel"} onClick={() => setRedactStyle("pixel")} title="Pixelate — cosmetic only, can be reversed on text">
+              <button data-active={redactStyle === "pixel"} onClick={() => setRedactStyle("pixel")} title="Pixelate - cosmetic only, can be reversed on text">
                 Pixel
               </button>
             </div>
@@ -805,7 +805,7 @@ export default function AnnotateWindow() {
           )}
           {tool === "probe" && (
             <div className="fade pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-card/90 px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur">
-              {probeFirst ? "Click the second color — ratio attaches to the selected issue" : "Click the first color to probe contrast in this capture"}
+              {probeFirst ? "Click the second color - ratio attaches to the selected issue" : "Click the first color to probe contrast in this capture"}
             </div>
           )}
           {textEntry && (
@@ -906,7 +906,7 @@ export default function AnnotateWindow() {
                       ))}
                     </select>
                   </div>
-                  {type.sc && <p className="mb-1 text-[10px] text-muted-foreground">WCAG {type.sc} — {type.label}</p>}
+                  {type.sc && <p className="mb-1 text-[10px] text-muted-foreground">WCAG {type.sc} - {type.label}</p>}
                   <textarea
                     value={b.note}
                     onChange={(e) =>

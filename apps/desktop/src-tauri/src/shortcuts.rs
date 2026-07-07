@@ -4,7 +4,7 @@ use tauri_plugin_global_shortcut::ShortcutState;
 use crate::{lens, overlay, settings};
 
 /// Shortcuts are registered dynamically from the saved config (see
-/// settings::apply, called in setup and after every change) — the plugin
+/// settings::apply, called in setup and after every change) - the plugin
 /// here only routes fired shortcuts to their action.
 pub fn plugin() -> tauri::plugin::TauriPlugin<Wry> {
     tauri_plugin_global_shortcut::Builder::new()

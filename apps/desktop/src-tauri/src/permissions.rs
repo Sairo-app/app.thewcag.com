@@ -22,7 +22,7 @@ pub fn screen_permission_status() -> bool {
 }
 
 /// Triggers the OS permission prompt. Returns false if the user previously
-/// denied — macOS will not re-prompt, so the caller should send them to
+/// denied - macOS will not re-prompt, so the caller should send them to
 /// System Settings instead.
 #[tauri::command]
 pub fn request_screen_permission() -> bool {
@@ -34,7 +34,7 @@ pub fn request_screen_permission() -> bool {
     true
 }
 
-/// macOS only applies a Screen Recording grant to NEW processes — the
+/// macOS only applies a Screen Recording grant to NEW processes - the
 /// running app keeps seeing "denied" until it relaunches. The permission
 /// card offers this after the user returns from System Settings.
 #[tauri::command]

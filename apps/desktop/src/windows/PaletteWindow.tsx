@@ -90,7 +90,7 @@ export default function PaletteWindow() {
         {colors.length < 2 ? (
           <div className="mt-16 text-center text-sm text-muted-foreground">
             Add two or more colors (paste a design system&apos;s hex codes) to see the full
-            pairwise WCAG contrast matrix — text color down the side, background across the top.
+            pairwise WCAG contrast matrix - text color down the side, background across the top.
           </div>
         ) : (
           <table className="border-separate border-spacing-1">
@@ -120,7 +120,7 @@ export default function PaletteWindow() {
                     </div>
                   </th>
                   {colors.map((bg, j) => {
-                    if (i === j) return <td key={bg} className="text-center text-muted-foreground">—</td>;
+                    if (i === j) return <td key={bg} className="text-center text-muted-foreground">-</td>;
                     const ratio = matrix[i][j];
                     const tone =
                       ratio >= 4.5 ? "#16A34A" : ratio >= 3 ? "#F59E0B" : "#DC2626";

@@ -113,7 +113,7 @@ export default function LensWindow() {
             ))}
           </div>
           {filter !== "off" && filter !== "achromatopsia" && (
-            <label className="flex items-center gap-1" title="Severity — 100% is full dichromacy, lower is anomalous trichromacy (more common)">
+            <label className="flex items-center gap-1" title="Severity - 100% is full dichromacy, lower is anomalous trichromacy (more common)">
               <input
                 type="range"
                 min={20}
@@ -129,7 +129,7 @@ export default function LensWindow() {
         <div className="flex items-center gap-1">
           <button
             onClick={() => setLowVision((v) => (v === "blur" ? "none" : "blur"))}
-            title="Low acuity — blur (B)"
+            title="Low acuity - blur (B)"
             className={`rounded-md px-2 py-1 text-[11px] ${
               lowVision === "blur" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"
             }`}

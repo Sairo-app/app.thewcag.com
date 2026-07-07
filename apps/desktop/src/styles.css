@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
- * Brand tokens (TheWCAG) — mirrored from the site's globals.css (the
+ * Brand tokens (TheWCAG) - mirrored from the site's globals.css (the
  * site). Light-first with automatic dark mode, same HSL variables. The main
  * window sits on an NSVisualEffectView (vibrancy), so surfaces here are
  * translucent and the OS blurs whatever is behind the window.
@@ -124,7 +124,7 @@ body {
     hsl(var(--background));
 }
 
-/* translucent card surface — flat with a hairline border (Linear/Notion) */
+/* translucent card surface - flat with a hairline border (Linear/Notion) */
 .card {
   background: hsl(var(--card) / 0.72);
   border: 1px solid hsl(var(--border) / 0.7);
@@ -210,7 +210,7 @@ button:active:not(:disabled) {
   transform: scale(0.97);
 }
 
-/* keyboard a11y — this is an accessibility app, walk the walk */
+/* keyboard a11y - this is an accessibility app, walk the walk */
 :focus-visible {
   outline: 2px solid hsl(var(--ring));
   outline-offset: 1px;

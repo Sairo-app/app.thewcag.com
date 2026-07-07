@@ -187,7 +187,7 @@ export default function OverlayWindow() {
     ctx.strokeRect(half * LOUPE.zoom - 2, half * LOUPE.zoom - 2, LOUPE.zoom + 4, LOUPE.zoom + 4);
 
     // AA-edge heuristic: the center pixel sits between two contrasting
-    // neighbors — a blended edge, not the ink color.
+    // neighbors - a blended edge, not the ink color.
     const data = imgDataRef.current!;
     const luma = (x: number, y: number) => {
       const i = (Math.min(Math.max(y, 0), data.height - 1) * data.width + Math.min(Math.max(x, 0), data.width - 1)) * 4;
@@ -408,7 +408,7 @@ export default function OverlayWindow() {
                 </span>
                 {edgy && !liveRatio && (
                   <span className="rounded bg-amber-500/90 px-1 py-px text-[9px] font-semibold text-black">
-                    edge — nudge ←→
+                    edge - nudge ←→
                   </span>
                 )}
                 {liveRatio !== null && (
@@ -442,7 +442,7 @@ export default function OverlayWindow() {
             style={{ backgroundColor: firstPick.hex }}
           />
           <span className="font-mono text-[11px] text-white">text {firstPick.hex}</span>
-          <span className="text-[11px] text-white/60">— click bg, or drag a region for worst-case</span>
+          <span className="text-[11px] text-white/60">click bg, or drag a region for worst-case</span>
         </div>
       )}
 
@@ -453,7 +453,7 @@ export default function OverlayWindow() {
             ? "Drag to measure any element · targets under 24×24 px flag WCAG 2.5.8 · Esc to finish"
             : meta?.mode === "pair"
               ? firstPick
-                ? "Click the background — or drag across gradients/images for the worst-case pixel"
+                ? "Click the background - or drag across gradients/images for the worst-case pixel"
                 : "Click the text color · arrows nudge · C copies hex · Esc cancels"
               : `Click to pick the ${meta?.mode === "bg" ? "background" : "text"} color · arrows nudge · C copies hex · Esc cancels`}
       </div>

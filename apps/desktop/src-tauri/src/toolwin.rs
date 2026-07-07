@@ -5,9 +5,9 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 #[tauri::command]
 pub fn open_tool_window(app: AppHandle, kind: String) -> Result<(), String> {
     let (title, w, h) = match kind.as_str() {
-        "findings" => ("Findings Register — TheWCAG", 940.0, 660.0),
-        "checklist" => ("WCAG 2.2 Checklist — TheWCAG", 760.0, 740.0),
-        "palette" => ("Palette Contrast — TheWCAG", 760.0, 660.0),
+        "findings" => ("Findings Register - TheWCAG", 940.0, 660.0),
+        "checklist" => ("WCAG 2.2 Checklist - TheWCAG", 760.0, 740.0),
+        "palette" => ("Palette Contrast - TheWCAG", 760.0, 660.0),
         _ => return Err("unknown tool window".into()),
     };
 

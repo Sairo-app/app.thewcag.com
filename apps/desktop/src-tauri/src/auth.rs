@@ -82,7 +82,7 @@ pub async fn get_account() -> Result<Account, String> {
         .map_err(|e| e.to_string())?;
 
     if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
-        // token revoked or invalid — forget it so the UI shows signed-out
+        // token revoked or invalid - forget it so the UI shows signed-out
         clear_token();
         return Ok(Account::default());
     }
@@ -132,7 +132,7 @@ pub async fn publish_report(
 
     if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
         clear_token();
-        return Err("Your session expired — sign in again from the main window.".into());
+        return Err("Your session expired - sign in again from the main window.".into());
     }
     if resp.status() == reqwest::StatusCode::PAYLOAD_TOO_LARGE {
         return Err("This report is too large to publish.".into());

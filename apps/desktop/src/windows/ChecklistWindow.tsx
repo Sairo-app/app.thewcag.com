@@ -167,7 +167,7 @@ export default function ChecklistWindow() {
   async function exportMarkdown() {
     const rows = exportRows();
     const md = [
-      `# WCAG 2.2 audit — ${today()}`,
+      `# WCAG 2.2 audit - ${today()}`,
       "",
       `${stats.pass} pass · ${stats.fail} fail · ${stats.na} N/A · ${stats.total - stats.tested} untested`,
       "",

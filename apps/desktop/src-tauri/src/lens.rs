@@ -33,7 +33,7 @@ pub fn toggle_lens(app: AppHandle) {
 
 /// Captures what is on screen *below* the lens window (so the lens never
 /// sees itself) and returns raw pixels: [w: u32 LE][h: u32 LE][RGBA...].
-/// Uses CGWindowListCreateImage — deprecated by Apple in favor of
+/// Uses CGWindowListCreateImage - deprecated by Apple in favor of
 /// ScreenCaptureKit but still the only one-call below-window capture;
 /// revisit when the sandbox/MAS build lands.
 #[cfg(target_os = "macos")]

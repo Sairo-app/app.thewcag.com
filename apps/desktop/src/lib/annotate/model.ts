@@ -16,7 +16,7 @@ export type IssueId = (typeof ISSUE_TYPES)[number]["id"];
 export const SEVERITIES = ["blocker", "major", "minor"] as const;
 export type Severity = (typeof SEVERITIES)[number];
 
-/** Severity is the badge's visual identity — triage at a glance. */
+/** Severity is the badge's visual identity - triage at a glance. */
 export const SEVERITY_COLORS: Record<Severity, string> = {
   blocker: "#DC2626",
   major: "#F59E0B",
@@ -35,7 +35,7 @@ export interface Shape {
   issueType?: IssueId;
   severity?: Severity;
   note?: string;
-  /** redact: solid is the safe default — pixelation can be reversed */
+  /** redact: solid is the safe default - pixelation can be reversed */
   style?: "solid" | "pixel";
 }
 
@@ -54,7 +54,7 @@ export function parseDoc(json: string): AnnotationDoc | null {
     const doc = JSON.parse(json);
     if (doc?.version === 1 && Array.isArray(doc.shapes)) return doc as AnnotationDoc;
   } catch {
-    /* corrupted doc — start fresh rather than crash */
+    /* corrupted doc - start fresh rather than crash */
   }
   return null;
 }
