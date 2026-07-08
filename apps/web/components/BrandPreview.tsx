@@ -32,7 +32,13 @@ export function BrandPreview({
   logoUrl: string | null;
 }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-background shadow-sm">
+    <div
+      role="img"
+      aria-label={`Preview of a shared accessibility report branded as ${
+        name || "your organization"
+      } with a custom accent color and logo. Sample content shown for illustration.`}
+      className="overflow-hidden rounded-xl border border-border bg-background shadow-sm"
+    >
       {/* accent strip */}
       <div aria-hidden="true" style={{ background: color }} className="h-1 w-full" />
 

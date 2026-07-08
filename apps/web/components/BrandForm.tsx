@@ -92,14 +92,20 @@ export function BrandForm({
       </div>
 
       <div>
-        <span className="label">Logo</span>
-        <p className="mt-0.5 text-xs text-muted">PNG, JPG, WEBP, or SVG · up to 1 MB · transparent background looks best.</p>
+        <label htmlFor="brand-logo" className="label">
+          Logo
+        </label>
+        <p id="brand-logo-hint" className="mt-0.5 text-xs text-muted">
+          PNG, JPG, WEBP, or SVG · up to 1 MB · transparent background looks best.
+        </p>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <input
             ref={fileRef}
+            id="brand-logo"
             type="file"
             name="logo"
             accept="image/png,image/jpeg,image/webp,image/svg+xml"
+            aria-describedby="brand-logo-hint"
             onChange={onFile}
             className="block text-sm file:mr-3 file:rounded-lg file:border file:border-border file:bg-card file:px-3 file:py-1.5 file:text-sm file:font-medium hover:file:bg-muted"
           />
