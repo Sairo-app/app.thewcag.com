@@ -47,6 +47,8 @@ services:
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://app.thewcag.com}
       AUTH_TRUST_HOST: "true"
       AUTH_EMAIL_FROM: ${AUTH_EMAIL_FROM:-TheWCAG <noreply@updates.onchange.app>}
+      # Comma-separated emails that get the /admin panel (unset = no admins).
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       # External credentials - set these in Coolify.
       AUTH_RESEND_KEY: ${AUTH_RESEND_KEY}
       R2_ENDPOINT: ${R2_ENDPOINT}

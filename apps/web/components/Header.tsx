@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
+import { isAdminEmail } from "@/lib/admin";
 import { HeaderNav } from "./HeaderNav";
 import { DownloadIcon, ImageIcon, LogInIcon, LogOutIcon } from "@/components/icons";
 
 export async function Header() {
   const session = await auth();
   const signedIn = Boolean(session?.user);
+  const admin = isAdminEmail(session?.user?.email);
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">
@@ -21,6 +23,11 @@ export async function Header() {
         <div className="ml-auto flex items-center gap-3">
           {signedIn ? (
             <>
+              {admin && (
+                <Link href="/admin" className="text-sm font-medium text-primary hover:underline">
+                  Admin
+                </Link>
+              )}
               <Link
                 href="/screenshots"
                 className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-foreground"

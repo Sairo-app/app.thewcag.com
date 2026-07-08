@@ -8,7 +8,7 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
       // Keep auth + private + API surfaces out of the index.
-      disallow: ["/api/", "/connect", "/signin", "/signin/check", "/screenshots"],
+      disallow: ["/api/", "/admin", "/brand", "/connect", "/signin", "/signin/check", "/screenshots"],
     },
     sitemap: `${SITE}/sitemap.xml`,
     host: SITE,
