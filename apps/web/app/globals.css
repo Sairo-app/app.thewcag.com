@@ -1,25 +1,33 @@
 @import "tailwindcss";
 
+/*
+ * Cool-neutral palette (Notion / Linear feel): near-black neutral text on
+ * white in light mode, a deep near-black surface set in dark mode, soft
+ * hairline borders, restrained brand accent. Mirrors the desktop app.
+ */
 :root {
   --bg: 0 0% 100%;
-  --fg: 222 47% 11%;
-  --muted: 215 16% 47%;
-  --border: 214 32% 91%;
+  --fg: 240 6% 10%;
+  --muted: 240 4% 46%;
+  --border: 240 6% 90%;
   --card: 0 0% 100%;
-  /* TheWCAG brand orange (from Logo.png) */
+  --card-2: 240 5% 96.5%;
   --primary: 22 88% 52%;
   --primary-fg: 0 0% 100%;
+  --ring: 22 88% 52%;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: 222 47% 6%;
-    --fg: 210 40% 98%;
-    --muted: 215 20% 65%;
-    --border: 217 33% 20%;
-    --card: 222 47% 9%;
-    --primary: 22 90% 55%;
+    --bg: 240 6% 7%;
+    --fg: 240 9% 92%;
+    --muted: 240 5% 60%;
+    --border: 240 5% 20%;
+    --card: 240 6% 11%;
+    --card-2: 240 5% 15%;
+    --primary: 24 92% 56%;
     --primary-fg: 0 0% 100%;
+    --ring: 24 92% 56%;
   }
 }
 
@@ -29,19 +37,71 @@
   --color-muted: hsl(var(--muted));
   --color-border: hsl(var(--border));
   --color-card: hsl(var(--card));
+  --color-card-2: hsl(var(--card-2));
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-fg));
+  --color-ring: hsl(var(--ring));
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 }
 
 html {
   background: hsl(var(--bg));
   color: hsl(var(--fg));
+  -webkit-text-size-adjust: 100%;
 }
 body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
+
 * {
   border-color: hsl(var(--border));
+}
+
+::selection {
+  background: hsl(var(--primary) / 0.18);
+}
+
+/* Quiet, consistent interaction transitions. */
+a,
+button {
+  transition:
+    color 150ms ease,
+    background-color 150ms ease,
+    border-color 150ms ease,
+    opacity 150ms ease,
+    box-shadow 150ms ease;
+}
+
+/* Keyboard focus — brand ring (walk the walk on an accessibility product). */
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Refined, slightly tighter heading tracking. */
+h1,
+h2,
+h3 {
+  letter-spacing: -0.02em;
+}
+
+/* Reusable flat card surface with a hairline border. */
+.card {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  a,
+  button {
+    transition: none;
+  }
 }

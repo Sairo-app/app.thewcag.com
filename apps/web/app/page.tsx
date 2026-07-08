@@ -57,7 +57,10 @@ export default function Home() {
 
         <section className="grid gap-4 pb-8 sm:grid-cols-3">
           {FEATURES.map((f) => (
-            <div key={f.title} className="flex flex-col rounded-xl border border-border bg-card p-5">
+            <div
+              key={f.title}
+              className="flex flex-col rounded-xl border border-border bg-card p-5 transition-shadow hover:shadow-md"
+            >
               <h2 className="text-base font-semibold">{f.title}</h2>
               <p className="mt-2 flex-1 text-sm text-muted">{f.body}</p>
               <Link href={f.href} className="mt-4 text-sm font-medium text-primary hover:underline">
