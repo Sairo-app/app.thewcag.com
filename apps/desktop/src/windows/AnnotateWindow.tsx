@@ -75,6 +75,7 @@ export default function AnnotateWindow() {
   const [focusNoteId, setFocusNoteId] = useState<number | null>(null);
   const discardTextRef = useRef(false); // Escape cancels the text entry without committing
   const [view, setView] = useState<View>({ scale: 1, tx: 0, ty: 0 });
+  const [panning, setPanning] = useState(false); // Space held -> grab cursor
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -101,6 +102,15 @@ export default function AnnotateWindow() {
         const octx = off.getContext("2d", { willReadFrequently: true })!;
         octx.drawImage(img, 0, 0);
         imgDataRef.current = octx.getImageData(0, 0, off.width, off.height);
+        // Fit the view up front so the first painted frame is already centered,
+        // avoiding a one-frame flash at the default 1:1 transform.
+        const container = containerRef.current;
+        if (container) {
+          const cw = container.clientWidth;
+          const ch = container.clientHeight;
+          const s = Math.min(cw / img.naturalWidth, ch / img.naturalHeight) * 0.96;
+          setView({ scale: s, tx: (cw - img.naturalWidth * s) / 2, ty: (ch - img.naturalHeight * s) / 2 });
+        }
         setImage(img);
         const saved = await ipc.loadAnnotationDoc(meta.id).catch(() => null);
         const doc = (saved && parseDoc(saved)) || emptyDoc();
@@ -446,6 +456,7 @@ export default function AnnotateWindow() {
       const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
       if (e.key === " " && !typing) {
         spaceRef.current = e.type === "keydown";
+        setPanning(e.type === "keydown");
         e.preventDefault();
         return;
       }
@@ -852,18 +863,33 @@ export default function AnnotateWindow() {
         <main
           ref={containerRef}
           className="relative min-w-0 flex-1 overflow-hidden"
-          style={{ cursor: spaceRef.current ? "grab" : tool === "select" ? "default" : "crosshair" }}
+          style={{
+            cursor: panning
+              ? "grab"
+              : tool === "text"
+                ? "text"
+                : tool === "select"
+                  ? "default"
+                  : "crosshair",
+          }}
         >
           <canvas
             ref={canvasRef}
-            className="absolute inset-0 h-full w-full"
+            className={`absolute inset-0 h-full w-full transition-opacity duration-200 ${
+              image ? "opacity-100" : "opacity-0"
+            }`}
             onMouseDown={onMouseDown}
             onMouseMove={onMouseMove}
             onMouseUp={onMouseUp}
             onMouseLeave={() => setMouseDoc(null)}
             onDoubleClick={onDoubleClick}
           />
-          {shapes.length === 0 && !draft && (
+          {!image && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
+              Loading capture…
+            </div>
+          )}
+          {image && shapes.length === 0 && !draft && (
             <div className="fade pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-card/90 px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur">
               Click to drop issue #1 (<kbd className="font-mono">I</kbd>), scroll to pan, pinch or ⌘scroll to zoom
             </div>
