@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { ConnectClient } from "./ConnectClient";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Connect your app - TheWCAG", robots: { index: false } };
+export const metadata = { title: "Connect your app", robots: { index: false } };
 
 export default async function ConnectPage({
   searchParams,

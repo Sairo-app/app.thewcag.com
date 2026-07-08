@@ -48,7 +48,7 @@ export default function WcagContrastPage() {
           })),
         }}
       />
-      <main className="mx-auto max-w-3xl px-6 py-16">
+      <main id="main" className="mx-auto max-w-3xl px-6 py-16">
         <h1 className="text-3xl font-bold tracking-tight">
           WCAG color contrast requirements, explained
         </h1>
@@ -64,9 +64,9 @@ export default function WcagContrastPage() {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-border text-muted">
-                  <th className="py-2 pr-4 font-medium">What</th>
-                  <th className="py-2 pr-4 font-medium">AA (1.4.3)</th>
-                  <th className="py-2 font-medium">AAA (1.4.6)</th>
+                  <th scope="col" className="py-2 pr-4 font-medium">What</th>
+                  <th scope="col" className="py-2 pr-4 font-medium">AA (1.4.3)</th>
+                  <th scope="col" className="py-2 font-medium">AAA (1.4.6)</th>
                 </tr>
               </thead>
               <tbody>

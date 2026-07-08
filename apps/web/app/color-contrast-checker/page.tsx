@@ -52,7 +52,7 @@ export default function ColorContrastCheckerPage() {
           })),
         }}
       />
-      <main className="mx-auto max-w-3xl px-6 py-16">
+      <main id="main" className="mx-auto max-w-3xl px-6 py-16">
         <h1 className="text-3xl font-bold tracking-tight">Color Contrast Checker</h1>
         <p className="mt-3 max-w-2xl text-muted">
           Check WCAG color contrast <strong>anywhere on your screen</strong> - not just inside a
@@ -84,9 +84,9 @@ export default function ColorContrastCheckerPage() {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-border text-muted">
-                  <th className="py-2 pr-4 font-medium">Content</th>
-                  <th className="py-2 pr-4 font-medium">AA</th>
-                  <th className="py-2 font-medium">AAA</th>
+                  <th scope="col" className="py-2 pr-4 font-medium">Content</th>
+                  <th scope="col" className="py-2 pr-4 font-medium">AA</th>
+                  <th scope="col" className="py-2 font-medium">AAA</th>
                 </tr>
               </thead>
               <tbody>

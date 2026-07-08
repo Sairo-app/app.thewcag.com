@@ -20,7 +20,7 @@ export function ConnectClient({ state, device, email }: { state: string; device:
   }
 
   return (
-    <main className="mx-auto max-w-md px-6 py-24 text-center">
+    <main id="main" className="mx-auto max-w-md px-6 py-24 text-center">
       <h1 className="text-2xl font-bold tracking-tight">Connect your desktop app</h1>
       <p className="mt-3 text-sm text-muted">
         Authorize <strong>{device}</strong> to use your TheWCAG account (
@@ -50,7 +50,9 @@ export function ConnectClient({ state, device, email }: { state: string; device:
         </div>
       )}
       {status === "error" && (
-        <p className="mt-6 text-sm text-red-600">Something went wrong. Try connecting again from the app.</p>
+        <p className="mt-6 text-sm text-red-600 dark:text-red-400">
+          Something went wrong. Try connecting again from the app.
+        </p>
       )}
     </main>
   );

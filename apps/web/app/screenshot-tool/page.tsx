@@ -6,12 +6,12 @@ import { Footer, JsonLd } from "@/components/Footer";
 const SITE = process.env.NEXT_PUBLIC_APP_URL || "https://app.thewcag.com";
 
 export const metadata: Metadata = {
-  title: "Accessibility Screenshot Tool — Full How-To Guide",
+  title: "Accessibility Screenshot Tool - Full How-To Guide",
   description:
     "A complete guide to TheWCAG's screenshot and annotation tool: capture any region, flag issues against WCAG success criteria, measure target sizes, probe contrast, and publish a shareable report.",
   alternates: { canonical: "/screenshot-tool" },
   openGraph: {
-    title: "Accessibility Screenshot Tool — Full How-To Guide",
+    title: "Accessibility Screenshot Tool - Full How-To Guide",
     description:
       "Capture, annotate against WCAG criteria, measure targets, probe contrast, and share a report. Step by step.",
     url: `${SITE}/screenshot-tool`,
@@ -25,7 +25,7 @@ const STEPS: { title: string; body: string }[] = [
   },
   {
     title: "Flag an issue",
-    body: "Press I and click where the problem is to drop a numbered issue marker. Each marker becomes a row in the findings panel. Add as many as you need — they stay anchored to the image as you zoom and pan.",
+    body: "Press I and click where the problem is to drop a numbered issue marker. Each marker becomes a row in the findings panel. Add as many as you need - they stay anchored to the image as you zoom and pan.",
   },
   {
     title: "Describe it against WCAG",
@@ -33,15 +33,15 @@ const STEPS: { title: string; body: string }[] = [
   },
   {
     title: "Measure & probe",
-    body: "Use the ruler to measure any element — targets under 24×24px are flagged for WCAG 2.5.8. Use the contrast probe to click two points in the capture and read the exact ratio, attaching it to a finding.",
+    body: "Use the ruler to measure any element - targets under 24×24px are flagged for WCAG 2.5.8. Use the contrast probe to click two points in the capture and read the exact ratio, attaching it to a finding.",
   },
   {
     title: "Redact anything sensitive",
-    body: "Draw a solid block over private data before sharing. Prefer solid redaction over pixelation — pixelation can sometimes be reversed on text.",
+    body: "Draw a solid block over private data before sharing. Prefer solid redaction over pixelation - pixelation can sometimes be reversed on text.",
   },
   {
     title: "Save or publish",
-    body: "Export the annotated image as PNG, or the findings as Markdown, for a ticket or doc. Or publish to a shareable app.thewcag.com link that anyone can open in a browser — no account required to view.",
+    body: "Export the annotated image as PNG, or the findings as Markdown, for a ticket or doc. Or publish to a shareable app.thewcag.com link that anyone can open in a browser - no account required to view.",
   },
 ];
 
@@ -87,7 +87,7 @@ export default function ScreenshotToolPage() {
           })),
         }}
       />
-      <main className="mx-auto max-w-3xl px-6 py-16">
+      <main id="main" className="mx-auto max-w-3xl px-6 py-16">
         <h1 className="text-3xl font-bold tracking-tight">The accessibility screenshot tool</h1>
         <p className="mt-3 max-w-2xl text-muted">
           TheWCAG turns a screenshot into a structured accessibility report. Capture any part of any
@@ -133,9 +133,9 @@ export default function ScreenshotToolPage() {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-border text-muted">
-                  <th className="py-2 pr-4 font-medium">Action</th>
-                  <th className="py-2 pr-4 font-medium">macOS</th>
-                  <th className="py-2 font-medium">Windows</th>
+                  <th scope="col" className="py-2 pr-4 font-medium">Action</th>
+                  <th scope="col" className="py-2 pr-4 font-medium">macOS</th>
+                  <th scope="col" className="py-2 font-medium">Windows</th>
                 </tr>
               </thead>
               <tbody>

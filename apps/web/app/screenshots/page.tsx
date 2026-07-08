@@ -7,12 +7,17 @@ import { db } from "@/lib/db";
 import { reports } from "@/lib/schema";
 import { SITE_URL } from "@/lib/reports";
 import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { DeleteButton } from "@/components/DeleteButton";
 import { CalendarIcon, EyeIcon, FlagIcon } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "My screenshots - TheWCAG", robots: { index: false } };
+export const metadata: Metadata = { title: "My screenshots", robots: { index: false } };
+
+function formatDate(d: Date): string {
+  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
 
 export default async function MyScreenshotsPage() {
   const session = await auth();
@@ -29,13 +34,16 @@ export default async function MyScreenshotsPage() {
     })
     .from(reports)
     .where(eq(reports.userId, userId))
-    .orderBy(desc(reports.createdAt));
+    .orderBy(desc(reports.createdAt))
+    .limit(200);
 
   return (
     <>
       <Header />
-      <main className="mx-auto max-w-3xl px-6 py-10">
-        <h1 className="text-2xl font-bold tracking-tight">My screenshots</h1>
+      <main id="main" className="mx-auto max-w-3xl px-6 py-10">
+        <h1 className="text-2xl font-bold tracking-tight">
+          My screenshots{rows.length > 0 && <span className="ml-2 font-normal text-muted">({rows.length})</span>}
+        </h1>
         <p className="mt-1 text-sm text-muted">
           Annotated screenshots you published from the desktop app. Anyone with a link can view one;
           delete it to revoke the link immediately.
@@ -73,12 +81,12 @@ export default async function MyScreenshotsPage() {
                       </span>
                       <span className="inline-flex items-center gap-1">
                         <CalendarIcon size={12} />
-                        {new Date(r.createdAt).toLocaleDateString()}
+                        <time dateTime={new Date(r.createdAt).toISOString()}>{formatDate(r.createdAt)}</time>
                       </span>
                     </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-3">
-                    <CopyLinkButton url={url} className="text-xs text-muted hover:text-foreground" />
+                  <div className="flex shrink-0 items-center gap-2">
+                    <CopyLinkButton url={url} />
                     <DeleteButton slug={r.slug} />
                   </div>
                 </li>
@@ -87,6 +95,7 @@ export default async function MyScreenshotsPage() {
           </ul>
         )}
       </main>
+      <Footer />
     </>
   );
 }

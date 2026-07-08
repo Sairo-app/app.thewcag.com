@@ -18,8 +18,8 @@ const FEATURES = [
   {
     title: "Annotate & share",
     body: "Capture a region, flag issues against WCAG success criteria, and publish an annotated report to a shareable link.",
-    href: "/wcag-contrast",
-    cta: "WCAG contrast guide",
+    href: "/screenshot-tool",
+    cta: "Screenshot tool guide",
   },
 ];
 
@@ -27,7 +27,7 @@ export default function Home() {
   return (
     <>
       <Header />
-      <main className="mx-auto max-w-5xl px-6">
+      <main id="main" className="mx-auto max-w-5xl px-6">
         <section className="flex flex-col items-center pt-20 pb-12 text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="" width={72} height={72} className="mb-6 h-18 w-18" />

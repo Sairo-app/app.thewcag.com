@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const NAV = [
   { href: "/screenshot-tool", label: "Screenshot tool" },
@@ -7,6 +10,7 @@ const NAV = [
 ];
 
 export function Header() {
+  const pathname = usePathname();
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">
       <div className="mx-auto flex max-w-5xl items-center gap-6 px-6 py-3">
@@ -15,12 +19,20 @@ export function Header() {
           <img src="/logo.png" alt="" width={24} height={24} className="h-6 w-6" />
           <span className="text-sm font-bold tracking-tight">TheWCAG</span>
         </Link>
-        <nav className="hidden items-center gap-5 text-sm text-muted sm:flex">
-          {NAV.map((n) => (
-            <Link key={n.href} href={n.href} className="hover:text-foreground">
-              {n.label}
-            </Link>
-          ))}
+        <nav className="hidden items-center gap-5 text-sm sm:flex" aria-label="Primary">
+          {NAV.map((n) => {
+            const active = pathname === n.href;
+            return (
+              <Link
+                key={n.href}
+                href={n.href}
+                aria-current={active ? "page" : undefined}
+                className={active ? "font-medium text-foreground" : "text-muted hover:text-foreground"}
+              >
+                {n.label}
+              </Link>
+            );
+          })}
         </nav>
         <Link
           href="/download"

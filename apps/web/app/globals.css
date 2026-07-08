@@ -11,10 +11,12 @@
   --muted: 240 4% 46%;
   --border: 240 6% 90%;
   --card: 0 0% 100%;
-  --card-2: 240 5% 96.5%;
-  --primary: 22 88% 52%;
+  /* Brand orange, darkened until white text and orange-on-white text both
+   * clear WCAG AA 4.5:1 (computed 4.85:1). This is an accessibility product;
+   * the CTA must pass the standard it sells. */
+  --primary: 22 88% 40%;
   --primary-fg: 0 0% 100%;
-  --ring: 22 88% 52%;
+  --ring: 22 88% 40%;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -24,9 +26,11 @@
     --muted: 240 5% 60%;
     --border: 240 5% 20%;
     --card: 240 6% 11%;
-    --card-2: 240 5% 15%;
+    /* Dark: the vivid orange reads fine AS text on the dark surface (6.9:1),
+     * but white text ON it fails, so the button foreground flips to near-black
+     * (6.5:1). Ring stays vivid for visibility on dark surfaces. */
     --primary: 24 92% 56%;
-    --primary-fg: 0 0% 100%;
+    --primary-fg: 240 6% 10%;
     --ring: 24 92% 56%;
   }
 }
@@ -74,7 +78,7 @@ button {
     box-shadow 150ms ease;
 }
 
-/* Keyboard focus — brand ring (walk the walk on an accessibility product). */
+/* Keyboard focus - brand ring (walk the walk on an accessibility product). */
 :focus-visible {
   outline: 2px solid hsl(var(--ring));
   outline-offset: 2px;
