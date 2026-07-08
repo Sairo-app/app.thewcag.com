@@ -69,6 +69,16 @@ export default function AnnotateWindow() {
   const [statusError, setStatusError] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [exportOpen, setExportOpen] = useState(false); // Export ▾ menu
+
+  // Close the Export menu on any outside press. A fixed backdrop can't do this
+  // here: the header's backdrop-filter makes it the containing block for fixed
+  // descendants, so a "full-screen" backdrop would only cover the header.
+  useEffect(() => {
+    if (!exportOpen) return;
+    const close = () => setExportOpen(false);
+    window.addEventListener("mousedown", close);
+    return () => window.removeEventListener("mousedown", close);
+  }, [exportOpen]);
   const statusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Remember the last classification so serial findings don't reset to
   // Contrast/major every time; focus the new badge's note to speed data entry.
@@ -891,7 +901,10 @@ export default function AnnotateWindow() {
 
   return (
     <div className="app-bg-solid flex h-screen flex-col font-sans text-[13px] text-foreground">
-      <header className="border-b border-border bg-card/80 backdrop-blur-xl">
+      {/* relative + z-30: the backdrop-blur makes the header its own stacking
+          context, so without an explicit z-index the Export menu paints UNDER
+          later siblings (properties row, canvas overlays). */}
+      <header className="relative z-30 border-b border-border bg-card/80 backdrop-blur-xl">
         {/* Row 1 - Snagit-style: big labeled tools on the left, primary actions
             on the right. Small controls live in the properties row below. */}
         <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 px-3 pb-1.5 pt-2">
@@ -940,7 +953,7 @@ export default function AnnotateWindow() {
             >
               {status}
             </span>
-            <div className="relative">
+            <div className="relative" onMouseDown={(e) => e.stopPropagation()}>
               <button
                 onClick={() => setExportOpen((o) => !o)}
                 aria-haspopup="menu"
@@ -950,31 +963,28 @@ export default function AnnotateWindow() {
                 Export ▾
               </button>
               {exportOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setExportOpen(false)} aria-hidden="true" />
-                  <div role="menu" className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-border bg-card p-1 shadow-lg">
-                    {(
-                      [
-                        ["Copy as Markdown", () => void onCopyMarkdown()],
-                        ["Copy as Jira markup", () => void onCopyJira()],
-                        ["Save report sheet…", () => void onReport()],
-                      ] as [string, () => void][]
-                    ).map(([label, run]) => (
-                      <button
-                        key={label}
-                        role="menuitem"
-                        disabled={badges.length === 0}
-                        onClick={() => {
-                          setExportOpen(false);
-                          run();
-                        }}
-                        className="block w-full rounded-md px-2.5 py-1.5 text-left text-xs hover:bg-muted disabled:opacity-40"
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </>
+                <div role="menu" className="absolute right-0 z-50 mt-1 w-44 rounded-lg border border-border bg-card p-1 shadow-lg">
+                  {(
+                    [
+                      ["Copy as Markdown", () => void onCopyMarkdown()],
+                      ["Copy as Jira markup", () => void onCopyJira()],
+                      ["Save report sheet…", () => void onReport()],
+                    ] as [string, () => void][]
+                  ).map(([label, run]) => (
+                    <button
+                      key={label}
+                      role="menuitem"
+                      disabled={badges.length === 0}
+                      onClick={() => {
+                        setExportOpen(false);
+                        run();
+                      }}
+                      className="block w-full rounded-md px-2.5 py-1.5 text-left text-xs hover:bg-muted disabled:opacity-40"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
             <button onClick={() => void onCopy()} className="btn px-2.5 py-1.5 text-xs">
