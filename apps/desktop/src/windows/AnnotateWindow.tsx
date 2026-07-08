@@ -516,6 +516,15 @@ export default function AnnotateWindow() {
   /** One-page finding sheet: annotated image + issue table, branded. */
   function buildReportCanvas(): HTMLCanvasElement {
     const img = image!;
+    // No findings → share the bare screenshot (plus any freehand markup), with
+    // no report header/table/border. Sharing needs no annotations at all.
+    if (badges.length === 0) {
+      const bare = document.createElement("canvas");
+      bare.width = img.naturalWidth;
+      bare.height = img.naturalHeight;
+      renderDoc(bare.getContext("2d")!, img, shapes, { forExport: true });
+      return bare;
+    }
     const W = Math.max(900, img.naturalWidth);
     const pad = 48;
     const rowH = 34;
