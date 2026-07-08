@@ -367,7 +367,11 @@ export default function OverlayWindow() {
               }`}
               style={sel}
             >
-              <span className="absolute -top-6 left-0 rounded-md bg-black/80 px-1.5 py-0.5 font-mono text-[10px] text-white">
+              <span
+                className={`absolute left-0 rounded-md bg-black/80 px-1.5 py-0.5 font-mono text-[10px] text-white ${
+                  Number(sel.top ?? 0) < 24 ? "top-1" : "-top-6"
+                }`}
+              >
                 {isShot
                   ? `${Math.round((sel.width ?? 0) * (meta?.scale ?? 1))} × ${Math.round(
                       (sel.height ?? 0) * (meta?.scale ?? 1),
@@ -407,7 +411,7 @@ export default function OverlayWindow() {
                   <span className="font-mono text-[11px] text-white">{currentColor.hex}</span>
                 </span>
                 {edgy && !liveRatio && (
-                  <span className="rounded bg-amber-500/90 px-1 py-px text-[9px] font-semibold text-black">
+                  <span className="rounded bg-amber-500/90 px-1 py-px text-[11px] font-semibold text-black">
                     edge - nudge ←→
                   </span>
                 )}
@@ -417,7 +421,7 @@ export default function OverlayWindow() {
                       {liveRatio.toFixed(2)}:1
                     </span>
                     <span
-                      className={`rounded px-1 py-px text-[9px] font-bold ${
+                      className={`rounded px-1 py-px text-[11px] font-bold ${
                         liveRatio >= 4.5
                           ? "bg-emerald-500/90 text-white"
                           : liveRatio >= 3
@@ -446,14 +450,14 @@ export default function OverlayWindow() {
         </div>
       )}
 
-      <div className="fade pointer-events-none absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-full bg-black/80 px-3 py-1.5 text-[11px] text-white/90 shadow-lg">
+      <div className="fade pointer-events-none absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-full bg-black/80 px-3.5 py-1.5 text-[13px] text-white shadow-lg">
         {isShot
-          ? "Drag to capture a region, Space for full screen, Esc to cancel"
+          ? "Drag to capture a region, Space or Enter for full screen, Esc to cancel"
           : isMeasure
-            ? "Drag to measure any element, targets under 24×24 px flag WCAG 2.5.8, Esc to finish"
+            ? "Drag to measure any element, targets under 24×24 px flag WCAG 2.5.8, Esc to close"
             : meta?.mode === "pair"
               ? firstPick
-                ? "Click the background - or drag across gradients/images for the worst-case pixel"
+                ? "Click the background, or drag across gradients/images for the worst-case pixel"
                 : "Click the text color, arrows nudge, C copies hex, Esc cancels"
               : `Click to pick the ${meta?.mode === "bg" ? "background" : "text"} color, arrows nudge, C copies hex, Esc cancels`}
       </div>

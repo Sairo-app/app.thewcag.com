@@ -30,6 +30,7 @@ export default function LensWindow() {
   const [split, setSplit] = useState(false);
   const [lowVision, setLowVision] = useState<"none" | "blur" | "lowcontrast">("none");
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
   const stateRef = useRef({ filter, frozen, split, severity });
   stateRef.current = { filter, frozen, split, severity };
 
@@ -37,6 +38,10 @@ export default function LensWindow() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).tagName === "INPUT") return;
+      if (e.key === "Escape") {
+        void getCurrentWebviewWindow().close();
+        return;
+      }
       const index = Number(e.key) - 1;
       if (index >= 0 && index < FILTERS.length) setFilter(FILTERS[index].key);
       if (e.key === " ") {
@@ -92,7 +97,11 @@ export default function LensWindow() {
     const canvas = canvasRef.current!;
     const blob: Blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b!), "image/png"));
     const name = `colorblind-${filter}-${new Date().toISOString().slice(0, 10)}.png`;
-    await ipc.savePng(new Uint8Array(await blob.arrayBuffer()), name);
+    const path = await ipc.savePng(new Uint8Array(await blob.arrayBuffer()), name);
+    if (path) {
+      setSaved(`Saved ${path.split("/").pop()}`);
+      setTimeout(() => setSaved(null), 2200);
+    }
   }
 
   const cssFilter =
@@ -129,6 +138,8 @@ export default function LensWindow() {
         <div className="flex items-center gap-1">
           <button
             onClick={() => setLowVision((v) => (v === "blur" ? "none" : "blur"))}
+            aria-pressed={lowVision === "blur"}
+            aria-label="Low acuity blur (B)"
             title="Low acuity - blur (B)"
             className={`rounded-md px-2 py-1 text-[11px] ${
               lowVision === "blur" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -138,6 +149,8 @@ export default function LensWindow() {
           </button>
           <button
             onClick={() => setLowVision((v) => (v === "lowcontrast" ? "none" : "lowcontrast"))}
+            aria-pressed={lowVision === "lowcontrast"}
+            aria-label="Low contrast sensitivity (L)"
             title="Low contrast sensitivity (L)"
             className={`rounded-md px-2 py-1 text-[11px] ${
               lowVision === "lowcontrast" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -148,6 +161,8 @@ export default function LensWindow() {
           <span className="h-4 w-px bg-border" />
           <button
             onClick={() => setSplit((s) => !s)}
+            aria-pressed={split}
+            aria-label="Split view (D)"
             title="Split view: left original, right filtered (D)"
             className={`rounded-md p-1.5 ${
               split ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -157,6 +172,8 @@ export default function LensWindow() {
           </button>
           <button
             onClick={() => setFrozen((f) => !f)}
+            aria-pressed={frozen}
+            aria-label={frozen ? "Resume live view (Space)" : "Freeze frame (Space)"}
             title={frozen ? "Resume (Space)" : "Freeze frame (Space)"}
             className={`rounded-md p-1.5 ${
               frozen ? "bg-yellow/20 text-yellow" : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -166,6 +183,7 @@ export default function LensWindow() {
           </button>
           <button
             onClick={() => void saveShot()}
+            aria-label="Save what the lens sees"
             title="Save what the lens sees"
             className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
           >
@@ -173,6 +191,7 @@ export default function LensWindow() {
           </button>
           <button
             onClick={() => void getCurrentWebviewWindow().close()}
+            aria-label="Close lens"
             title="Close lens"
             className="rounded-md p-1.5 text-muted-foreground hover:bg-coral/20 hover:text-coral"
           >
@@ -198,6 +217,13 @@ export default function LensWindow() {
             {error}
           </div>
         )}
+        <div
+          role="status"
+          aria-live="polite"
+          className={`pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/75 px-3 py-1 text-[11px] text-white transition-opacity ${saved ? "opacity-100" : "opacity-0"}`}
+        >
+          {saved}
+        </div>
       </div>
     </div>
   );
