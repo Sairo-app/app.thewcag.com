@@ -5,12 +5,20 @@ const REPO = "https://github.com/Sairo-app/app.thewcag.com";
 
 const COLUMNS: { heading: string; links: { href: string; label: string }[] }[] = [
   {
-    heading: "Product",
+    heading: "Tools",
     links: [
-      { href: "/download", label: "Download" },
       { href: "/screenshot-tool", label: "Screenshot tool" },
       { href: "/color-contrast-checker", label: "Contrast checker" },
       { href: "/color-blindness-simulator", label: "Color blindness simulator" },
+      { href: "/download", label: "Download" },
+    ],
+  },
+  {
+    heading: "Account",
+    links: [
+      { href: "/signin", label: "Sign in" },
+      { href: "/screenshots", label: "My screenshots" },
+      { href: "/brand", label: "White-label branding" },
     ],
   },
   {
@@ -26,9 +34,9 @@ export function Footer() {
   return (
     <footer className="mt-24 border-t border-border">
       <div className="mx-auto max-w-5xl px-6 py-12">
-        <div className="grid gap-10 md:grid-cols-4">
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
           {/* Brand */}
-          <div className="md:col-span-2">
+          <div className="sm:col-span-2">
             <Link href="/" className="flex items-center gap-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/logo.png" alt="" width={24} height={24} className="h-6 w-6" />

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const NAV = [
   { href: "/screenshot-tool", label: "Screenshot tool" },
   { href: "/color-contrast-checker", label: "Contrast checker" },
+  { href: "/color-blindness-simulator", label: "Color blindness" },
   { href: "/wcag-contrast", label: "Guide" },
 ];
 
