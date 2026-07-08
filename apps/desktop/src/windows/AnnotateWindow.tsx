@@ -68,6 +68,7 @@ export default function AnnotateWindow() {
   const [status, setStatus] = useState<string | null>(null);
   const [statusError, setStatusError] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false); // Export ▾ menu
   const statusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Remember the last classification so serial findings don't reset to
   // Contrast/major every time; focus the new badge's note to speed data entry.
@@ -890,21 +891,23 @@ export default function AnnotateWindow() {
 
   return (
     <div className="app-bg-solid flex h-screen flex-col font-sans text-[13px] text-foreground">
-      <header className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 border-b border-border bg-card/80 px-3 py-2 backdrop-blur-xl">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="seg" role="toolbar" aria-label="Annotation tools">
+      <header className="border-b border-border bg-card/80 backdrop-blur-xl">
+        {/* Row 1 - Snagit-style: big labeled tools on the left, primary actions
+            on the right. Small controls live in the properties row below. */}
+        <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 px-3 pb-1.5 pt-2">
+          <div className="flex flex-wrap items-center gap-0.5" role="toolbar" aria-label="Annotation tools">
             {(
               [
-                ["select", <CursorIcon key="i" />, "Select", "V", "Select"],
-                ["badge", <IssueIcon key="i" />, "Issue", "I", "Drop issue marker"],
-                ["arrow", <ArrowIcon key="i" />, "Arrow", "A", "Arrow"],
-                ["rect", <BoxIcon key="i" />, "Box", "R", "Rectangle"],
-                ["measure", <RulerIcon key="i" />, "24px", "M", "Measure target size"],
-                ["probe", <PipetteIcon key="i" />, "Probe", "P", "Probe contrast"],
-                ["focus", <RouteIcon key="i" />, "Order", "O", "Focus order"],
-                ["redact", <RedactIcon key="i" />, "Redact", "X", "Redact"],
-                ["text", <TypeIcon key="i" />, "Text", "T", "Text"],
-                ["crop", <CropIcon key="i" />, "Crop", "C", "Crop capture"],
+                ["select", <CursorIcon key="i" size={16} />, "Select", "V", "Select"],
+                ["badge", <IssueIcon key="i" size={16} />, "Issue", "I", "Drop issue marker"],
+                ["arrow", <ArrowIcon key="i" size={16} />, "Arrow", "A", "Arrow"],
+                ["rect", <BoxIcon key="i" size={16} />, "Box", "R", "Rectangle"],
+                ["measure", <RulerIcon key="i" size={16} />, "24px", "M", "Measure target size"],
+                ["probe", <PipetteIcon key="i" size={16} />, "Probe", "P", "Probe contrast"],
+                ["focus", <RouteIcon key="i" size={16} />, "Order", "O", "Focus order"],
+                ["redact", <RedactIcon key="i" size={16} />, "Redact", "X", "Redact"],
+                ["text", <TypeIcon key="i" size={16} />, "Text", "T", "Text"],
+                ["crop", <CropIcon key="i" size={16} />, "Crop", "C", "Crop capture"],
               ] as [Tool, ReactNode, string, string, string][]
             ).map(([t, icon, label, key, name]) => (
               <button
@@ -918,25 +921,83 @@ export default function AnnotateWindow() {
                   if (t !== "crop") setCropRect(null);
                 }}
                 title={`${name} (${key})`}
+                className={`flex w-[50px] flex-col items-center gap-1 rounded-lg px-1 py-1.5 text-[9px] font-medium transition-colors ${
+                  tool === t
+                    ? "bg-primary/15 text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
               >
                 {icon}
-                {label && <span className="hidden lg:inline">{label}</span>}
+                <span>{label}</span>
               </button>
             ))}
           </div>
-          {tool === "redact" && (
-            <div className="seg">
-              <button data-active={redactStyle === "solid"} onClick={() => setRedactStyle("solid")} title="Solid block - safe redaction">
-                Solid
+          <div className="flex flex-wrap items-center justify-end gap-1.5 pt-1.5">
+            <span
+              role="status"
+              aria-live="polite"
+              className={`mr-2 text-[11px] ${statusError ? "text-coral" : "text-ok"}`}
+            >
+              {status}
+            </span>
+            <div className="relative">
+              <button
+                onClick={() => setExportOpen((o) => !o)}
+                aria-haspopup="menu"
+                aria-expanded={exportOpen}
+                className="btn px-2.5 py-1.5 text-xs"
+              >
+                Export ▾
               </button>
-              <button data-active={redactStyle === "pixel"} onClick={() => setRedactStyle("pixel")} title="Pixelate - cosmetic only, can be reversed on text">
-                Pixel
-              </button>
+              {exportOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setExportOpen(false)} aria-hidden="true" />
+                  <div role="menu" className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-border bg-card p-1 shadow-lg">
+                    {(
+                      [
+                        ["Copy as Markdown", () => void onCopyMarkdown()],
+                        ["Copy as Jira markup", () => void onCopyJira()],
+                        ["Save report sheet…", () => void onReport()],
+                      ] as [string, () => void][]
+                    ).map(([label, run]) => (
+                      <button
+                        key={label}
+                        role="menuitem"
+                        disabled={badges.length === 0}
+                        onClick={() => {
+                          setExportOpen(false);
+                          run();
+                        }}
+                        className="block w-full rounded-md px-2.5 py-1.5 text-left text-xs hover:bg-muted disabled:opacity-40"
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
-          )}
-          <span className="h-5 w-px bg-border" />
-          {/* Severity quick styles: one click sets the sticky severity AND the
-              draw color, so every new marker/shape triages at a glance. */}
+            <button onClick={() => void onCopy()} className="btn px-2.5 py-1.5 text-xs">
+              Copy PNG
+            </button>
+            <button onClick={() => void onSave()} className="btn px-2.5 py-1.5 text-xs">
+              Save…
+            </button>
+            <button
+              onClick={() => void onPublish()}
+              disabled={publishing}
+              className="btn-primary flex items-center gap-1.5 px-3 py-1.5 text-xs disabled:opacity-40"
+              title="Publish a shareable link on thewcag.com (requires sign-in)"
+            >
+              <ShareIcon size={13} />
+              {publishing ? "Publishing…" : "Share link"}
+            </button>
+          </div>
+        </div>
+
+        {/* Row 2 - contextual properties: severity, color, tool options, view. */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-border/60 px-3 py-1.5">
+          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Style</span>
           <div className="seg" role="group" aria-label="Severity quick style">
             {SEVERITIES.map((s) => (
               <button
@@ -951,73 +1012,54 @@ export default function AnnotateWindow() {
                 title={`New issues and shapes use ${s} styling`}
               >
                 <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ backgroundColor: SEVERITY_COLORS[s] }} />
-                <span className="hidden capitalize xl:inline">{s}</span>
+                <span className="capitalize">{s}</span>
               </button>
             ))}
           </div>
-          <span className="h-5 w-px bg-border" />
           {PALETTE.map((c) => (
             <button
               key={c}
               onClick={() => setColor(c)}
+              aria-label={`Draw color ${c}`}
               className={`h-5 w-5 rounded-full border ${color === c ? "border-primary ring-2 ring-ring/40" : "border-border"}`}
               style={{ backgroundColor: c }}
               title={c}
             />
           ))}
-          <span className="h-5 w-px bg-border" />
-          <button onClick={undo} title="Undo (⌘Z)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
-            <UndoIcon />
-          </button>
-          <button onClick={redo} title="Redo (⇧⌘Z)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
-            <RedoIcon />
-          </button>
-          <span className="h-5 w-px bg-border" />
-          <button onClick={() => zoomAt(containerRef.current!.clientWidth / 2, containerRef.current!.clientHeight / 2, 0.8)} title="Zoom out (⌘-)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
-            <MinusIcon />
-          </button>
-          <span className="w-11 text-center font-mono text-[10px] text-muted-foreground">
-            {Math.round(view.scale * 100)}%
+          {tool === "redact" && (
+            <>
+              <span className="h-5 w-px bg-border" />
+              <div className="seg">
+                <button data-active={redactStyle === "solid"} onClick={() => setRedactStyle("solid")} title="Solid block - safe redaction">
+                  Solid
+                </button>
+                <button data-active={redactStyle === "pixel"} onClick={() => setRedactStyle("pixel")} title="Pixelate - cosmetic only, can be reversed on text">
+                  Pixel
+                </button>
+              </div>
+            </>
+          )}
+          <span className="ml-auto flex items-center gap-0.5">
+            <button onClick={undo} title="Undo (⌘Z)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+              <UndoIcon />
+            </button>
+            <button onClick={redo} title="Redo (⇧⌘Z)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+              <RedoIcon />
+            </button>
+            <span className="mx-1 h-5 w-px bg-border" />
+            <button onClick={() => zoomAt(containerRef.current!.clientWidth / 2, containerRef.current!.clientHeight / 2, 0.8)} title="Zoom out (⌘-)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+              <MinusIcon />
+            </button>
+            <span className="w-11 text-center font-mono text-[10px] text-muted-foreground">
+              {Math.round(view.scale * 100)}%
+            </span>
+            <button onClick={() => zoomAt(containerRef.current!.clientWidth / 2, containerRef.current!.clientHeight / 2, 1.25)} title="Zoom in (⌘=)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+              <PlusIcon />
+            </button>
+            <button onClick={fit} title="Fit to window (⌘0)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+              <FitIcon />
+            </button>
           </span>
-          <button onClick={() => zoomAt(containerRef.current!.clientWidth / 2, containerRef.current!.clientHeight / 2, 1.25)} title="Zoom in (⌘=)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
-            <PlusIcon />
-          </button>
-          <button onClick={fit} title="Fit to window (⌘0)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
-            <FitIcon />
-          </button>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-1.5">
-          <span
-            role="status"
-            aria-live="polite"
-            className={`mr-2 text-[11px] ${statusError ? "text-coral" : "text-ok"}`}
-          >
-            {status}
-          </span>
-          <button onClick={() => void onCopyMarkdown()} disabled={badges.length === 0} className="btn px-2.5 py-1.5 text-xs disabled:opacity-40">
-            Markdown
-          </button>
-          <button onClick={() => void onCopyJira()} disabled={badges.length === 0} className="btn px-2.5 py-1.5 text-xs disabled:opacity-40">
-            Jira
-          </button>
-          <button onClick={() => void onReport()} disabled={badges.length === 0} className="btn px-2.5 py-1.5 text-xs disabled:opacity-40" title="One-page finding sheet: annotated image + issue table">
-            Report
-          </button>
-          <button
-            onClick={() => void onPublish()}
-            disabled={publishing}
-            className="btn flex items-center gap-1.5 px-2.5 py-1.5 text-xs disabled:opacity-40"
-            title="Publish a shareable link on thewcag.com (requires sign-in)"
-          >
-            <ShareIcon size={13} />
-            {publishing ? "Publishing…" : "Share"}
-          </button>
-          <button onClick={() => void onCopy()} className="btn px-2.5 py-1.5 text-xs">
-            Copy PNG
-          </button>
-          <button onClick={() => void onSave()} className="btn-primary px-3 py-1.5 text-xs">
-            Save…
-          </button>
         </div>
       </header>
 
