@@ -1,13 +1,62 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { contrastRatio, hexToRgb, rgbToHex } from "@accessibility-build/a11y-core";
 import { ipc } from "../lib/ipc";
+import { CloseIcon } from "../lib/icons";
 
 const HEX_RE = /#?[0-9a-fA-F]{6}\b|#?[0-9a-fA-F]{3}\b/g;
+const STORE_KEY = "palette-colors";
+const MAX_COLORS = 16;
+
+// Badge tones chosen so white text clears AA on each.
+function toneFor(ratio: number): string {
+  return ratio >= 4.5 ? "#15803D" : ratio >= 3 ? "#B45309" : "#B91C1C";
+}
 
 export default function PaletteWindow() {
   const [colors, setColors] = useState<string[]>([]);
   const [draft, setDraft] = useState("");
   const [status, setStatus] = useState<string | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const loaded = useRef(false);
+
+  // Persist the palette so a pasted design system survives a window close.
+  useEffect(() => {
+    void ipc
+      .storeGet(STORE_KEY)
+      .then((raw) => {
+        if (raw) {
+          try {
+            setColors(JSON.parse(raw));
+          } catch {
+            /* ignore */
+          }
+        }
+        loaded.current = true;
+      })
+      .catch(() => {
+        loaded.current = true;
+      });
+  }, []);
+  useEffect(() => {
+    if (loaded.current) void ipc.storeSet(STORE_KEY, JSON.stringify(colors)).catch(() => {});
+  }, [colors]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (e.key === "Escape" && t?.tagName !== "INPUT" && t?.tagName !== "TEXTAREA" && t?.tagName !== "SELECT") {
+        void getCurrentWebviewWindow().close();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  function flash(m: string) {
+    setStatus(m);
+    setTimeout(() => setStatus(null), 2000);
+  }
 
   function addColors(input: string) {
     const found = input.match(HEX_RE) ?? [];
@@ -16,18 +65,20 @@ export default function PaletteWindow() {
       .map((h) => hexToRgb(h))
       .filter((rgb): rgb is NonNullable<typeof rgb> => rgb !== null)
       .map(rgbToHex);
-    if (normalized.length === 0) return;
-    setColors((prev) => Array.from(new Set([...prev, ...normalized])).slice(0, 16));
+    if (normalized.length === 0) {
+      flash("No valid hex colors found");
+      return;
+    }
+    setColors((prev) => {
+      const merged = Array.from(new Set([...prev, ...normalized]));
+      if (merged.length > MAX_COLORS) flash(`Showing the first ${MAX_COLORS} colors`);
+      return merged.slice(0, MAX_COLORS);
+    });
     setDraft("");
   }
 
   function remove(hex: string) {
     setColors((prev) => prev.filter((c) => c !== hex));
-  }
-
-  function flash(m: string) {
-    setStatus(m);
-    setTimeout(() => setStatus(null), 2000);
   }
 
   const matrix = useMemo(
@@ -49,10 +100,17 @@ export default function PaletteWindow() {
     flash("Matrix copied as CSV");
   }
 
+  const pairs = colors.length * (colors.length - 1);
+
   return (
     <div className="app-bg-solid flex h-screen flex-col font-sans text-[13px] text-foreground">
       <header className="flex flex-wrap items-center gap-2 border-b border-border bg-card/80 px-3 py-2 backdrop-blur-xl">
         <h1 className="text-sm font-bold">Palette Contrast</h1>
+        {colors.length > 0 && (
+          <span className="text-[11px] text-muted-foreground">
+            {colors.length} colors, {pairs} pairs
+          </span>
+        )}
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -65,6 +123,7 @@ export default function PaletteWindow() {
             onChange={(e) => setDraft(e.target.value)}
             placeholder="Paste hex colors…"
             spellCheck={false}
+            aria-label="Add hex colors"
             className="w-52 rounded-md border border-border bg-card-2/70 px-2 py-1.5 font-mono text-xs outline-none focus:ring-1 focus:ring-ring"
           />
           <button type="submit" className="btn px-2.5 py-1.5 text-xs">
@@ -72,14 +131,27 @@ export default function PaletteWindow() {
           </button>
         </form>
         <div className="ml-auto flex items-center gap-1.5">
-          {status && <span className="rise mr-1 text-[11px] text-ok">{status}</span>}
+          <span role="status" aria-live="polite" className="mr-1 text-[11px] text-ok">
+            {status}
+          </span>
           {colors.length > 0 && (
             <>
               <button onClick={() => void copyCsv()} className="btn px-2.5 py-1.5 text-xs">
                 Copy CSV
               </button>
-              <button onClick={() => setColors([])} className="btn px-2.5 py-1.5 text-xs text-muted-foreground">
-                Clear
+              <button
+                onClick={() => {
+                  if (confirmClear) {
+                    setColors([]);
+                    setConfirmClear(false);
+                  } else {
+                    setConfirmClear(true);
+                    setTimeout(() => setConfirmClear(false), 2500);
+                  }
+                }}
+                className="btn px-2.5 py-1.5 text-xs text-muted-foreground"
+              >
+                {confirmClear ? "Clear all?" : "Clear"}
               </button>
             </>
           )}
@@ -96,9 +168,9 @@ export default function PaletteWindow() {
           <table className="border-separate border-spacing-1">
             <thead>
               <tr>
-                <th className="sticky left-0 z-10 bg-background" />
+                <th className="sticky left-0 top-0 z-20 bg-background" />
                 {colors.map((bg) => (
-                  <th key={bg} className="p-1">
+                  <th key={bg} scope="col" className="sticky top-0 z-10 bg-background p-1">
                     <div className="flex flex-col items-center gap-1">
                       <span className="h-5 w-8 rounded border border-border" style={{ backgroundColor: bg }} />
                       <span className="font-mono text-[9px] text-muted-foreground">{bg}</span>
@@ -110,20 +182,23 @@ export default function PaletteWindow() {
             <tbody>
               {colors.map((fg, i) => (
                 <tr key={fg}>
-                  <th className="sticky left-0 z-10 bg-background pr-1">
+                  <th scope="row" className="sticky left-0 z-10 bg-background pr-1">
                     <div className="flex items-center gap-1.5">
                       <span className="h-5 w-8 shrink-0 rounded border border-border" style={{ backgroundColor: fg }} />
                       <span className="font-mono text-[9px] text-muted-foreground">{fg}</span>
-                      <button onClick={() => remove(fg)} className="text-[10px] text-muted-foreground hover:text-coral" title="Remove">
-                        ✕
+                      <button
+                        onClick={() => remove(fg)}
+                        className="rounded p-1 text-muted-foreground hover:text-coral"
+                        aria-label={`Remove ${fg}`}
+                        title="Remove"
+                      >
+                        <CloseIcon size={11} />
                       </button>
                     </div>
                   </th>
                   {colors.map((bg, j) => {
                     if (i === j) return <td key={bg} className="text-center text-muted-foreground">-</td>;
                     const ratio = matrix[i][j];
-                    const tone =
-                      ratio >= 4.5 ? "#16A34A" : ratio >= 3 ? "#F59E0B" : "#DC2626";
                     return (
                       <td key={bg} className="p-0.5">
                         <div
@@ -133,8 +208,8 @@ export default function PaletteWindow() {
                         >
                           <span className="text-sm font-semibold leading-none">Aa</span>
                           <span
-                            className="mt-1 rounded px-1 text-[9px] font-bold"
-                            style={{ backgroundColor: tone, color: "#fff" }}
+                            className="mt-1 rounded px-1 text-[9px] font-bold text-white"
+                            style={{ backgroundColor: toneFor(ratio) }}
                           >
                             {ratio.toFixed(1)}
                           </span>

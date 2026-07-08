@@ -1,7 +1,28 @@
 import { useEffect, useMemo, useState } from "react";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { ipc } from "../lib/ipc";
 
 const STORE_KEY = "checklist-default";
+
+const RESULT_LABEL: Record<string, string> = {
+  pass: "Pass",
+  fail: "Fail",
+  na: "N/A",
+  untested: "Untested",
+};
+
+function useEscapeToClose() {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (e.key === "Escape" && t?.tagName !== "INPUT" && t?.tagName !== "TEXTAREA" && t?.tagName !== "SELECT") {
+        void getCurrentWebviewWindow().close();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+}
 
 type Level = "A" | "AA";
 interface Criterion {
@@ -102,6 +123,7 @@ const RESULT_COLOR: Record<Exclude<Result, "untested">, string> = {
 };
 
 export default function ChecklistWindow() {
+  useEscapeToClose();
   const [state, setState] = useState<State>({});
   const [levelFilter, setLevelFilter] = useState<Level | "all">("all");
   const [saved, setSaved] = useState<string | null>(null);
@@ -157,12 +179,23 @@ export default function ChecklistWindow() {
     setTimeout(() => setSaved(null), 2000);
   }
 
+  // Export only the visible (filtered) criteria, matching what the auditor sees.
   function exportRows() {
-    return CRITERIA.map((c) => ({
+    return visible.map((c) => ({
       ...c,
       result: state[c.sc]?.result ?? "untested",
       note: (state[c.sc]?.note ?? "").replace(/\s+/g, " ").trim(),
     }));
+  }
+  async function exportCsv() {
+    const esc = (s: string) => `"${s.replace(/"/g, '""')}"`;
+    const rows = exportRows();
+    const csv = [
+      ["SC", "Level", "Criterion", "Result", "Note"].join(","),
+      ...rows.map((r) => [r.sc, r.level, r.name, RESULT_LABEL[r.result], r.note].map(esc).join(",")),
+    ].join("\n");
+    const path = await ipc.saveText(csv, `wcag-audit-${today()}.csv`);
+    if (path) flash(`CSV saved (${rows.length} criteria)`);
   }
   async function exportMarkdown() {
     const rows = exportRows();
@@ -173,12 +206,12 @@ export default function ChecklistWindow() {
       "",
       "| SC | Level | Criterion | Result | Note |",
       "|----|-------|-----------|--------|------|",
-      ...rows.map((r) => `| ${r.sc} | ${r.level} | ${r.name} | ${r.result} | ${r.note.replace(/\|/g, "\\|")} |`),
+      ...rows.map((r) => `| ${r.sc} | ${r.level} | ${r.name} | ${RESULT_LABEL[r.result]} | ${r.note.replace(/\|/g, "\\|")} |`),
       "",
       "Audited with TheWCAG desktop.",
     ].join("\n");
     const path = await ipc.saveText(md, `wcag-audit-${today()}.md`);
-    if (path) flash("Markdown saved");
+    if (path) flash(`Markdown saved (${rows.length} criteria)`);
   }
   async function exportHtml() {
     const rows = exportRows();
@@ -186,20 +219,20 @@ export default function ChecklistWindow() {
     const body = rows
       .map(
         (r) =>
-          `<tr><td>${r.sc}</td><td>${r.level}</td><td>${esc(r.name)}</td><td class="r-${r.result}">${r.result}</td><td>${esc(r.note)}</td></tr>`,
+          `<tr><td>${r.sc}</td><td>${r.level}</td><td>${esc(r.name)}</td><td class="r-${r.result}">${RESULT_LABEL[r.result]}</td><td>${esc(r.note)}</td></tr>`,
       )
       .join("");
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>WCAG 2.2 audit</title>
 <style>body{font:14px -apple-system,system-ui,sans-serif;margin:40px;color:#0f172a}h1{font-size:22px}
 table{border-collapse:collapse;width:100%;margin-top:16px}th,td{border:1px solid #e2e8f0;padding:7px 10px;text-align:left}
 th{background:#f8fafc;font-size:12px;text-transform:uppercase;color:#64748b}
-.r-pass{color:#16a34a;font-weight:600}.r-fail{color:#dc2626;font-weight:600}.r-na{color:#64748b}.r-untested{color:#94a3b8}</style></head>
+.r-pass{color:#15803d;font-weight:600}.r-fail{color:#b91c1c;font-weight:600}.r-na{color:#475569}.r-untested{color:#64748b}</style></head>
 <body><h1>WCAG 2.2 audit <small style="color:#64748b">${today()}</small></h1>
 <p>${stats.pass} pass, ${stats.fail} fail, ${stats.na} N/A, ${stats.total - stats.tested} untested</p>
 <table><thead><tr><th>SC</th><th>Level</th><th>Criterion</th><th>Result</th><th>Note</th></tr></thead>
 <tbody>${body}</tbody></table></body></html>`;
     const path = await ipc.saveText(html, `wcag-audit-${today()}.html`);
-    if (path) flash("HTML saved");
+    if (path) flash(`HTML saved (${exportRows().length} criteria)`);
   }
 
   const pct = stats.total ? Math.round((stats.tested / stats.total) * 100) : 0;
@@ -209,24 +242,35 @@ th{background:#f8fafc;font-size:12px;text-transform:uppercase;color:#64748b}
       <header className="border-b border-border bg-card/80 px-3 py-2 backdrop-blur-xl">
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-sm font-bold">WCAG 2.2 Checklist</h1>
-          <select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value as Level | "all")} className="rounded-md border border-border bg-card-2/70 px-2 py-1 text-xs outline-none">
+          <select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value as Level | "all")} aria-label="Filter by conformance level" className="rounded-md border border-border bg-card-2/70 px-2 py-1 text-xs outline-none">
             <option value="all">A &amp; AA</option>
             <option value="A">Level A</option>
             <option value="AA">Level AA</option>
           </select>
           <div className="ml-auto flex items-center gap-1.5">
-            {saved && <span className="rise mr-1 text-[11px] text-ok">{saved}</span>}
+            <span role="status" aria-live="polite" className="mr-1 text-[11px] text-ok">
+              {saved}
+            </span>
+            <button onClick={() => void exportCsv()} className="btn px-2.5 py-1.5 text-xs">CSV</button>
             <button onClick={() => void exportMarkdown()} className="btn px-2.5 py-1.5 text-xs">Markdown</button>
             <button onClick={() => void exportHtml()} className="btn-primary px-3 py-1.5 text-xs">HTML</button>
           </div>
         </div>
         <div className="mt-2 flex items-center gap-3">
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-            <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+          <div
+            role="progressbar"
+            aria-valuenow={pct}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`${stats.tested} of ${stats.total} criteria tested`}
+            className="flex h-1.5 flex-1 overflow-hidden rounded-full bg-muted"
+          >
+            <div className="h-full bg-ok" style={{ width: `${stats.total ? (stats.pass / stats.total) * 100 : 0}%` }} />
+            <div className="h-full bg-coral" style={{ width: `${stats.total ? (stats.fail / stats.total) * 100 : 0}%` }} />
+            <div className="h-full bg-muted-foreground/40" style={{ width: `${stats.total ? (stats.na / stats.total) * 100 : 0}%` }} />
           </div>
           <span className="text-[11px] text-muted-foreground">
-            <span className="text-ok">{stats.pass}✓</span>, <span className="text-coral">{stats.fail}✕</span>,{" "}
-            {stats.na} N/A, {stats.total - stats.tested} left
+            {stats.pass} pass, {stats.fail} fail, {stats.na} N/A, {stats.total - stats.tested} left
           </span>
         </div>
       </header>
@@ -234,38 +278,42 @@ th{background:#f8fafc;font-size:12px;text-transform:uppercase;color:#64748b}
       <main className="min-h-0 flex-1 overflow-y-auto p-3">
         {Object.entries(byPrinciple).map(([principle, items]) => (
           <section key={principle} className="mb-4">
-            <h2 className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{principle}</h2>
+            <h2 className="label mb-1.5">{principle}</h2>
             <div className="space-y-1">
               {items.map((c) => {
                 const entry = state[c.sc] ?? { result: "untested" as Result, note: "" };
                 return (
-                  <div key={c.sc} className="rounded-lg border border-border bg-card p-2">
+                  <div key={c.sc} className="card p-2">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-[11px] text-muted-foreground">{c.sc}</span>
                       <span className="rounded bg-muted px-1 py-0.5 text-[9px] font-semibold text-muted-foreground">{c.level}</span>
                       <span className="min-w-0 flex-1 truncate text-xs" title={c.name}>{c.name}</span>
-                      <div className="flex shrink-0 gap-1">
+                      <div className="flex shrink-0 gap-1" role="group" aria-label={`Result for ${c.sc}`}>
                         {(["pass", "fail", "na"] as const).map((r) => (
                           <button
                             key={r}
                             onClick={() => setResult(c.sc, r)}
-                            className="rounded-md border px-1.5 py-1 text-[10px] font-semibold"
+                            aria-pressed={entry.result === r}
+                            aria-label={`${RESULT_LABEL[r]} - ${c.sc} ${c.name}`}
+                            title={entry.result === r ? "Click again to clear" : RESULT_LABEL[r]}
+                            className="min-h-6 rounded-md border px-2 py-1 text-[10px] font-semibold"
                             style={
                               entry.result === r
                                 ? { backgroundColor: RESULT_COLOR[r], color: "#fff", borderColor: RESULT_COLOR[r] }
                                 : { color: RESULT_COLOR[r], borderColor: "hsl(var(--border))" }
                             }
                           >
-                            {r === "pass" ? "Pass" : r === "fail" ? "Fail" : "N/A"}
+                            {RESULT_LABEL[r]}
                           </button>
                         ))}
                       </div>
                     </div>
-                    {(entry.result === "fail" || entry.note) && (
+                    {(entry.result !== "untested" || entry.note) && (
                       <input
                         value={entry.note}
                         onChange={(e) => setNote(c.sc, e.target.value)}
-                        placeholder="Note…"
+                        placeholder={entry.result === "pass" ? "Evidence (optional)…" : entry.result === "na" ? "Why not applicable…" : "Note…"}
+                        aria-label={`Note for ${c.sc}`}
                         className="mt-1.5 w-full rounded-md border border-border bg-card-2/70 px-2 py-1 text-[11px] outline-none focus:ring-1 focus:ring-ring"
                       />
                     )}
