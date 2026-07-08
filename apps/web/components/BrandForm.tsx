@@ -2,9 +2,11 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { saveBrand, type BrandResult } from "@/app/brand/actions";
+import { BrandPreview } from "@/components/BrandPreview";
 import { CheckIcon } from "@/components/icons";
 
 const DEFAULT_COLOR = "#c2410c";
+const HEX = /^#[0-9a-fA-F]{6}$/;
 
 export function BrandForm({
   initial,
@@ -42,31 +44,17 @@ export function BrandForm({
   }
 
   const showLogo = logoPreview && !removeLogo;
+  const safeColor = HEX.test(color) ? color : DEFAULT_COLOR;
 
   return (
     <form action={formAction} className="mt-8 space-y-8">
-      {/* Live preview of the share-page header */}
+      {/* Live, faithful preview of an actual shared report with this brand. */}
       <div>
-        <p className="label mb-2">Preview</p>
-        <div className="overflow-hidden rounded-xl border border-border">
-          <div aria-hidden="true" style={{ background: color }} className="h-1 w-full" />
-          <div className="flex items-center justify-between gap-3 bg-background px-4 py-3">
-            <div className="flex min-w-0 items-center gap-2.5">
-              {showLogo ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={logoPreview!} alt="" className="h-7 w-auto max-w-[160px] object-contain" />
-              ) : null}
-              {name ? (
-                <span className="truncate text-sm font-semibold">{name}</span>
-              ) : !showLogo ? (
-                <span className="text-sm text-muted">Your brand appears here</span>
-              ) : null}
-            </div>
-            <span className="shrink-0 text-[11px] font-medium uppercase tracking-wide text-muted">
-              Accessibility report
-            </span>
-          </div>
+        <div className="mb-2 flex items-baseline justify-between">
+          <p className="label">Live preview</p>
+          <p className="text-[11px] text-muted">How anyone opening your link sees it</p>
         </div>
+        <BrandPreview name={name} color={safeColor} logoUrl={showLogo ? logoPreview : null} />
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2">
