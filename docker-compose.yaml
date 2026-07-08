@@ -58,6 +58,14 @@ services:
       - "3100"
     ports:
       - "3100:3100"
+    # Lets Coolify/Traefik route only once the server is actually serving on
+    # 3100 (migrations run on boot, so allow a generous start period).
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3100/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 45s
 
 volumes:
   pgdata:

@@ -28,6 +28,10 @@ RUN pnpm --filter @thewcag/web build
 FROM base AS runner
 ENV NODE_ENV=production
 ENV PORT=3100
+# Bind to all interfaces so Coolify's reverse proxy (Traefik, on the docker
+# network) can reach the server. Without this, Next's standalone server can
+# bind to localhost only -> Traefik returns "503 no available server".
+ENV HOSTNAME=0.0.0.0
 WORKDIR /app
 # Standalone (traced from the monorepo root) bundles the server, node_modules
 # and packages. Server lives at apps/web/server.js; static + public sit beside it.
