@@ -122,15 +122,19 @@ pub fn list_annotation_docs(app: AppHandle) -> Result<Vec<CaptureEntry>, String>
     Ok(entries)
 }
 
-/// Return a capture's thumbnail bytes for the gallery. Prefers the annotated
-/// preview (<id>.thumb.png, written on save) so the gallery shows the markup;
-/// falls back to the raw capture when no preview exists yet.
+/// Return a capture's image bytes. By default prefers the annotated preview
+/// (<id>.thumb.png, written on save) so galleries show the markup; pass
+/// raw=true to always get the original pixels (used when editing).
 #[tauri::command]
-pub fn capture_image(app: AppHandle, id: String) -> Result<tauri::ipc::Response, String> {
+pub fn capture_image(app: AppHandle, id: String, raw: Option<bool>) -> Result<tauri::ipc::Response, String> {
     sanitize(&id)?;
     let dir = captures_dir(&app)?;
     let thumb = dir.join(format!("{id}.thumb.png"));
-    let path = if thumb.exists() { thumb } else { dir.join(format!("{id}.png")) };
+    let path = if !raw.unwrap_or(false) && thumb.exists() {
+        thumb
+    } else {
+        dir.join(format!("{id}.png"))
+    };
     let png = std::fs::read(path).map_err(|_| "capture no longer exists")?;
     Ok(tauri::ipc::Response::new(png))
 }

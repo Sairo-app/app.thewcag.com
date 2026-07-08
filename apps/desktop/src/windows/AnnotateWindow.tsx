@@ -26,6 +26,7 @@ import { badgeColor, renderDoc } from "../lib/annotate/render";
 import {
   ArrowIcon,
   BoxIcon,
+  CropIcon,
   CursorIcon,
   FitIcon,
   IssueIcon,
@@ -76,6 +77,14 @@ export default function AnnotateWindow() {
   const discardTextRef = useRef(false); // Escape cancels the text entry without committing
   const [view, setView] = useState<View>({ scale: 1, tx: 0, ty: 0 });
   const [panning, setPanning] = useState(false); // Space held -> grab cursor
+  // Severity quick-style: one click sets the sticky severity AND the draw color.
+  const [quickSev, setQuickSev] = useState<Severity>("major");
+  // Crop marquee (doc coords) + whether the user is still dragging it out.
+  const [cropRect, setCropRect] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const [cropDragging, setCropDragging] = useState(false);
+  // In-editor filmstrip of recent captures for one-click switching.
+  const [strip, setStrip] = useState<{ id: string; modified_ms: number; issues: number }[]>([]);
+  const objectUrlRef = useRef<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -89,36 +98,84 @@ export default function AnnotateWindow() {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ---------- document lifecycle: load capture + restore doc, autosave ----------
+  /** Load a capture into the editor, resetting all per-document state. Used on
+   *  mount and when switching captures in place (filmstrip, crop). */
+  function loadCapture(id: string, buf: ArrayBuffer | Uint8Array) {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    setDocId(null);
+    setImage(null);
+    setShapes([]);
+    pastRef.current = [];
+    futureRef.current = [];
+    nextIdRef.current = 1;
+    setSelectedId(null);
+    setHoverId(null);
+    setDraft(null);
+    setProbeFirst(null);
+    setTextEntry(null);
+    setCropRect(null);
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    const url = URL.createObjectURL(new Blob([buf as BlobPart], { type: "image/png" }));
+    objectUrlRef.current = url;
+    const img = new Image();
+    img.onload = async () => {
+      const off = document.createElement("canvas");
+      off.width = img.naturalWidth;
+      off.height = img.naturalHeight;
+      const octx = off.getContext("2d", { willReadFrequently: true })!;
+      octx.drawImage(img, 0, 0);
+      imgDataRef.current = octx.getImageData(0, 0, off.width, off.height);
+      // Fit the view up front so the first painted frame is already centered,
+      // avoiding a one-frame flash at the default 1:1 transform.
+      const container = containerRef.current;
+      if (container) {
+        const cw = container.clientWidth;
+        const ch = container.clientHeight;
+        const s = Math.min(cw / img.naturalWidth, ch / img.naturalHeight) * 0.96;
+        setView({ scale: s, tx: (cw - img.naturalWidth * s) / 2, ty: (ch - img.naturalHeight * s) / 2 });
+      }
+      setImage(img);
+      const saved = await ipc.loadAnnotationDoc(id).catch(() => null);
+      const doc = (saved && parseDoc(saved)) || emptyDoc();
+      nextIdRef.current = doc.nextId;
+      setShapes(doc.shapes);
+      // docId last: the autosave effect only runs once the real doc is in.
+      setDocId(id);
+    };
+    img.src = url;
+  }
+
+  const refreshStrip = () => void ipc.listAnnotationDocs().then(setStrip).catch(() => {});
+
+  /** Save the current doc immediately, then swap another capture in. */
+  async function switchCapture(id: string) {
+    if (id === docId || !id) return;
+    try {
+      if (docId) {
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        await ipc
+          .saveAnnotationDoc(docId, JSON.stringify({ version: 1, nextId: nextIdRef.current, shapes }))
+          .catch(() => {});
+      }
+      const buf = await ipc.captureImage(id, true);
+      loadCapture(id, buf);
+    } catch (e) {
+      flash(String(e), true);
+    }
+  }
+
   useEffect(() => {
     void (async () => {
       const [meta, buf] = await Promise.all([ipc.annotationMeta(), ipc.annotationPng()]);
-      setDocId(meta.id);
-      const url = URL.createObjectURL(new Blob([buf], { type: "image/png" }));
-      const img = new Image();
-      img.onload = async () => {
-        const off = document.createElement("canvas");
-        off.width = img.naturalWidth;
-        off.height = img.naturalHeight;
-        const octx = off.getContext("2d", { willReadFrequently: true })!;
-        octx.drawImage(img, 0, 0);
-        imgDataRef.current = octx.getImageData(0, 0, off.width, off.height);
-        // Fit the view up front so the first painted frame is already centered,
-        // avoiding a one-frame flash at the default 1:1 transform.
-        const container = containerRef.current;
-        if (container) {
-          const cw = container.clientWidth;
-          const ch = container.clientHeight;
-          const s = Math.min(cw / img.naturalWidth, ch / img.naturalHeight) * 0.96;
-          setView({ scale: s, tx: (cw - img.naturalWidth * s) / 2, ty: (ch - img.naturalHeight * s) / 2 });
-        }
-        setImage(img);
-        const saved = await ipc.loadAnnotationDoc(meta.id).catch(() => null);
-        const doc = (saved && parseDoc(saved)) || emptyDoc();
-        nextIdRef.current = doc.nextId;
-        setShapes(doc.shapes);
-      };
-      img.src = url;
+      loadCapture(meta.id, buf);
     })();
+    refreshStrip();
+    window.addEventListener("focus", refreshStrip);
+    return () => {
+      window.removeEventListener("focus", refreshStrip);
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -250,7 +307,22 @@ export default function AnnotateWindow() {
       ctx.lineWidth = 2 / view.scale;
       ctx.stroke();
     }
-  }, [image, shapes, draft, selectedId, hoverId, view, mouseDoc, tool, probeFirst, textEntry, badges.length]);
+    if (cropRect) {
+      // Dim everything outside the marquee (even-odd fill), stroke the keep-area.
+      const cx = Math.min(cropRect.x1, cropRect.x2);
+      const cy = Math.min(cropRect.y1, cropRect.y2);
+      const cw2 = Math.abs(cropRect.x2 - cropRect.x1);
+      const ch2 = Math.abs(cropRect.y2 - cropRect.y1);
+      ctx.beginPath();
+      ctx.rect(0, 0, image.naturalWidth, image.naturalHeight);
+      ctx.rect(cx, cy, cw2, ch2);
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fill("evenodd");
+      ctx.strokeStyle = "#FFFFFF";
+      ctx.lineWidth = 1.5 / view.scale;
+      ctx.strokeRect(cx, cy, cw2, ch2);
+    }
+  }, [image, shapes, draft, selectedId, hoverId, view, mouseDoc, tool, probeFirst, textEntry, badges.length, cropRect]);
 
   // ---------- pointer input ----------
   function sample(p: Point): { r: number; g: number; b: number } {
@@ -359,6 +431,11 @@ export default function AnnotateWindow() {
       }
       return;
     }
+    if (tool === "crop") {
+      setCropDragging(true);
+      setCropRect({ x1: p.x, y1: p.y, x2: p.x, y2: p.y });
+      return;
+    }
     // drag tools: arrow / rect / redact / measure
     setDraft({
       id: nextIdRef.current++,
@@ -381,6 +458,10 @@ export default function AnnotateWindow() {
     }
     const p = toDoc(e);
     setMouseDoc(p);
+    if (cropDragging && cropRect) {
+      setCropRect({ ...cropRect, x2: p.x, y2: p.y });
+      return;
+    }
     if (resizeRef.current) {
       const { id, handle } = resizeRef.current;
       setShapes((prev) => prev.map((s) => (s.id === id ? applyHandle(s, handle, p) : s)));
@@ -415,6 +496,14 @@ export default function AnnotateWindow() {
     panRef.current = null;
     dragRef.current = null;
     resizeRef.current = null;
+    if (cropDragging) {
+      setCropDragging(false);
+      // A stray click (no real drag) shouldn't leave a 0-size crop armed.
+      if (cropRect && (Math.abs(cropRect.x2 - cropRect.x1) < 8 || Math.abs(cropRect.y2 - cropRect.y1) < 8)) {
+        setCropRect(null);
+      }
+      return;
+    }
     if (!draft) return;
     const moved = Math.abs(draft.x2 - draft.x1) > 5 || Math.abs(draft.y2 - draft.y1) > 5;
     if (moved) {
@@ -453,6 +542,7 @@ export default function AnnotateWindow() {
       m: "measure",
       p: "probe",
       o: "focus",
+      c: "crop",
     };
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -495,6 +585,7 @@ export default function AnnotateWindow() {
       if (e.key === "Escape") {
         setSelectedId(null);
         setProbeFirst(null);
+        setCropRect(null);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -505,6 +596,40 @@ export default function AnnotateWindow() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, fit]);
+
+  // ---------- crop ----------
+  /** Crop to the marquee - NON-destructive: the cropped region becomes a new
+   *  capture (annotations shifted along), and the original stays in the
+   *  library. The editor switches to the new capture in place. */
+  async function applyCrop() {
+    if (!cropRect || !image) return;
+    const x = Math.max(0, Math.round(Math.min(cropRect.x1, cropRect.x2)));
+    const y = Math.max(0, Math.round(Math.min(cropRect.y1, cropRect.y2)));
+    const w = Math.min(image.naturalWidth - x, Math.round(Math.abs(cropRect.x2 - cropRect.x1)));
+    const h = Math.min(image.naturalHeight - y, Math.round(Math.abs(cropRect.y2 - cropRect.y1)));
+    if (w < 8 || h < 8) {
+      setCropRect(null);
+      return;
+    }
+    try {
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      c.getContext("2d")!.drawImage(image, -x, -y);
+      const blob: Blob = await new Promise((res) => c.toBlob((b) => res(b!), "image/png"));
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      await ipc.storeAnnotation(bytes); // registers a NEW capture id
+      const meta = await ipc.annotationMeta();
+      const shifted = shapes.map((s) => ({ ...s, x1: s.x1 - x, y1: s.y1 - y, x2: s.x2 - x, y2: s.y2 - y }));
+      await ipc.saveAnnotationDoc(meta.id, JSON.stringify({ version: 1, nextId: nextIdRef.current, shapes: shifted }));
+      loadCapture(meta.id, bytes);
+      setTool("select");
+      refreshStrip();
+      flash("Cropped to a new capture - the original stays in your library");
+    } catch (e) {
+      flash(String(e), true);
+    }
+  }
 
   // ---------- exports ----------
   async function exportPng(): Promise<Uint8Array> {
@@ -772,13 +897,14 @@ export default function AnnotateWindow() {
               [
                 ["select", <CursorIcon key="i" />, "Select", "V", "Select"],
                 ["badge", <IssueIcon key="i" />, "Issue", "I", "Drop issue marker"],
-                ["arrow", <ArrowIcon key="i" />, "", "A", "Arrow"],
-                ["rect", <BoxIcon key="i" />, "", "R", "Rectangle"],
+                ["arrow", <ArrowIcon key="i" />, "Arrow", "A", "Arrow"],
+                ["rect", <BoxIcon key="i" />, "Box", "R", "Rectangle"],
                 ["measure", <RulerIcon key="i" />, "24px", "M", "Measure target size"],
                 ["probe", <PipetteIcon key="i" />, "Probe", "P", "Probe contrast"],
                 ["focus", <RouteIcon key="i" />, "Order", "O", "Focus order"],
-                ["redact", <RedactIcon key="i" />, "", "X", "Redact"],
-                ["text", <TypeIcon key="i" />, "", "T", "Text"],
+                ["redact", <RedactIcon key="i" />, "Redact", "X", "Redact"],
+                ["text", <TypeIcon key="i" />, "Text", "T", "Text"],
+                ["crop", <CropIcon key="i" />, "Crop", "C", "Crop capture"],
               ] as [Tool, ReactNode, string, string, string][]
             ).map(([t, icon, label, key, name]) => (
               <button
@@ -789,11 +915,12 @@ export default function AnnotateWindow() {
                 onClick={() => {
                   setTool(t);
                   setProbeFirst(null);
+                  if (t !== "crop") setCropRect(null);
                 }}
                 title={`${name} (${key})`}
               >
                 {icon}
-                {label && <span>{label}</span>}
+                {label && <span className="hidden lg:inline">{label}</span>}
               </button>
             ))}
           </div>
@@ -807,6 +934,27 @@ export default function AnnotateWindow() {
               </button>
             </div>
           )}
+          <span className="h-5 w-px bg-border" />
+          {/* Severity quick styles: one click sets the sticky severity AND the
+              draw color, so every new marker/shape triages at a glance. */}
+          <div className="seg" role="group" aria-label="Severity quick style">
+            {SEVERITIES.map((s) => (
+              <button
+                key={s}
+                data-active={quickSev === s}
+                aria-pressed={quickSev === s}
+                onClick={() => {
+                  setQuickSev(s);
+                  lastSevRef.current = s;
+                  setColor(SEVERITY_COLORS[s]);
+                }}
+                title={`New issues and shapes use ${s} styling`}
+              >
+                <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ backgroundColor: SEVERITY_COLORS[s] }} />
+                <span className="hidden capitalize xl:inline">{s}</span>
+              </button>
+            ))}
+          </div>
           <span className="h-5 w-px bg-border" />
           {PALETTE.map((c) => (
             <button
@@ -915,6 +1063,27 @@ export default function AnnotateWindow() {
                   ? "Click the second color - ratio attaches to the selected issue"
                   : "Click the second color - select an issue first to attach the ratio"
                 : "Click the first color to probe contrast in this capture"}
+            </div>
+          )}
+          {tool === "crop" && !cropRect && (
+            <div className="fade pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-card/90 px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur">
+              Drag the area to keep - cropping creates a new capture, the original is kept
+            </div>
+          )}
+          {cropRect && !cropDragging && (
+            <div
+              className="absolute z-10 flex gap-1.5"
+              style={{
+                left: Math.min(cropRect.x1, cropRect.x2) * view.scale + view.tx,
+                top: Math.max(cropRect.y1, cropRect.y2) * view.scale + view.ty + 8,
+              }}
+            >
+              <button onClick={() => void applyCrop()} className="btn-primary px-3 py-1.5 text-xs shadow-md">
+                Crop
+              </button>
+              <button onClick={() => setCropRect(null)} className="btn px-3 py-1.5 text-xs shadow-md">
+                Cancel
+              </button>
             </div>
           )}
           {textEntry && (
@@ -1035,7 +1204,86 @@ export default function AnnotateWindow() {
           </aside>
         )}
       </div>
+
+      {/* Filmstrip: every recent capture one click away, Snagit-style. */}
+      {strip.length > 1 && (
+        <div
+          className="flex shrink-0 items-center gap-1.5 overflow-x-auto border-t border-border bg-card/70 px-2 py-1.5"
+          role="listbox"
+          aria-label="Recent captures"
+        >
+          {strip.map((d) => (
+            <button
+              key={d.id}
+              role="option"
+              aria-selected={d.id === docId}
+              onClick={() => void switchCapture(d.id)}
+              className={`relative h-11 w-[72px] shrink-0 overflow-hidden rounded-md border transition-opacity ${
+                d.id === docId ? "border-primary ring-1 ring-ring/50" : "border-border opacity-60 hover:opacity-100"
+              }`}
+              title={new Date(d.modified_ms).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+              aria-label={`Open capture from ${new Date(d.modified_ms).toLocaleString()}`}
+            >
+              <StripThumb id={d.id} />
+              {d.issues > 0 && (
+                <span className="absolute bottom-0.5 right-0.5 rounded-full bg-black/70 px-1 text-[8px] font-semibold text-white">
+                  {d.issues}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Status bar: dimensions, tool hint, findings count. */}
+      <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-card/80 px-3 py-1 font-mono text-[10px] text-muted-foreground">
+        <span>{image ? `${image.naturalWidth} × ${image.naturalHeight} px` : "…"}</span>
+        <span className="min-w-0 truncate font-sans">{TOOL_HINTS[tool]}</span>
+        <span>
+          {badges.length} issue{badges.length === 1 ? "" : "s"}
+        </span>
+      </footer>
     </div>
+  );
+}
+
+/** One-line hints so the status bar always says what the current tool does. */
+const TOOL_HINTS: Record<Tool, string> = {
+  select: "Click to select - drag to move, handles to resize, Delete to remove",
+  badge: "Click to drop a numbered issue marker",
+  arrow: "Drag to draw an arrow - Shift snaps the angle",
+  rect: "Drag to draw a box - Shift keeps it square",
+  measure: "Click an element to auto-measure it, or drag - under 24px fails WCAG 2.5.8",
+  probe: "Click two colors to read their contrast ratio",
+  focus: "Click in sequence to map the expected focus order",
+  redact: "Drag over anything sensitive - solid blocks are unrecoverable",
+  text: "Click to place a text label",
+  crop: "Drag the area to keep - creates a new capture, the original stays",
+};
+
+/** A capture thumbnail in the filmstrip, loaded from disk over IPC. */
+function StripThumb({ id }: { id: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    let cancelled = false;
+    ipc
+      .captureImage(id)
+      .then((buf) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(new Blob([buf], { type: "image/png" }));
+        setUrl(objectUrl);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [id]);
+  return url ? (
+    <img src={url} alt="" className="h-full w-full object-cover" draggable={false} />
+  ) : (
+    <span className="block h-full w-full animate-pulse bg-muted" />
   );
 }
 

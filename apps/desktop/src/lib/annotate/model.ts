@@ -1,5 +1,6 @@
 export type ShapeKind = "badge" | "arrow" | "rect" | "redact" | "text" | "measure" | "probe" | "focus";
-export type Tool = "select" | ShapeKind;
+/** "crop" trims the capture itself (into a new capture) - it draws no shape. */
+export type Tool = "select" | "crop" | ShapeKind;
 
 export const ISSUE_TYPES = [
   { id: "contrast", label: "Contrast", sc: "1.4.3", template: "Text does not reach the 4.5:1 minimum contrast ratio against its background." },
