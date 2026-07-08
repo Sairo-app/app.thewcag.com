@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   apcaLc,
   apcaRating,
@@ -10,8 +10,9 @@ import {
   type ColorblindType,
   type Rgb,
 } from "@accessibility-build/a11y-core";
-import { displayShortcut, events, ipc, type Account, type Shortcuts } from "../lib/ipc";
-import { CheckIcon, CopyIcon, FolderIcon, SwapIcon, TimerIcon } from "../lib/icons";
+import { getVersion } from "@tauri-apps/api/app";
+import { displayShortcut, events, ipc, isMac, type Account, type Shortcuts } from "../lib/ipc";
+import { CheckIcon, CloseIcon, CopyIcon, FolderIcon, SwapIcon, TimerIcon } from "../lib/icons";
 
 const SITE = "https://thewcag.com";
 const HISTORY_KEY = "contrast-history-v1";
@@ -74,6 +75,7 @@ export default function MainWindow() {
   const [installing, setInstalling] = useState(false);
   const [onboarding, setOnboarding] = useState(() => !localStorage.getItem("onboarded-v1"));
   const [account, setAccount] = useState<Account | null>(null);
+  const [version, setVersion] = useState("");
 
   function appendLog(kind: LogEntry["kind"], text: string) {
     setLog((prev) => {
@@ -90,6 +92,7 @@ export default function MainWindow() {
     // silent: dev builds have no manifest yet; failures are expected offline
     void ipc.checkUpdate().then(setUpdate).catch(() => {});
     void ipc.getAccount().then(setAccount).catch(() => {});
+    void getVersion().then(setVersion).catch(() => {});
     const unlisteners = [
       events.onPicked((p) => {
         setError(null);
@@ -168,9 +171,7 @@ export default function MainWindow() {
   const bgRgb = hexToRgb(bg);
 
   // macOS uses an overlay titlebar (traffic lights sit over the content, so we
-  // pad the top). Windows shows a real titlebar, so no extra top padding.
-  const isMac = typeof navigator !== "undefined" && /Mac/i.test(navigator.userAgent);
-
+  // pad the top); Windows shows a real titlebar. `isMac` comes from ipc.
   return (
     <div className="app-bg flex h-screen flex-col overflow-hidden font-sans text-[13px] text-foreground">
       {/* titlebar overlay: draggable strip under the traffic lights (macOS) */}
@@ -198,8 +199,18 @@ export default function MainWindow() {
       {/* scroll region: fills the window, scrolls internally (no visible bar) */}
       <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5 pb-4">
       {error && (
-        <div className="rise mb-3 rounded-xl border border-coral/40 bg-coral/10 px-3 py-2 text-xs text-coral">
-          {error}
+        <div
+          role="alert"
+          className="rise mb-3 flex items-start justify-between gap-2 rounded-xl border border-coral/40 bg-coral/10 px-3 py-2 text-xs text-coral"
+        >
+          <span>{error}</span>
+          <button
+            onClick={() => setError(null)}
+            aria-label="Dismiss error"
+            className="shrink-0 rounded p-0.5 text-coral/70 hover:text-coral"
+          >
+            <CloseIcon size={12} />
+          </button>
         </div>
       )}
 
@@ -222,6 +233,21 @@ export default function MainWindow() {
             {installing ? "Installing…" : "Update & restart"}
           </button>
         </div>
+      )}
+
+      {screenshot && (
+        <section className="rise card mb-3 flex items-center justify-between px-3 py-2">
+          <p className="mr-2 truncate text-xs text-muted-foreground" title={screenshot}>
+            Saved: {screenshot.split("/").pop()}
+          </p>
+          <button
+            onClick={() => void ipc.revealPath(screenshot)}
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted"
+          >
+            <FolderIcon size={12} />
+            Reveal
+          </button>
+        </section>
       )}
 
       {permission === false && (
@@ -255,42 +281,42 @@ export default function MainWindow() {
         />
       )}
 
-      <section className="mb-3 grid grid-cols-3 gap-2">
+      <h2 className="label mb-1.5">Sample from screen</h2>
+      <section aria-label="Sample from screen" className="mb-3 grid grid-cols-3 gap-2">
         <ToolCard
           title="Pick pair"
           hotkey={shortcuts ? displayShortcut(shortcuts.pick) : ""}
-          hint="fg + bg from screen"
+          hint="Text + background"
           onClick={() => void ipc.beginOverlay("pair")}
           onDelayed={() => void ipc.beginOverlay("pair", 3000)}
         />
         <ToolCard
           title="Capture"
           hotkey={shortcuts ? displayShortcut(shortcuts.shot) : ""}
-          hint="region + annotate"
+          hint="Region + annotate"
           onClick={() => void ipc.beginOverlay("shot")}
           onDelayed={() => void ipc.beginOverlay("shot", 3000)}
         />
         <ToolCard
           title="Lens"
           hotkey={shortcuts ? displayShortcut(shortcuts.lens) : ""}
-          hint="colorblind view"
+          hint="Colorblind view"
           onClick={() => void ipc.toggleLens()}
         />
       </section>
 
-      <section className="mb-3 grid grid-cols-4 gap-2">
+      <h2 className="label mb-1.5">Auditor tools</h2>
+      <section aria-label="Auditor tools" className="mb-3 grid grid-cols-4 gap-2">
         <AuditButton label="Measure" hint="24px targets" onClick={() => void ipc.beginOverlay("measure")} />
-        <AuditButton label="Findings" hint="issue log" onClick={() => void ipc.openToolWindow("findings")} />
+        <AuditButton label="Findings" hint="Issue log" onClick={() => void ipc.openToolWindow("findings")} />
         <AuditButton label="Checklist" hint="WCAG 2.2" onClick={() => void ipc.openToolWindow("checklist")} />
-        <AuditButton label="Palette" hint="contrast grid" onClick={() => void ipc.openToolWindow("palette")} />
+        <AuditButton label="Palette" hint="Contrast grid" onClick={() => void ipc.openToolWindow("palette")} />
       </section>
 
       {history.length > 0 && (
         <section className="card mb-3 p-3">
           <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Recent pairs
-            </h2>
+            <h2 className="label">Recent pairs</h2>
             <button
               onClick={() => {
                 setHistory([]);
@@ -306,12 +332,12 @@ export default function MainWindow() {
               <button
                 key={`${p.fg}${p.bg}${i}`}
                 onClick={() => {
-                  setFg(p.fg);
-                  setBg(p.bg);
                   setWorst(false);
+                  applyPair(p.fg, p.bg);
                 }}
                 className="rounded-md border border-border px-2 py-1 font-mono text-[10px] hover:-translate-y-px hover:shadow-sm"
                 style={{ color: p.fg, backgroundColor: p.bg }}
+                aria-label={`Re-check ${p.fg} on ${p.bg}`}
                 title={`${p.fg} on ${p.bg}`}
               >
                 Aa
@@ -334,21 +360,6 @@ export default function MainWindow() {
         <ShortcutsCard shortcuts={shortcuts} onChanged={setShortcuts} onError={setError} />
       )}
 
-      {screenshot && (
-        <section className="rise card mb-3 flex items-center justify-between px-3 py-2">
-          <p className="mr-2 truncate text-xs text-muted-foreground" title={screenshot}>
-            Saved: {screenshot.split("/").pop()}
-          </p>
-          <button
-            onClick={() => void ipc.revealPath(screenshot)}
-            className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted"
-          >
-            <FolderIcon size={12} />
-            Reveal
-          </button>
-        </section>
-      )}
-
       </div>
 
       <footer className="flex shrink-0 items-center justify-between border-t border-border/70 px-5 pb-4 pt-3">
@@ -356,17 +367,22 @@ export default function MainWindow() {
           <button
             role="switch"
             aria-checked={autostart}
+            aria-label="Launch at login"
             onClick={() => {
               const next = !autostart;
               setAutostartState(next);
-              void ipc.setAutostart(next).catch(() => {});
+              // Roll back the optimistic toggle if the OS call fails.
+              void ipc.setAutostart(next).catch((e) => {
+                setAutostartState(!next);
+                setError(`Couldn't change launch-at-login: ${e}`);
+              });
             }}
             className="switch"
             data-on={autostart}
           />
           Launch at login
         </label>
-        <span className="text-[10px] text-muted-foreground">v2.3.0</span>
+        <span className="text-[10px] text-muted-foreground">v{version}</span>
       </footer>
 
       {onboarding && (
@@ -386,6 +402,7 @@ export default function MainWindow() {
 
 function CapturesCard() {
   const [docs, setDocs] = useState<{ id: string; modified_ms: number; issues: number }[]>([]);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
 
   const refresh = () => void ipc.listAnnotationDocs().then(setDocs).catch(() => {});
   useEffect(() => {
@@ -397,9 +414,7 @@ function CapturesCard() {
   if (docs.length === 0) return null;
   return (
     <section className="card mb-3 p-3">
-      <h2 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        Captures - click to re-edit
-      </h2>
+      <h2 className="label mb-2">Captures</h2>
       <div className="max-h-36 space-y-1 overflow-y-auto">
         {docs.slice(0, 8).map((d) => (
           <div key={d.id} className="group flex items-center justify-between rounded-md px-1.5 py-1 hover:bg-muted">
@@ -419,10 +434,20 @@ function CapturesCard() {
               </span>
             </button>
             <button
-              onClick={() => void ipc.deleteAnnotation(d.id).then(refresh)}
-              className="text-[10px] text-muted-foreground opacity-0 hover:text-coral group-hover:opacity-100"
+              onClick={() => {
+                if (confirmId === d.id) {
+                  setConfirmId(null);
+                  void ipc.deleteAnnotation(d.id).then(refresh).catch(refresh);
+                } else {
+                  setConfirmId(d.id);
+                  // Auto-revert the armed state so a stray first click is harmless.
+                  setTimeout(() => setConfirmId((c) => (c === d.id ? null : c)), 2500);
+                }
+              }}
+              aria-label={confirmId === d.id ? "Confirm delete capture" : "Delete capture"}
+              className="rounded px-1 text-[10px] text-muted-foreground opacity-0 hover:text-coral focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
             >
-              Delete
+              {confirmId === d.id ? "Delete?" : "Delete"}
             </button>
           </div>
         ))}
@@ -468,7 +493,7 @@ function AccountCard({ account }: { account: Account | null }) {
           onClick={() => void ipc.openSite("https://app.thewcag.com/screenshots")}
           className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted"
         >
-          Account
+          Screenshots
         </button>
         <button
           onClick={() => void ipc.signOut()}
@@ -566,10 +591,30 @@ function Onboarding(props: {
     },
   ];
   const last = step === steps.length - 1;
+  const nextRef = useRef<HTMLButtonElement>(null);
+
+  // Move focus into the dialog on each step; close on Escape.
+  useEffect(() => {
+    nextRef.current?.focus();
+  }, [step]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") props.onDone();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
-    <div className="fade fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-6 backdrop-blur-sm">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Getting started: ${steps[step].title}`}
+      className="fade fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-6 backdrop-blur-sm"
+    >
       <div className="rise card w-full max-w-sm p-5">
-        <div className="mb-3 flex gap-1">
+        <div className="mb-3 flex gap-1" aria-hidden="true">
           {steps.map((_, i) => (
             <span
               key={i}
@@ -579,7 +624,7 @@ function Onboarding(props: {
         </div>
         <h2 className="mb-1 text-sm font-bold">{steps[step].title}</h2>
         <p className="mb-4 text-xs leading-relaxed text-muted-foreground">{steps[step].body}</p>
-        {last && props.permission === false && (
+        {props.permission === false && (
           <button
             onClick={props.onGrant}
             className="mb-3 w-full rounded-lg border border-yellow/50 bg-yellow/10 px-3 py-2 text-xs font-medium text-foreground hover:bg-yellow/20"
@@ -592,6 +637,7 @@ function Onboarding(props: {
             Skip
           </button>
           <button
+            ref={nextRef}
             onClick={() => (last ? props.onDone() : setStep(step + 1))}
             className="rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90"
           >
@@ -627,7 +673,9 @@ function ShortcutsCard(props: {
         e.metaKey && "super",
       ].filter(Boolean) as string[];
       if (mods.length === 0) {
-        props.onError("Shortcuts need at least one modifier (⌘, ⌥, ⌃ or ⇧)");
+        props.onError(
+          `Shortcuts need at least one modifier (${isMac ? "⌘, ⌥, ⌃ or ⇧" : "Ctrl, Alt, Shift or Win"})`,
+        );
         setRecording(null);
         return;
       }
@@ -646,18 +694,17 @@ function ShortcutsCard(props: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recording]);
 
+  // Labels match the tool tiles for one consistent vocabulary.
   const rows: { action: keyof Shortcuts; label: string }[] = [
-    { action: "pick", label: "Check contrast" },
-    { action: "shot", label: "Capture & annotate" },
-    { action: "lens", label: "Colorblind lens" },
+    { action: "pick", label: "Pick pair" },
+    { action: "shot", label: "Capture" },
+    { action: "lens", label: "Lens" },
   ];
 
   return (
     <section className="card mb-3 p-3">
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Keyboard shortcuts
-        </h2>
+        <h2 className="label">Keyboard shortcuts</h2>
         <button
           onClick={() =>
             void ipc.resetShortcuts().then((s) => {
@@ -695,7 +742,7 @@ function PermissionCard(props: { onGrant: () => void; onOpenSettings: () => void
       <h2 className="text-sm font-semibold">One-time setup: Screen Recording</h2>
       <p className="mt-1 text-xs text-muted-foreground">
         The color picker, screenshots and lens read your screen locally.
-        Nothing ever leaves your Mac.
+        Nothing ever leaves your device.
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <button
@@ -783,6 +830,7 @@ function ContrastPanel(props: {
         <Swatch label="Text" hex={props.fg} onChange={props.onFg} pickMode="fg" />
         <button
           onClick={props.onSwap}
+          aria-label="Swap text and background"
           title="Swap text and background"
           className="mt-4 rounded-md border border-border p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
         >
@@ -802,9 +850,15 @@ function ContrastPanel(props: {
       </div>
 
       <div className="mb-3 flex items-center justify-between">
-        <div className="seg" role="tablist" aria-label="Text size">
+        <div className="seg" role="radiogroup" aria-label="Text size">
           {TEXT_MODES.map((m) => (
-            <button key={m.key} data-active={mode === m.key} onClick={() => setMode(m.key)}>
+            <button
+              key={m.key}
+              role="radio"
+              aria-checked={mode === m.key}
+              data-active={mode === m.key}
+              onClick={() => setMode(m.key)}
+            >
               {m.label}
             </button>
           ))}
@@ -858,27 +912,28 @@ function ContrastPanel(props: {
                 className={`rounded-md px-1.5 py-0.5 font-mono text-[9px] ${
                   bad ? "bg-coral/15 font-bold text-coral" : "bg-muted/70 text-muted-foreground"
                 }`}
+                aria-label={`${row.label}: ${row.ratio.toFixed(2)} to 1${bad ? ", passes normally but fails under this color-vision deficiency" : ""}`}
                 title={`${row.key}: ${row.ratio.toFixed(2)}:1${bad ? " - passes normally but fails under this CVD" : ""}`}
               >
                 {row.label} {row.ratio.toFixed(1)}
+                {bad && <span aria-hidden="true"> !</span>}
               </span>
             );
           })}
         </div>
         <button
           onClick={() => void copyFinding()}
-          className="rounded-md border border-border px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="btn flex shrink-0 items-center gap-1 px-2 py-1 text-[11px]"
           title={`Copy as audit finding (WCAG ${modeInfo.sc})`}
         >
-          {copied ? "✓ copied" : "Copy finding"}
+          {copied ? <CheckIcon size={12} /> : <CopyIcon size={12} />}
+          {copied ? "Copied" : "Copy finding"}
         </button>
       </div>
 
       {(fgFixes.length > 0 || bgFixes.length > 0) && (
         <div className="mt-3 border-t border-border/70 pt-3">
-          <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Make it pass - nearest {modeInfo.target}:1 fixes
-          </h3>
+          <h3 className="label mb-2">Make it pass - nearest {modeInfo.target}:1 fixes</h3>
           <div className="flex flex-wrap gap-2">
             {fgFixes.map((s) => (
               <FixButton
@@ -939,12 +994,11 @@ function Swatch(props: {
   useEffect(() => setDraft(props.hex), [props.hex]);
   return (
     <div className="min-w-0 flex-1">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        {props.label}
-      </span>
+      <span className="label">{props.label}</span>
       <div className="mt-1 flex items-center gap-1.5">
         <button
           onClick={() => void ipc.beginOverlay(props.pickMode)}
+          aria-label={`Pick ${props.label.toLowerCase()} color from screen`}
           title={`Pick ${props.label.toLowerCase()} from screen`}
           className="h-8 w-8 shrink-0 rounded-lg border border-border shadow-sm hover:scale-105"
           style={{ backgroundColor: props.hex }}
@@ -956,6 +1010,7 @@ function Swatch(props: {
             if (hexToRgb(e.target.value)) props.onChange(e.target.value.toUpperCase());
           }}
           spellCheck={false}
+          aria-label={`${props.label} hex value`}
           className="w-full min-w-0 rounded-md border border-border bg-card-2/70 px-2 py-1.5 font-mono text-xs outline-none focus:ring-1 focus:ring-ring"
         />
         <button
@@ -964,6 +1019,7 @@ function Swatch(props: {
             setCopied(true);
             setTimeout(() => setCopied(false), 1200);
           }}
+          aria-label={`Copy ${props.label.toLowerCase()} hex`}
           title="Copy hex"
           className={`shrink-0 rounded-md border border-border p-1.5 hover:bg-muted ${
             copied ? "text-ok" : "text-muted-foreground hover:text-foreground"
@@ -1013,8 +1069,9 @@ function ToolCard(props: {
       {props.onDelayed && (
         <button
           onClick={props.onDelayed}
+          aria-label={`${props.title} after a 3 second delay`}
           title="Start after a 3s delay - time to open hover states and menus"
-          className="absolute bottom-2 right-2 flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[9px] text-muted-foreground opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
+          className="absolute bottom-2 right-2 flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[9px] text-muted-foreground opacity-0 transition-opacity hover:bg-muted focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
         >
           <TimerIcon size={10} />
           3s

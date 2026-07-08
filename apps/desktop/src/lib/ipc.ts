@@ -83,28 +83,34 @@ export interface Shortcuts {
   lens: string;
 }
 
-/** "alt+super+KeyP" → "⌥⌘P" (matches settings::display in Rust). */
+/** True on macOS. Used to render Mac glyphs vs. Windows key names. */
+export const isMac = typeof navigator !== "undefined" && /Mac/i.test(navigator.userAgent);
+
+/**
+ * "alt+super+KeyP" → "⌥⌘P" on macOS, "Alt+Win+P" on Windows.
+ * (matches settings::display in Rust; platform-aware for glyphs vs. names).
+ */
 export function displayShortcut(shortcut: string): string {
-  let mods = "";
+  const mods: string[] = [];
   let key = "";
   for (const token of shortcut.split("+")) {
     switch (token.toLowerCase()) {
       case "ctrl":
       case "control":
-        mods += "⌃";
+        mods.push(isMac ? "⌃" : "Ctrl");
         break;
       case "alt":
       case "option":
-        mods += "⌥";
+        mods.push(isMac ? "⌥" : "Alt");
         break;
       case "shift":
-        mods += "⇧";
+        mods.push(isMac ? "⇧" : "Shift");
         break;
       case "super":
       case "cmd":
       case "command":
       case "meta":
-        mods += "⌘";
+        mods.push(isMac ? "⌘" : "Win");
         break;
       default:
         key = token.replace(/^Key/, "").replace(/^Digit/, "");
@@ -116,7 +122,9 @@ export function displayShortcut(shortcut: string): string {
     ArrowLeft: "←",
     ArrowRight: "→",
   };
-  return mods + (arrows[key] ?? key.toUpperCase());
+  const keyDisp = arrows[key] ?? key.toUpperCase();
+  // macOS stacks glyphs (⌥⌘P); Windows joins with + (Alt+Win+P).
+  return isMac ? mods.join("") + keyDisp : [...mods, keyDisp].filter(Boolean).join("+");
 }
 
 export interface PickedPair {

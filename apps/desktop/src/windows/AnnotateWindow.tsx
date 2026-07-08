@@ -65,6 +65,15 @@ export default function AnnotateWindow() {
   const [mouseDoc, setMouseDoc] = useState<Point | null>(null);
   const [textEntry, setTextEntry] = useState<{ docX: number; docY: number; value: string; editId?: number } | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const statusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Remember the last classification so serial findings don't reset to
+  // Contrast/major every time; focus the new badge's note to speed data entry.
+  const lastTypeRef = useRef<IssueId>(ISSUE_TYPES[0].id);
+  const lastSevRef = useRef<Severity>("major");
+  const [focusNoteId, setFocusNoteId] = useState<number | null>(null);
+  const discardTextRef = useRef(false); // Escape cancels the text entry without committing
   const [view, setView] = useState<View>({ scale: 1, tx: 0, ty: 0 });
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -273,6 +282,7 @@ export default function AnnotateWindow() {
       return;
     }
     if (tool === "badge") {
+      const lastType = ISSUE_TYPES.find((t) => t.id === lastTypeRef.current) ?? ISSUE_TYPES[0];
       const shape: Shape = {
         id: nextIdRef.current++,
         kind: "badge",
@@ -280,13 +290,14 @@ export default function AnnotateWindow() {
         y1: p.y,
         x2: p.x,
         y2: p.y,
-        color: SEVERITY_COLORS.major,
-        issueType: "contrast",
-        severity: "major",
-        note: ISSUE_TYPES[0].template,
+        color: SEVERITY_COLORS[lastSevRef.current],
+        issueType: lastType.id,
+        severity: lastSevRef.current,
+        note: lastType.template,
       };
       commit((prev) => [...prev, shape]);
       setSelectedId(shape.id);
+      setFocusNoteId(shape.id); // jump focus to the note for immediate typing
       return;
     }
     if (tool === "focus") {
@@ -564,9 +575,13 @@ export default function AnnotateWindow() {
     return new Uint8Array(await blob.arrayBuffer());
   }
 
-  function flash(message: string) {
+  // Success flashes auto-dismiss quickly; errors are shown in coral and linger
+  // long enough to read and act on (never disguised as success).
+  function flash(message: string, error = false) {
     setStatus(message);
-    setTimeout(() => setStatus(null), 2400);
+    setStatusError(error);
+    if (statusTimer.current) clearTimeout(statusTimer.current);
+    statusTimer.current = setTimeout(() => setStatus(null), error ? 6000 : 2400);
   }
 
   function issueSummaries(): string[] {
@@ -606,6 +621,7 @@ export default function AnnotateWindow() {
     await ipc.copyPng(await exportPng());
     flash("Image copied");
     void emit("annotate-exported", issueSummaries());
+    if (badges.length) void ipc.addFindings(registerItems());
   }
   async function onReport() {
     const path = await ipc.savePng(await exportReport(), `a11y-report-${docId}.png`);
@@ -616,11 +632,14 @@ export default function AnnotateWindow() {
     }
   }
   async function onPublish() {
+    if (publishing) return;
     if (shapes.length === 0) {
       flash("Nothing to publish yet");
       return;
     }
+    setPublishing(true);
     setStatus("Publishing…");
+    setStatusError(false);
     try {
       const base64 = await canvasToBase64(scaledCanvas(buildReportCanvas(), 1400));
       const issues = badges.map((b, i) => {
@@ -653,7 +672,9 @@ export default function AnnotateWindow() {
       void emit("annotate-exported", issueSummaries());
       if (badges.length) void ipc.addFindings(registerItems());
     } catch (e) {
-      flash(String(e));
+      flash(String(e), true);
+    } finally {
+      setPublishing(false);
     }
   }
   async function onCopyMarkdown() {
@@ -677,6 +698,41 @@ export default function AnnotateWindow() {
     flash("Jira markup copied");
   }
 
+  // Commit the text-tool entry (from Enter or blur) so typed text is never
+  // silently lost; Escape sets discardTextRef to cancel instead.
+  function commitText(entry: typeof textEntry) {
+    if (entry) {
+      const value = entry.value.trim();
+      if (value) {
+        if (entry.editId !== undefined) {
+          const editId = entry.editId;
+          commit((prev) => prev.map((s) => (s.id === editId ? { ...s, text: value } : s)));
+        } else {
+          const shape: Shape = {
+            id: nextIdRef.current++,
+            kind: "text",
+            x1: entry.docX,
+            y1: entry.docY,
+            x2: 0,
+            y2: 0,
+            color,
+            text: value,
+          };
+          commit((prev) => [...prev, shape]);
+        }
+      }
+    }
+    setTextEntry(null);
+  }
+
+  // The sidebar mounts once the first badge lands (and unmounts on the last),
+  // changing the canvas width; refit so the image doesn't jump or clip.
+  const hasBadges = badges.length > 0;
+  useEffect(() => {
+    fit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasBadges]);
+
   // text entry position in screen space
   const textEntryStyle = textEntry
     ? { left: textEntry.docX * view.scale + view.tx, top: textEntry.docY * view.scale + view.ty }
@@ -686,28 +742,30 @@ export default function AnnotateWindow() {
     <div className="app-bg-solid flex h-screen flex-col font-sans text-[13px] text-foreground">
       <header className="flex items-center justify-between border-b border-border bg-card/80 px-3 py-2 backdrop-blur-xl">
         <div className="flex items-center gap-2">
-          <div className="seg">
+          <div className="seg" role="toolbar" aria-label="Annotation tools">
             {(
               [
-                ["select", <CursorIcon key="i" />, "Select", "V"],
-                ["badge", <IssueIcon key="i" />, "Issue", "I"],
-                ["arrow", <ArrowIcon key="i" />, "", "A"],
-                ["rect", <BoxIcon key="i" />, "", "R"],
-                ["measure", <RulerIcon key="i" />, "24px", "M"],
-                ["probe", <PipetteIcon key="i" />, "Probe", "P"],
-                ["focus", <RouteIcon key="i" />, "Order", "O"],
-                ["redact", <RedactIcon key="i" />, "", "X"],
-                ["text", <TypeIcon key="i" />, "", "T"],
-              ] as [Tool, ReactNode, string, string][]
-            ).map(([t, icon, label, key]) => (
+                ["select", <CursorIcon key="i" />, "Select", "V", "Select"],
+                ["badge", <IssueIcon key="i" />, "Issue", "I", "Drop issue marker"],
+                ["arrow", <ArrowIcon key="i" />, "", "A", "Arrow"],
+                ["rect", <BoxIcon key="i" />, "", "R", "Rectangle"],
+                ["measure", <RulerIcon key="i" />, "24px", "M", "Measure target size"],
+                ["probe", <PipetteIcon key="i" />, "Probe", "P", "Probe contrast"],
+                ["focus", <RouteIcon key="i" />, "Order", "O", "Focus order"],
+                ["redact", <RedactIcon key="i" />, "", "X", "Redact"],
+                ["text", <TypeIcon key="i" />, "", "T", "Text"],
+              ] as [Tool, ReactNode, string, string, string][]
+            ).map(([t, icon, label, key, name]) => (
               <button
                 key={t}
                 data-active={tool === t}
+                aria-pressed={tool === t}
+                aria-label={`${name} (${key})`}
                 onClick={() => {
                   setTool(t);
                   setProbeFirst(null);
                 }}
-                title={`${t} (${key})`}
+                title={`${name} (${key})`}
               >
                 {icon}
                 {label && <span>{label}</span>}
@@ -756,28 +814,35 @@ export default function AnnotateWindow() {
           </button>
         </div>
         <div className="flex items-center gap-1.5">
-          {status && <span className="rise mr-2 text-[11px] text-ok">{status}</span>}
-          <button onClick={() => void onCopyMarkdown()} disabled={badges.length === 0} className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-40">
+          <span
+            role="status"
+            aria-live="polite"
+            className={`mr-2 text-[11px] ${statusError ? "text-coral" : "text-ok"}`}
+          >
+            {status}
+          </span>
+          <button onClick={() => void onCopyMarkdown()} disabled={badges.length === 0} className="btn px-2.5 py-1.5 text-xs disabled:opacity-40">
             Markdown
           </button>
-          <button onClick={() => void onCopyJira()} disabled={badges.length === 0} className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-40">
+          <button onClick={() => void onCopyJira()} disabled={badges.length === 0} className="btn px-2.5 py-1.5 text-xs disabled:opacity-40">
             Jira
           </button>
-          <button onClick={() => void onReport()} className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted" title="One-page finding sheet: annotated image + issue table">
+          <button onClick={() => void onReport()} disabled={badges.length === 0} className="btn px-2.5 py-1.5 text-xs disabled:opacity-40" title="One-page finding sheet: annotated image + issue table">
             Report
           </button>
           <button
             onClick={() => void onPublish()}
-            className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted"
+            disabled={publishing}
+            className="btn flex items-center gap-1.5 px-2.5 py-1.5 text-xs disabled:opacity-40"
             title="Publish a shareable link on thewcag.com (requires sign-in)"
           >
             <ShareIcon size={13} />
-            Share
+            {publishing ? "Publishing…" : "Share"}
           </button>
-          <button onClick={() => void onCopy()} className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted">
+          <button onClick={() => void onCopy()} className="btn px-2.5 py-1.5 text-xs">
             Copy PNG
           </button>
-          <button onClick={() => void onSave()} className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90">
+          <button onClick={() => void onSave()} className="btn-primary px-3 py-1.5 text-xs">
             Save…
           </button>
         </div>
@@ -800,12 +865,16 @@ export default function AnnotateWindow() {
           />
           {shapes.length === 0 && !draft && (
             <div className="fade pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-card/90 px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur">
-              Press <kbd className="font-mono">I</kbd> and click to drop issue #1, scroll to pan, pinch or ⌘scroll to zoom
+              Click to drop issue #1 (<kbd className="font-mono">I</kbd>), scroll to pan, pinch or ⌘scroll to zoom
             </div>
           )}
           {tool === "probe" && (
             <div className="fade pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-card/90 px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur">
-              {probeFirst ? "Click the second color - ratio attaches to the selected issue" : "Click the first color to probe contrast in this capture"}
+              {probeFirst
+                ? selectedId !== null
+                  ? "Click the second color - ratio attaches to the selected issue"
+                  : "Click the second color - select an issue first to attach the ratio"
+                : "Click the first color to probe contrast in this capture"}
             </div>
           )}
           {textEntry && (
@@ -814,29 +883,22 @@ export default function AnnotateWindow() {
               value={textEntry.value}
               onChange={(e) => setTextEntry({ ...textEntry, value: e.target.value })}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && textEntry.value.trim()) {
-                  const value = textEntry.value.trim();
-                  if (textEntry.editId !== undefined) {
-                    const editId = textEntry.editId;
-                    commit((prev) => prev.map((s) => (s.id === editId ? { ...s, text: value } : s)));
-                  } else {
-                    const shape: Shape = {
-                      id: nextIdRef.current++,
-                      kind: "text",
-                      x1: textEntry.docX,
-                      y1: textEntry.docY,
-                      x2: 0,
-                      y2: 0,
-                      color,
-                      text: value,
-                    };
-                    commit((prev) => [...prev, shape]);
-                  }
-                  setTextEntry(null);
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  e.currentTarget.blur(); // blur commits via onBlur
+                } else if (e.key === "Escape") {
+                  discardTextRef.current = true;
+                  e.currentTarget.blur();
                 }
-                if (e.key === "Escape") setTextEntry(null);
               }}
-              onBlur={() => setTextEntry(null)}
+              onBlur={() => {
+                if (discardTextRef.current) {
+                  discardTextRef.current = false;
+                  setTextEntry(null);
+                  return;
+                }
+                commitText(textEntry);
+              }}
               placeholder="Type, then Enter"
               className="absolute z-10 rounded-md border border-primary bg-card px-2 py-1 text-sm outline-none"
               style={textEntryStyle}
@@ -846,16 +908,17 @@ export default function AnnotateWindow() {
 
         {badges.length > 0 && (
           <aside className="w-80 shrink-0 overflow-y-auto border-l border-border bg-card/80 p-3 backdrop-blur-xl">
-            <h2 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Issues ({badges.length})
-            </h2>
+            <h2 className="label mb-2">Issues ({badges.length})</h2>
             {badges.map((b, i) => {
               const type = issueTypeOf(b);
               return (
                 <div
                   key={b.id}
+                  role="group"
+                  aria-label={`Issue ${i + 1}: ${type.label}`}
                   className={`rise mb-2 rounded-lg border p-2 ${selectedId === b.id ? "border-primary" : "border-border"}`}
                   onClick={() => setSelectedId(b.id)}
+                  onFocus={() => setSelectedId(b.id)}
                   onMouseEnter={() => setHoverId(b.id)}
                   onMouseLeave={() => setHoverId(null)}
                 >
@@ -868,8 +931,10 @@ export default function AnnotateWindow() {
                     </span>
                     <select
                       value={b.issueType}
+                      aria-label={`WCAG criterion for issue ${i + 1}`}
                       onChange={(e) => {
                         const nextType = e.target.value as IssueId;
+                        lastTypeRef.current = nextType;
                         setShapes((prev) =>
                           prev.map((s) => {
                             if (s.id !== b.id) return s;
@@ -891,11 +956,12 @@ export default function AnnotateWindow() {
                     </select>
                     <select
                       value={b.severity ?? "major"}
-                      onChange={(e) =>
-                        setShapes((prev) =>
-                          prev.map((s) => (s.id === b.id ? { ...s, severity: e.target.value as Severity } : s)),
-                        )
-                      }
+                      aria-label={`Severity for issue ${i + 1}`}
+                      onChange={(e) => {
+                        const sev = e.target.value as Severity;
+                        lastSevRef.current = sev;
+                        setShapes((prev) => prev.map((s) => (s.id === b.id ? { ...s, severity: sev } : s)));
+                      }}
                       className="rounded-md border border-border bg-card-2/70 px-1 py-1 text-[11px] outline-none"
                       style={{ color: SEVERITY_COLORS[b.severity ?? "major"] }}
                     >
@@ -908,12 +974,19 @@ export default function AnnotateWindow() {
                   </div>
                   {type.sc && <p className="mb-1 text-[10px] text-muted-foreground">WCAG {type.sc} - {type.label}</p>}
                   <textarea
+                    ref={(el) => {
+                      if (el && b.id === focusNoteId) {
+                        el.focus();
+                        setFocusNoteId(null);
+                      }
+                    }}
                     value={b.note}
                     onChange={(e) =>
                       setShapes((prev) => prev.map((s) => (s.id === b.id ? { ...s, note: e.target.value } : s)))
                     }
                     placeholder="What's wrong here?"
-                    rows={2}
+                    aria-label={`Note for issue ${i + 1}`}
+                    rows={Math.min(6, Math.max(2, (b.note ?? "").split("\n").length))}
                     className="w-full resize-none rounded-md border border-border bg-card-2/70 px-1.5 py-1 text-xs outline-none focus:ring-1 focus:ring-ring"
                   />
                 </div>

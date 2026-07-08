@@ -134,11 +134,23 @@ pub async fn publish_report(
         clear_token();
         return Err("Your session expired - sign in again from the main window.".into());
     }
-    if resp.status() == reqwest::StatusCode::PAYLOAD_TOO_LARGE {
-        return Err("This report is too large to publish.".into());
-    }
     if !resp.status().is_success() {
-        return Err(format!("Publish failed ({}).", resp.status()));
+        // The server sends a JSON { error, message } body (e.g. the storage
+        // quota explanation). Surface that human message when present.
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        let server_msg = serde_json::from_str::<serde_json::Value>(&body)
+            .ok()
+            .and_then(|v| {
+                v.get("message")
+                    .or_else(|| v.get("error"))
+                    .and_then(|m| m.as_str())
+                    .map(str::to_string)
+            });
+        return Err(server_msg.unwrap_or_else(|| match status {
+            reqwest::StatusCode::PAYLOAD_TOO_LARGE => "This report is too large to publish.".into(),
+            _ => format!("Publish failed ({status})."),
+        }));
     }
     let out: PublishResult = resp.json().await.map_err(|e| e.to_string())?;
     Ok(out.url)
