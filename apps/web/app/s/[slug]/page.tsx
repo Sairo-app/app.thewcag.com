@@ -10,7 +10,6 @@ import { SITE_URL } from "@/lib/reports";
 import { publicImageUrl } from "@/lib/r2";
 import { auth } from "@/auth";
 import { Header } from "@/components/Header";
-import { Footer } from "@/components/Footer";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { ArrowRightIcon, CalendarIcon, FlagIcon } from "@/components/icons";
 
@@ -98,19 +97,19 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
   return (
     <>
       <Header />
-      <main id="main" className="mx-auto max-w-6xl px-6 py-6">
-        {/* two columns on desktop: screenshot on the left, findings on the right */}
-        <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+      <main id="main" className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
+        {/* the screenshot is the star; findings sit in a compact side panel */}
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,2.5fr)_minmax(280px,1fr)]">
           <section className="min-w-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={`/api/s/${slug}/image`}
               alt={`Annotated screenshot: ${shot.title}`}
-              className="max-h-[calc(100vh-120px)] w-full rounded-xl border border-border object-contain shadow-sm"
+              className="max-h-[calc(100vh-84px)] w-full rounded-xl border border-border object-contain shadow-sm"
             />
           </section>
 
-          <aside className="flex max-h-[calc(100vh-120px)] flex-col">
+          <aside className="flex max-h-[calc(100vh-84px)] flex-col">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h1 className="text-xl font-bold tracking-tight">{shot.title}</h1>
@@ -191,7 +190,6 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
           </aside>
         </div>
       </main>
-      <Footer />
     </>
   );
 }

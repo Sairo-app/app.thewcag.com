@@ -118,6 +118,16 @@ pub fn list_annotation_docs(app: AppHandle) -> Result<Vec<CaptureEntry>, String>
     Ok(entries)
 }
 
+/// Return a capture's stored screenshot bytes (the raw pixels, so the gallery
+/// can show a real thumbnail of each past capture).
+#[tauri::command]
+pub fn capture_image(app: AppHandle, id: String) -> Result<tauri::ipc::Response, String> {
+    sanitize(&id)?;
+    let png = std::fs::read(captures_dir(&app)?.join(format!("{id}.png")))
+        .map_err(|_| "capture no longer exists")?;
+    Ok(tauri::ipc::Response::new(png))
+}
+
 /// Reopen a library capture in the annotation editor.
 #[tauri::command]
 pub fn open_annotation(app: AppHandle, id: String) -> Result<(), String> {

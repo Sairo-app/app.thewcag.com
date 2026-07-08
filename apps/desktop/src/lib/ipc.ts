@@ -36,6 +36,7 @@ export const ipc = {
   loadAnnotationDoc: (id: string) => invoke<string | null>("load_annotation_doc", { id }),
   listAnnotationDocs: () =>
     invoke<{ id: string; modified_ms: number; issues: number }[]>("list_annotation_docs"),
+  captureImage: (id: string) => invoke<ArrayBuffer>("capture_image", { id }),
   openAnnotation: (id: string) => invoke<void>("open_annotation", { id }),
   deleteAnnotation: (id: string) => invoke<void>("delete_annotation", { id }),
   toggleLens: () => invoke<void>("toggle_lens"),

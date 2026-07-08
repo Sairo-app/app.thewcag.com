@@ -644,7 +644,7 @@ export default function AnnotateWindow() {
   }
   async function onPublish() {
     if (publishing) return;
-    if (shapes.length === 0) {
+    if (!image) {
       flash("Nothing to publish yet");
       return;
     }
@@ -663,7 +663,9 @@ export default function AnnotateWindow() {
           note: (b.note ?? "").replace(/\n/g, " ").trim(),
         };
       });
-      const title = `Accessibility findings (${badges.length} issue${badges.length === 1 ? "" : "s"})`;
+      const title = badges.length
+        ? `Accessibility findings (${badges.length} issue${badges.length === 1 ? "" : "s"})`
+        : "Shared screenshot";
       const sevCounts = (["blocker", "major", "minor"] as const)
         .map((s) => ({ s, n: badges.filter((b) => (b.severity ?? "major") === s).length }))
         .filter((x) => x.n > 0)

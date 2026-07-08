@@ -400,6 +400,32 @@ export default function MainWindow() {
   );
 }
 
+/** A single capture's screenshot thumbnail, loaded from disk over IPC. */
+function CaptureThumb({ id }: { id: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    let cancelled = false;
+    ipc
+      .captureImage(id)
+      .then((buf) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(new Blob([buf], { type: "image/png" }));
+        setUrl(objectUrl);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [id]);
+  return url ? (
+    <img src={url} alt="" className="h-full w-full object-cover" />
+  ) : (
+    <div className="h-full w-full animate-pulse bg-muted" />
+  );
+}
+
 function CapturesCard() {
   const [docs, setDocs] = useState<{ id: string; modified_ms: number; issues: number }[]>([]);
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -414,24 +440,39 @@ function CapturesCard() {
   if (docs.length === 0) return null;
   return (
     <section className="card mb-3 p-3">
-      <h2 className="label mb-2">Captures</h2>
-      <div className="max-h-36 space-y-1 overflow-y-auto">
-        {docs.slice(0, 8).map((d) => (
-          <div key={d.id} className="group flex items-center justify-between rounded-md px-1.5 py-1 hover:bg-muted">
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="label">Captures</h2>
+        <span className="text-[10px] text-muted-foreground">Click to edit &amp; share</span>
+      </div>
+      <div className="grid max-h-80 grid-cols-2 gap-2 overflow-y-auto pr-0.5">
+        {docs.map((d) => (
+          <div
+            key={d.id}
+            className="group relative overflow-hidden rounded-lg border border-border bg-muted/40"
+          >
             <button
               onClick={() => void ipc.openAnnotation(d.id)}
-              className="min-w-0 flex-1 text-left text-xs"
-              title="Reopen in the annotation editor"
+              className="block w-full text-left"
+              title="Reopen to edit and share this capture"
             >
-              {new Date(d.modified_ms).toLocaleString([], {
-                month: "short",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-              <span className="ml-2 text-[10px] text-muted-foreground">
-                {d.issues} issue{d.issues === 1 ? "" : "s"}
-              </span>
+              <div className="aspect-video overflow-hidden bg-muted">
+                <CaptureThumb id={d.id} />
+              </div>
+              <div className="flex items-center justify-between gap-1 px-2 py-1.5">
+                <span className="truncate text-[10px] text-muted-foreground">
+                  {new Date(d.modified_ms).toLocaleString([], {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+                {d.issues > 0 && (
+                  <span className="shrink-0 rounded-full bg-primary/15 px-1.5 text-[9px] font-medium text-primary">
+                    {d.issues}
+                  </span>
+                )}
+              </div>
             </button>
             <button
               onClick={() => {
@@ -445,7 +486,12 @@ function CapturesCard() {
                 }
               }}
               aria-label={confirmId === d.id ? "Confirm delete capture" : "Delete capture"}
-              className="rounded px-1 text-[10px] text-muted-foreground opacity-0 hover:text-coral focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
+              title={confirmId === d.id ? "Click again to delete" : "Delete capture"}
+              className={`absolute right-1 top-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium backdrop-blur-sm transition ${
+                confirmId === d.id
+                  ? "bg-coral text-white opacity-100"
+                  : "bg-black/45 text-white/90 opacity-0 hover:bg-coral focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
+              }`}
             >
               {confirmId === d.id ? "Delete?" : "Delete"}
             </button>
