@@ -34,12 +34,25 @@ export function Header() {
             );
           })}
         </nav>
-        <Link
-          href="/download"
-          className="ml-auto rounded-lg bg-primary px-3.5 py-1.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
-        >
-          Download
-        </Link>
+        <div className="ml-auto flex items-center gap-3">
+          <Link
+            href="/signin"
+            aria-current={pathname === "/signin" ? "page" : undefined}
+            className={
+              pathname === "/signin"
+                ? "text-sm font-medium text-foreground"
+                : "text-sm text-muted hover:text-foreground"
+            }
+          >
+            Sign in
+          </Link>
+          <Link
+            href="/download"
+            className="rounded-lg bg-primary px-3.5 py-1.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
+          >
+            Download
+          </Link>
+        </div>
       </div>
     </header>
   );

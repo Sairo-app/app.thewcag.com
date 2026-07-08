@@ -128,8 +128,11 @@ export default function AnnotateWindow() {
       void ipc
         .saveAnnotationDoc(docId, JSON.stringify({ version: 1, nextId: nextIdRef.current, shapes }))
         .catch(() => {});
+      // Persist a small annotated preview so the Captures gallery shows the
+      // markup, not the bare screenshot. Best-effort — never blocks the save.
+      if (image) void saveCaptureThumb(docId, image, shapes);
     }, 400);
-  }, [shapes, docId]);
+  }, [shapes, docId, image]);
 
   // ---------- viewport ----------
   const fit = useCallback(() => {
@@ -1055,4 +1058,23 @@ function canvasToBase64(canvas: HTMLCanvasElement): Promise<string> {
       reader.readAsDataURL(b!);
     }, "image/png"),
   );
+}
+
+/** Write a small annotated preview (base image + shapes) for a capture so the
+ *  Captures gallery shows the markup. Best-effort; failures are swallowed. */
+async function saveCaptureThumb(id: string, image: HTMLImageElement, shapes: Shape[]): Promise<void> {
+  try {
+    const THUMB_W = 480;
+    const scale = Math.min(1, THUMB_W / image.naturalWidth);
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    c.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const ctx = c.getContext("2d")!;
+    ctx.scale(scale, scale);
+    renderDoc(ctx, image, shapes, { forExport: true });
+    const blob: Blob = await new Promise((res) => c.toBlob((b) => res(b!), "image/png"));
+    await ipc.saveCaptureThumb(id, new Uint8Array(await blob.arrayBuffer()));
+  } catch {
+    /* best-effort: thumbnails are cosmetic */
+  }
 }

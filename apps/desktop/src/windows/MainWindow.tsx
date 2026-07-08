@@ -563,6 +563,13 @@ function AccountCard({ account }: { account: Account | null }) {
           Screenshots
         </button>
         <button
+          onClick={() => void ipc.openSite("https://app.thewcag.com/brand")}
+          title="Add your logo and colors to shared reports"
+          className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted"
+        >
+          Branding
+        </button>
+        <button
           onClick={() => void ipc.signOut()}
           className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
         >

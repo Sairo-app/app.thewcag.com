@@ -49,6 +49,7 @@ pub fn run() {
             library::load_annotation_doc,
             library::list_annotation_docs,
             library::capture_image,
+            library::save_capture_thumb,
             library::open_annotation,
             library::delete_annotation,
             lens::toggle_lens,
