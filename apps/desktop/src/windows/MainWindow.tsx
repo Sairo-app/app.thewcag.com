@@ -177,27 +177,31 @@ export default function MainWindow() {
       {/* titlebar overlay: draggable strip under the traffic lights (macOS) */}
       <header
         data-tauri-drag-region
-        className={`flex shrink-0 items-center justify-between px-5 pb-4 ${isMac ? "pt-9" : "pt-4"}`}
+        className={`flex shrink-0 justify-center px-6 pb-4 ${isMac ? "pt-9" : "pt-4"}`}
       >
-        <button
-          onClick={() => void ipc.openSite(SITE)}
-          className="flex items-center gap-2.5 text-left"
-          title="Open thewcag.com"
-        >
-          <img src="/logo.png" alt="" className="h-9 w-9 shrink-0" draggable={false} />
-          <span>
-            <span className="block text-[19px] font-extrabold leading-none tracking-tight">
-              The<span className="text-primary">WCAG</span>
+        <div data-tauri-drag-region className="flex w-full max-w-[1040px] items-center justify-between">
+          <button
+            onClick={() => void ipc.openSite(SITE)}
+            className="flex items-center gap-2.5 text-left"
+            title="Open thewcag.com"
+          >
+            <img src="/logo.png" alt="" className="h-9 w-9 shrink-0" draggable={false} />
+            <span>
+              <span className="block text-[19px] font-extrabold leading-none tracking-tight">
+                The<span className="text-primary">WCAG</span>
+              </span>
+              <span className="mt-1 block text-[11px] font-medium text-muted-foreground">
+                Accessibility, anywhere on screen
+              </span>
             </span>
-            <span className="mt-1 block text-[11px] font-medium text-muted-foreground">
-              Accessibility, anywhere on screen
-            </span>
-          </span>
-        </button>
+          </button>
+        </div>
       </header>
 
-      {/* scroll region: fills the window, scrolls internally (no visible bar) */}
-      <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5 pb-4">
+      {/* scroll region: fills the window, scrolls internally (no visible bar).
+          Inner wrapper caps the width so a maximized window stays readable. */}
+      <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+      <div className="mx-auto w-full max-w-[1040px] px-6 pb-4 pt-1">
       {error && (
         <div
           role="alert"
@@ -257,32 +261,8 @@ export default function MainWindow() {
         />
       )}
 
-      {fgRgb && bgRgb && (
-        <ContrastPanel
-          fg={fg}
-          bg={bg}
-          fgRgb={fgRgb}
-          bgRgb={bgRgb}
-          worst={worst}
-          onFg={(v) => {
-            setFg(v);
-            setWorst(false);
-          }}
-          onBg={(v) => {
-            setBg(v);
-            setWorst(false);
-          }}
-          onSwap={() => {
-            setFg(bg);
-            setBg(fg);
-          }}
-          onApply={applyPair}
-          onError={setError}
-        />
-      )}
-
-      <h2 className="label mb-1.5">Sample from screen</h2>
-      <section aria-label="Sample from screen" className="mb-3 grid grid-cols-3 gap-2">
+      {/* Primary actions — what you reach for the moment the app opens. */}
+      <section aria-label="Capture tools" className="mb-4 grid grid-cols-3 gap-3">
         <ToolCard
           title="Pick pair"
           hotkey={shortcuts ? displayShortcut(shortcuts.pick) : ""}
@@ -305,64 +285,104 @@ export default function MainWindow() {
         />
       </section>
 
-      <h2 className="label mb-1.5">Auditor tools</h2>
-      <section aria-label="Auditor tools" className="mb-3 grid grid-cols-4 gap-2">
-        <AuditButton label="Measure" hint="24px targets" onClick={() => void ipc.beginOverlay("measure")} />
-        <AuditButton label="Findings" hint="Issue log" onClick={() => void ipc.openToolWindow("findings")} />
-        <AuditButton label="Checklist" hint="WCAG 2.2" onClick={() => void ipc.openToolWindow("checklist")} />
-        <AuditButton label="Palette" hint="Contrast grid" onClick={() => void ipc.openToolWindow("palette")} />
-      </section>
-
-      {history.length > 0 && (
-        <section className="card mb-3 p-3">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="label">Recent pairs</h2>
-            <button
-              onClick={() => {
-                setHistory([]);
-                localStorage.removeItem(HISTORY_KEY);
+      {/* Workspace: live contrast + auditor tools on the left, your library on the right. */}
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1.7fr)_minmax(264px,1fr)]">
+        <div className="min-w-0">
+          {fgRgb && bgRgb && (
+            <ContrastPanel
+              fg={fg}
+              bg={bg}
+              fgRgb={fgRgb}
+              bgRgb={bgRgb}
+              worst={worst}
+              onFg={(v) => {
+                setFg(v);
+                setWorst(false);
               }}
-              className="text-[10px] text-muted-foreground hover:text-coral"
-            >
-              Clear
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {history.map((p, i) => (
-              <button
-                key={`${p.fg}${p.bg}${i}`}
-                onClick={() => {
-                  setWorst(false);
-                  applyPair(p.fg, p.bg);
-                }}
-                className="rounded-md border border-border px-2 py-1 font-mono text-[10px] hover:-translate-y-px hover:shadow-sm"
-                style={{ color: p.fg, backgroundColor: p.bg }}
-                aria-label={`Re-check ${p.fg} on ${p.bg}`}
-                title={`${p.fg} on ${p.bg}`}
-              >
-                Aa
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
+              onBg={(v) => {
+                setBg(v);
+                setWorst(false);
+              }}
+              onSwap={() => {
+                setFg(bg);
+                setBg(fg);
+              }}
+              onApply={applyPair}
+              onError={setError}
+            />
+          )}
 
-      <CapturesCard />
+          <section aria-label="Auditor tools" className="mb-3">
+            <h2 className="label mb-1.5">Auditor tools</h2>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <AuditButton label="Measure" hint="24px targets" onClick={() => void ipc.beginOverlay("measure")} />
+              <AuditButton label="Findings" hint="Issue log" onClick={() => void ipc.openToolWindow("findings")} />
+              <AuditButton label="Checklist" hint="WCAG 2.2" onClick={() => void ipc.openToolWindow("checklist")} />
+              <AuditButton label="Palette" hint="Contrast grid" onClick={() => void ipc.openToolWindow("palette")} />
+            </div>
+          </section>
+        </div>
 
-      {log.length > 0 && <SessionLogCard log={log} onClear={() => {
-        setLog([]);
-        localStorage.removeItem(LOG_KEY);
-      }} />}
+        <aside className="min-w-0">
+          <AccountCard account={account} />
 
-      <AccountCard account={account} />
+          <CapturesCard />
 
-      {shortcuts && (
-        <ShortcutsCard shortcuts={shortcuts} onChanged={setShortcuts} onError={setError} />
-      )}
+          {history.length > 0 && (
+            <section className="card mb-3 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <h2 className="label">Recent pairs</h2>
+                <button
+                  onClick={() => {
+                    setHistory([]);
+                    localStorage.removeItem(HISTORY_KEY);
+                  }}
+                  className="text-[10px] text-muted-foreground hover:text-coral"
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {history.map((p, i) => (
+                  <button
+                    key={`${p.fg}${p.bg}${i}`}
+                    onClick={() => {
+                      setWorst(false);
+                      applyPair(p.fg, p.bg);
+                    }}
+                    className="rounded-md border border-border px-2 py-1 font-mono text-[10px] hover:-translate-y-px hover:shadow-sm"
+                    style={{ color: p.fg, backgroundColor: p.bg }}
+                    aria-label={`Re-check ${p.fg} on ${p.bg}`}
+                    title={`${p.fg} on ${p.bg}`}
+                  >
+                    Aa
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
 
+          {log.length > 0 && (
+            <SessionLogCard
+              log={log}
+              onClear={() => {
+                setLog([]);
+                localStorage.removeItem(LOG_KEY);
+              }}
+            />
+          )}
+
+          {shortcuts && (
+            <ShortcutsCard shortcuts={shortcuts} onChanged={setShortcuts} onError={setError} />
+          )}
+        </aside>
       </div>
 
-      <footer className="flex shrink-0 items-center justify-between border-t border-border/70 px-5 pb-4 pt-3">
+      </div>
+      </div>
+
+      <footer className="flex shrink-0 justify-center border-t border-border/70 px-6 pb-4 pt-3">
+        <div className="flex w-full max-w-[1040px] items-center justify-between">
         <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
           <button
             role="switch"
@@ -383,6 +403,7 @@ export default function MainWindow() {
           Launch at login
         </label>
         <span className="text-[10px] text-muted-foreground">v{version}</span>
+        </div>
       </footer>
 
       {onboarding && (
