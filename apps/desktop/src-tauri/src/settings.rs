@@ -16,10 +16,16 @@ pub struct ShortcutConfig {
 
 impl Default for ShortcutConfig {
     fn default() -> Self {
+        // macOS uses ⌥⌘ (alt+super); on Windows "super" is the Windows key,
+        // which collides with OS shortcuts, so default to Ctrl+Alt there.
+        #[cfg(target_os = "windows")]
+        const MOD: &str = "ctrl+alt";
+        #[cfg(not(target_os = "windows"))]
+        const MOD: &str = "alt+super";
         Self {
-            pick: "alt+super+KeyP".into(),
-            shot: "alt+super+KeyS".into(),
-            lens: "alt+super+KeyL".into(),
+            pick: format!("{MOD}+KeyP"),
+            shot: format!("{MOD}+KeyS"),
+            lens: format!("{MOD}+KeyL"),
         }
     }
 }

@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 const STEPS: { title: string; body: string }[] = [
   {
     title: "Capture a region",
-    body: "Press the Capture shortcut (default ⌘⌥2 on macOS, Ctrl+Alt+2 on Windows). The screen freezes with a magnified loupe. Drag a box around the area you want, or press Space to capture the whole screen. The capture opens in the annotation window.",
+    body: "Press the Capture shortcut (default ⌥⌘S on macOS, Ctrl+Alt+S on Windows). The screen freezes with a magnified loupe. Drag a box around the area you want, or press Space to capture the whole screen. The capture opens in the annotation window.",
   },
   {
     title: "Flag an issue",
@@ -46,9 +46,9 @@ const STEPS: { title: string; body: string }[] = [
 ];
 
 const SHORTCUTS: [string, string, string][] = [
-  ["Capture region", "⌘⌥2", "Ctrl+Alt+2"],
-  ["Pick color pair", "⌘⌥1", "Ctrl+Alt+1"],
-  ["Toggle color-blindness lens", "⌘⌥3", "Ctrl+Alt+3"],
+  ["Pick color pair", "⌥⌘P", "Ctrl+Alt+P"],
+  ["Capture region", "⌥⌘S", "Ctrl+Alt+S"],
+  ["Toggle color-blindness lens", "⌥⌘L", "Ctrl+Alt+L"],
   ["Drop an issue marker", "I, then click", "I, then click"],
   ["Pan / zoom the capture", "Scroll / ⌘-scroll", "Scroll / Ctrl-scroll"],
 ];
