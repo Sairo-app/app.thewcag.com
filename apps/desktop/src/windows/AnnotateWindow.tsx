@@ -740,8 +740,8 @@ export default function AnnotateWindow() {
 
   return (
     <div className="app-bg-solid flex h-screen flex-col font-sans text-[13px] text-foreground">
-      <header className="flex items-center justify-between border-b border-border bg-card/80 px-3 py-2 backdrop-blur-xl">
-        <div className="flex items-center gap-2">
+      <header className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 border-b border-border bg-card/80 px-3 py-2 backdrop-blur-xl">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="seg" role="toolbar" aria-label="Annotation tools">
             {(
               [
@@ -813,7 +813,7 @@ export default function AnnotateWindow() {
             <FitIcon />
           </button>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
           <span
             role="status"
             aria-live="polite"

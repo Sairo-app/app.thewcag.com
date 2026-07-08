@@ -111,9 +111,9 @@ export default function LensWindow() {
     <div className="flex h-screen flex-col overflow-hidden rounded-xl border border-border bg-card font-sans text-foreground">
       <header
         data-tauri-drag-region
-        className="flex items-center justify-between gap-2 border-b border-border bg-card/80 px-2 py-1.5 backdrop-blur-xl"
+        className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-card/80 px-2 py-1.5 backdrop-blur-xl"
       >
-        <div data-tauri-drag-region className="flex items-center gap-2">
+        <div data-tauri-drag-region className="flex flex-wrap items-center gap-2">
           <div className="seg">
             {FILTERS.map((f, i) => (
               <button key={f.key} data-active={filter === f.key} onClick={() => setFilter(f.key)} title={`${f.title} (${i + 1})`}>
