@@ -16,6 +16,11 @@ export const users = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: timestamp("emailVerified", { mode: "date" }),
   image: text("image"),
+  // White-label branding: an organization's logo, name, and accent color,
+  // applied to every report this user shares. All optional (null = TheWCAG).
+  brandName: text("brand_name"),
+  brandColor: text("brand_color"),
+  brandLogoKey: text("brand_logo_key"),
 });
 
 export const accounts = pgTable(

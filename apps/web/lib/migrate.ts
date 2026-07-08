@@ -79,6 +79,12 @@ DO $$ BEGIN ALTER TABLE "report" ADD CONSTRAINT "report_user_id_user_id_fk" FORE
 CREATE INDEX IF NOT EXISTS "desktop_device_user_idx" ON "desktop_device" ("user_id");
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "report_user_idx" ON "report" ("user_id");
+--> statement-breakpoint
+ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "brand_name" text;
+--> statement-breakpoint
+ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "brand_color" text;
+--> statement-breakpoint
+ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "brand_logo_key" text;
 `;
 
 let ran = false;

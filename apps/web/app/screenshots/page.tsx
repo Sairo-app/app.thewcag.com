@@ -41,9 +41,17 @@ export default async function MyScreenshotsPage() {
     <>
       <Header />
       <main id="main" className="mx-auto max-w-3xl px-6 py-10">
-        <h1 className="text-2xl font-bold tracking-tight">
-          My screenshots{rows.length > 0 && <span className="ml-2 font-normal text-muted">({rows.length})</span>}
-        </h1>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <h1 className="text-2xl font-bold tracking-tight">
+            My screenshots{rows.length > 0 && <span className="ml-2 font-normal text-muted">({rows.length})</span>}
+          </h1>
+          <Link
+            href="/brand"
+            className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-card"
+          >
+            White-label branding
+          </Link>
+        </div>
         <p className="mt-1 text-sm text-muted">
           Annotated screenshots you published from the desktop app. Anyone with a link can view one;
           delete it to revoke the link immediately.

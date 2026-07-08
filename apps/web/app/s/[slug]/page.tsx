@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { reports, type ReportIssue } from "@/lib/schema";
+import { reports, users, type ReportIssue } from "@/lib/schema";
 import { SITE_URL } from "@/lib/reports";
 import { publicImageUrl } from "@/lib/r2";
 import { auth } from "@/auth";
@@ -25,8 +25,12 @@ const getScreenshot = cache(async (slug: string) => {
       imageKey: reports.imageKey,
       createdAt: reports.createdAt,
       userId: reports.userId,
+      brandName: users.brandName,
+      brandColor: users.brandColor,
+      brandLogoKey: users.brandLogoKey,
     })
     .from(reports)
+    .leftJoin(users, eq(users.id, reports.userId))
     .where(eq(reports.slug, slug))
     .limit(1);
   return row ?? null;
@@ -94,9 +98,42 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
     { sev: "minor", n: issues.filter((i) => i.severity === "minor").length },
   ].filter((s) => s.n > 0);
 
+  // White-label: if the report owner set a brand, the page leads with their
+  // logo/name/accent instead of TheWCAG's site header.
+  const brand =
+    shot.brandName || shot.brandLogoKey
+      ? {
+          name: shot.brandName,
+          color: /^#[0-9a-fA-F]{6}$/.test(shot.brandColor ?? "") ? shot.brandColor! : null,
+          logoUrl: shot.brandLogoKey
+            ? publicImageUrl(shot.brandLogoKey) ?? `/api/brand/${shot.userId}/logo`
+            : null,
+        }
+      : null;
+
   return (
     <>
-      <Header />
+      {brand ? (
+        <>
+          {brand.color && <div aria-hidden="true" style={{ background: brand.color }} className="h-1 w-full" />}
+          <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur">
+            <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+              <div className="flex min-w-0 items-center gap-2.5">
+                {brand.logoUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={brand.logoUrl} alt={brand.name ?? "Logo"} className="h-7 w-auto max-w-[180px] object-contain" />
+                )}
+                {brand.name && <span className="truncate text-sm font-semibold">{brand.name}</span>}
+              </div>
+              <span className="shrink-0 text-[11px] font-medium uppercase tracking-wide text-muted">
+                Accessibility report
+              </span>
+            </div>
+          </header>
+        </>
+      ) : (
+        <Header />
+      )}
       <main id="main" className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
         {/* the screenshot is the star; findings sit in a compact side panel */}
         <div className="grid gap-6 lg:grid-cols-[minmax(0,2.5fr)_minmax(280px,1fr)]">
@@ -180,13 +217,22 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
               </ol>
             )}
 
-            <Link
-              href="/download"
-              className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
-            >
-              Audit with TheWCAG
-              <ArrowRightIcon size={16} />
-            </Link>
+            {brand ? (
+              <p className="mt-4 text-center text-[11px] text-muted">
+                Prepared with{" "}
+                <a href={SITE_URL} target="_blank" rel="noopener noreferrer" className="font-medium underline hover:text-foreground">
+                  TheWCAG
+                </a>
+              </p>
+            ) : (
+              <Link
+                href="/download"
+                className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+              >
+                Audit with TheWCAG
+                <ArrowRightIcon size={16} />
+              </Link>
+            )}
           </aside>
         </div>
       </main>
