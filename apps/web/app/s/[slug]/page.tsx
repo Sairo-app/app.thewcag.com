@@ -9,7 +9,6 @@ import { reports, users, type ReportIssue } from "@/lib/schema";
 import { SITE_URL } from "@/lib/reports";
 import { publicImageUrl } from "@/lib/r2";
 import { auth } from "@/auth";
-import { Header } from "@/components/Header";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { ArrowRightIcon, CalendarIcon, FlagIcon } from "@/components/icons";
 
@@ -112,41 +111,48 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
       : null;
 
   return (
-    <>
-      {brand ? (
-        <>
-          {brand.color && <div aria-hidden="true" style={{ background: brand.color }} className="h-1 w-full" />}
-          <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur">
-            <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-              <div className="flex min-w-0 items-center gap-2.5">
-                {brand.logoUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={brand.logoUrl} alt={brand.name ?? "Logo"} className="h-7 w-auto max-w-[180px] object-contain" />
-                )}
-                {brand.name && <span className="truncate text-sm font-semibold">{brand.name}</span>}
-              </div>
-              <span className="shrink-0 text-[11px] font-medium uppercase tracking-wide text-muted">
-                Accessibility report
-              </span>
+    <div className="flex min-h-screen flex-col">
+      {/* Minimal chrome: an accent strip (branded) and a slim logo-only bar.
+          No site nav — this page exists to show the screenshot. */}
+      {brand?.color && <div aria-hidden="true" style={{ background: brand.color }} className="h-1 w-full" />}
+      <header className="border-b border-border">
+        <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
+          {brand ? (
+            <div className="flex min-w-0 items-center gap-2.5">
+              {brand.logoUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={brand.logoUrl} alt={brand.name ?? "Logo"} className="h-6 w-auto max-w-[170px] object-contain" />
+              )}
+              {brand.name && <span className="truncate text-sm font-semibold">{brand.name}</span>}
             </div>
-          </header>
-        </>
-      ) : (
-        <Header />
-      )}
-      <main id="main" className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
-        {/* the screenshot is the star; findings sit in a compact side panel */}
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,2.5fr)_minmax(280px,1fr)]">
+          ) : (
+            <Link href="/" className="flex items-center gap-2" aria-label="TheWCAG home">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.png" alt="" width={22} height={22} className="h-[22px] w-[22px] rounded" />
+              <span className="text-sm font-bold tracking-tight">TheWCAG</span>
+            </Link>
+          )}
+          <span className="shrink-0 text-[10px] font-medium uppercase tracking-wider text-muted">
+            Accessibility report
+          </span>
+        </div>
+      </header>
+
+      <main id="main" className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-4 sm:px-6">
+        {/* the screenshot IS the page; findings sit in a slim side panel */}
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
           <section className="min-w-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`/api/s/${slug}/image`}
-              alt={`Annotated screenshot: ${shot.title}`}
-              className="max-h-[calc(100vh-84px)] w-full rounded-xl border border-border object-contain shadow-sm"
-            />
+            <div className="flex min-h-[60vh] items-center justify-center rounded-xl border border-border bg-card p-2 shadow-sm lg:min-h-[calc(100vh-110px)]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/api/s/${slug}/image`}
+                alt={`Annotated screenshot: ${shot.title}`}
+                className="max-h-[calc(100vh-130px)] w-auto max-w-full rounded-lg object-contain"
+              />
+            </div>
           </section>
 
-          <aside className="flex max-h-[calc(100vh-84px)] flex-col">
+          <aside className="flex max-h-[calc(100vh-110px)] flex-col">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h1 className="text-xl font-bold tracking-tight">{shot.title}</h1>
@@ -236,6 +242,6 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
           </aside>
         </div>
       </main>
-    </>
+    </div>
   );
 }
