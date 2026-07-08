@@ -25,8 +25,35 @@ const views: Record<string, React.ComponentType> = {
 };
 const View = label.startsWith("overlay-") ? OverlayWindow : (views[label] ?? MainWindow);
 
+// Tool windows are created hidden (Rust: .visible(false)) and revealed here
+// after the first painted frame, so the unpainted native frame never flashes.
+// Two rAFs = React has committed AND the compositor has drawn that commit.
+// The main window is visible from config (app launch) and needs no reveal.
+function Reveal({ children }: { children: React.ReactNode }) {
+  React.useEffect(() => {
+    if (label === "main") return;
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        const win = getCurrentWebviewWindow();
+        void win.show().then(() => {
+          // countdown is a passive HUD - never steal focus for it
+          if (label !== "countdown") void win.setFocus();
+        });
+      });
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, []);
+  return children;
+}
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <View />
+    <Reveal>
+      <View />
+    </Reveal>
   </React.StrictMode>,
 );

@@ -23,6 +23,7 @@ pub fn open_tool_window(app: AppHandle, kind: String) -> Result<(), String> {
         .min_inner_size(560.0, 460.0)
         .center()
         .focused(true)
+        .visible(false) // revealed by the frontend after first paint (no flash)
         .build()
         .map_err(|e| e.to_string())?;
     Ok(())

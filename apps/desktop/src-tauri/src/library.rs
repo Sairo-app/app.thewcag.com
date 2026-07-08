@@ -44,6 +44,9 @@ pub fn open_annotate_window(app: &AppHandle) -> Result<(), String> {
         .min_inner_size(840.0, 560.0)
         .center()
         .focused(true)
+        // Hidden at creation; the frontend shows the window after first paint
+        // so the user never sees the unpainted native frame flash.
+        .visible(false)
         .build()
         .map_err(|e| e.to_string())?;
     Ok(())

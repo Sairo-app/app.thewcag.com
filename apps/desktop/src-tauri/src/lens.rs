@@ -22,6 +22,7 @@ pub fn toggle(app: &AppHandle) {
             .skip_taskbar(true)
             .shadow(true)
             .focused(true)
+            .visible(false) // revealed by the frontend after first paint (no flash)
             .build();
         if let Ok(win) = built {
             #[cfg(target_os = "windows")]

@@ -78,6 +78,7 @@ fn show_countdown(app: &AppHandle, duration_ms: u64) {
             .skip_taskbar(true)
             .shadow(true)
             .focused(false)
+            .visible(false) // revealed by the frontend after first paint (no flash)
             .initialization_script(&format!("window.__COUNTDOWN_MS = {duration_ms};"))
             .build();
     });
@@ -144,6 +145,7 @@ fn capture_and_open(app: &AppHandle, mode: &str) -> Result<(), String> {
                 .shadow(false)
                 .accept_first_mouse(true)
                 .focused(true)
+                .visible(false) // revealed by the frontend after first paint (no flash)
                 .build();
             if let Err(e) = result {
                 let _ = handle.emit("capture-error", e.to_string());
