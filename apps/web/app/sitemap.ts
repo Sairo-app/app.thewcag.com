@@ -11,6 +11,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/screenshot-tool", priority: 0.8 },
     { path: "/color-contrast-checker", priority: 0.8 },
     { path: "/wcag-contrast", priority: 0.8 },
+    { path: "/wcag-checklist", priority: 0.8 },
+    { path: "/apca-contrast", priority: 0.7 },
+    { path: "/alt-text-guide", priority: 0.7 },
     { path: "/color-blindness-simulator", priority: 0.7 },
     { path: "/accessibility-statement", priority: 0.5 },
   ];

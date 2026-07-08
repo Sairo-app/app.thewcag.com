@@ -16,7 +16,7 @@ const NAV: { href: string; label: string; icon: ReactNode }[] = [
 export function HeaderNav() {
   const pathname = usePathname();
   return (
-    <nav className="hidden items-center gap-5 text-sm sm:flex" aria-label="Primary">
+    <nav className="hidden items-center gap-5 text-sm md:flex" aria-label="Primary">
       {NAV.map((n) => {
         const active = pathname === n.href;
         return (

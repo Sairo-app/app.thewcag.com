@@ -39,6 +39,9 @@ const COLUMNS: { heading: string; links: { href: string; label: string; icon: Re
     heading: "Learn",
     links: [
       { href: "/wcag-contrast", label: "WCAG contrast guide", icon: <BookIcon size={14} /> },
+      { href: "/wcag-checklist", label: "WCAG 2.2 checklist", icon: <BookIcon size={14} /> },
+      { href: "/apca-contrast", label: "APCA vs WCAG 2", icon: <ContrastIcon size={14} /> },
+      { href: "/alt-text-guide", label: "Alt text guide", icon: <ImageIcon size={14} /> },
       { href: "/accessibility-statement", label: "Accessibility statement", icon: <AccessibilityIcon size={14} /> },
     ],
   },
@@ -47,7 +50,7 @@ const COLUMNS: { heading: string; links: { href: string; label: string; icon: Re
 export function Footer() {
   return (
     <footer className="mt-24 border-t border-border">
-      <div className="mx-auto max-w-5xl px-6 py-12">
+      <div className="mx-auto max-w-6xl px-6 py-12">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
           {/* Brand */}
           <div className="sm:col-span-2">
