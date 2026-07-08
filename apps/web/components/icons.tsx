@@ -88,6 +88,72 @@ export const MailIcon = (p: { size?: number }) => (
   </Icon>
 );
 
+export const CropIcon = (p: { size?: number }) => (
+  <Icon {...p}>
+    <path d="M6 2v14a2 2 0 0 0 2 2h14" />
+    <path d="M18 22V8a2 2 0 0 0-2-2H2" />
+  </Icon>
+);
+
+export const BookIcon = (p: { size?: number }) => (
+  <Icon {...p}>
+    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+  </Icon>
+);
+
+export const DownloadIcon = (p: { size?: number }) => (
+  <Icon {...p}>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <path d="m7 10 5 5 5-5" />
+    <path d="M12 15V3" />
+  </Icon>
+);
+
+export const LogInIcon = (p: { size?: number }) => (
+  <Icon {...p}>
+    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+    <path d="m10 17 5-5-5-5" />
+    <path d="M15 12H3" />
+  </Icon>
+);
+
+export const LogOutIcon = (p: { size?: number }) => (
+  <Icon {...p}>
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <path d="m16 17 5-5-5-5" />
+    <path d="M21 12H9" />
+  </Icon>
+);
+
+export const PaletteIcon = (p: { size?: number }) => (
+  <Icon {...p}>
+    <circle cx="13.5" cy="6.5" r=".7" fill="currentColor" stroke="none" />
+    <circle cx="17.5" cy="10.5" r=".7" fill="currentColor" stroke="none" />
+    <circle cx="8.5" cy="7.5" r=".7" fill="currentColor" stroke="none" />
+    <circle cx="6.5" cy="12.5" r=".7" fill="currentColor" stroke="none" />
+    <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.6-.7 1.6-1.6 0-.4-.2-.8-.4-1.1-.3-.3-.4-.6-.4-1.1 0-.9.7-1.6 1.6-1.6H16c3 0 5.5-2.5 5.5-5.6C22 6 17.5 2 12 2z" />
+  </Icon>
+);
+
+export const AccessibilityIcon = (p: { size?: number }) => (
+  <Icon {...p}>
+    <circle cx="16" cy="4" r="1" fill="currentColor" stroke="none" />
+    <path d="m18 19 1-7-5.87.94" />
+    <path d="m5 8 3-3 5.5 3-2.36 3.5" />
+    <path d="M4.24 14.5a5 5 0 0 0 6.88 6" />
+    <path d="M13.76 17.5a5 5 0 0 0-6.88-6" />
+  </Icon>
+);
+
+/** Half-filled circle for contrast (needs a fill, so it's standalone). */
+export const ContrastIcon = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+    <path d="M12 3a9 9 0 0 1 0 18Z" fill="currentColor" />
+  </svg>
+);
+
 // Brand logos (filled, follow currentColor) - accept className for sizing.
 export const AppleIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className={className}>

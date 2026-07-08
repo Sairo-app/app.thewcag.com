@@ -1,31 +1,45 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
-import { AppleIcon, GitHubIcon, WindowsIcon } from "./icons";
+import {
+  AccessibilityIcon,
+  AppleIcon,
+  BookIcon,
+  ContrastIcon,
+  CropIcon,
+  DownloadIcon,
+  EyeIcon,
+  GitHubIcon,
+  ImageIcon,
+  LogInIcon,
+  PaletteIcon,
+  WindowsIcon,
+} from "./icons";
 
 const REPO = "https://github.com/Sairo-app/app.thewcag.com";
 
-const COLUMNS: { heading: string; links: { href: string; label: string }[] }[] = [
+const COLUMNS: { heading: string; links: { href: string; label: string; icon: ReactNode }[] }[] = [
   {
     heading: "Tools",
     links: [
-      { href: "/screenshot-tool", label: "Screenshot tool" },
-      { href: "/color-contrast-checker", label: "Contrast checker" },
-      { href: "/color-blindness-simulator", label: "Color blindness simulator" },
-      { href: "/download", label: "Download" },
+      { href: "/screenshot-tool", label: "Screenshot tool", icon: <CropIcon size={14} /> },
+      { href: "/color-contrast-checker", label: "Contrast checker", icon: <ContrastIcon size={14} /> },
+      { href: "/color-blindness-simulator", label: "Color blindness simulator", icon: <EyeIcon size={14} /> },
+      { href: "/download", label: "Download", icon: <DownloadIcon size={14} /> },
     ],
   },
   {
     heading: "Account",
     links: [
-      { href: "/signin", label: "Sign in" },
-      { href: "/screenshots", label: "My screenshots" },
-      { href: "/brand", label: "White-label branding" },
+      { href: "/signin", label: "Sign in", icon: <LogInIcon size={14} /> },
+      { href: "/screenshots", label: "My screenshots", icon: <ImageIcon size={14} /> },
+      { href: "/brand", label: "White-label branding", icon: <PaletteIcon size={14} /> },
     ],
   },
   {
     heading: "Learn",
     links: [
-      { href: "/wcag-contrast", label: "WCAG contrast guide" },
-      { href: "/accessibility-statement", label: "Accessibility statement" },
+      { href: "/wcag-contrast", label: "WCAG contrast guide", icon: <BookIcon size={14} /> },
+      { href: "/accessibility-statement", label: "Accessibility statement", icon: <AccessibilityIcon size={14} /> },
     ],
   },
 ];
@@ -84,7 +98,11 @@ export function Footer() {
               <ul className="mt-3 space-y-2">
                 {col.links.map((l) => (
                   <li key={l.href}>
-                    <Link href={l.href} className="text-sm text-muted hover:text-foreground">
+                    <Link
+                      href={l.href}
+                      className="inline-flex items-center gap-2 text-sm text-muted hover:text-foreground"
+                    >
+                      <span className="text-muted/70">{l.icon}</span>
                       {l.label}
                     </Link>
                   </li>

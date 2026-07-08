@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import { HeaderNav } from "./HeaderNav";
+import { DownloadIcon, ImageIcon, LogInIcon, LogOutIcon } from "@/components/icons";
 
 export async function Header() {
   const session = await auth();
@@ -20,7 +21,11 @@ export async function Header() {
         <div className="ml-auto flex items-center gap-3">
           {signedIn ? (
             <>
-              <Link href="/screenshots" className="text-sm text-muted hover:text-foreground">
+              <Link
+                href="/screenshots"
+                className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-foreground"
+              >
+                <ImageIcon size={15} />
                 My screenshots
               </Link>
               <form
@@ -29,20 +34,29 @@ export async function Header() {
                   await signOut({ redirectTo: "/" });
                 }}
               >
-                <button type="submit" className="text-sm text-muted hover:text-foreground">
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-foreground"
+                >
+                  <LogOutIcon size={15} />
                   Sign out
                 </button>
               </form>
             </>
           ) : (
-            <Link href="/signin" className="text-sm text-muted hover:text-foreground">
+            <Link
+              href="/signin"
+              className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-foreground"
+            >
+              <LogInIcon size={15} />
               Sign in
             </Link>
           )}
           <Link
             href="/download"
-            className="rounded-lg bg-primary px-3.5 py-1.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
           >
+            <DownloadIcon size={15} />
             Download
           </Link>
         </div>
