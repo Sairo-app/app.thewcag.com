@@ -1,5 +1,48 @@
 # Changelog
 
+## v2.4.0 — 2026-07-09
+
+The editor release: Snagit-class ergonomics, kept WCAG-native.
+
+**Desktop**
+
+- **Wider launch window**: opens at 900×740 (maximizable), with a two-column
+  workspace — capture tools up top, contrast + auditor tools left, your
+  library (account, captures, recent pairs, log, shortcuts) right.
+- **Captures gallery**: past captures render as thumbnails showing your
+  annotations (not the bare screenshot); click to reopen, edit and share.
+- **Annotate editor overhaul**:
+  - Two-row toolbar: big labeled tools on top, a contextual properties bar
+    (severity quick-styles, palette, redact options, undo/zoom) below, and an
+    Export menu (Markdown / Jira / report sheet) beside a primary Share button.
+  - **Filmstrip**: recent captures along the bottom; one click switches
+    captures in place.
+  - **Crop tool (C)**, non-destructive: the crop becomes a new capture with
+    annotations shifted along; the original stays in the library.
+  - **Severity quick-styles**: Blocker/Major/Minor sets the sticky severity
+    and draw color in one click.
+  - Status bar with capture dimensions, per-tool hints and findings count.
+- **Share without annotations**: publishing no longer requires markup; a bare
+  screenshot shares as a clean image.
+- **Flash-free windows**: every tool window is created hidden and revealed
+  after its UI is ready — no more unpainted-frame blink.
+
+**Web (app.thewcag.com)**
+
+- Screenshot-first public share page (logo-only header, viewer layout).
+- **White-label branding**: set a logo, name and accent color at /brand with a
+  live report preview; shared links lead with your brand.
+- **Admin panel** at /admin (gated by ADMIN_EMAILS): users, reports, storage.
+- Auth-aware header, sign-in reachable, favicon, icons in nav + footer, three
+  new SEO pages (WCAG 2.2 checklist, APCA explainer, alt-text guide).
+
+## v2.3.0 — 2026-07-08
+
+- **Windows support**: cross-platform capture via xcap, per-OS keychain,
+  Windows lens capture-exclusion, NSIS installer + updater artifacts.
+- Release pipeline hardening: correct Windows updater artifact naming,
+  notarized-vs-ad-hoc macOS build split, responsive Annotate/Lens toolbars.
+
 ## v2.2.0 — 2026-07-06
 
 Bold, clean, professional UI pass.
