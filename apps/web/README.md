@@ -1,97 +1,103 @@
 # app.thewcag.com
 
-The account &amp; sharing backend for the TheWCAG desktop app. It does exactly
-two things:
+This package is the website, account service, and report-sharing backend for the TheWCAG desktop auditor. It combines public product and accessibility content with passwordless accounts, desktop device authorization, report storage, white-label presentation, and administration.
 
-1. **Authenticate the app** — magic-link email sign-in (Auth.js + Resend);
-   the app exchanges a browser session for a device token it stores in the
-   macOS Keychain.
-2. **Store &amp; share reports** — annotated report images go to Cloudflare R2,
-   metadata to Postgres, served at public `app.thewcag.com/reports/<slug>`
-   links with social-preview cards.
+The canonical monorepo setup, architecture, environment, quality, deployment, and release instructions live in the [root README](../../README.md). This file documents the web package specifically.
 
 ## Stack
 
-Next.js 15 (standalone) · Auth.js v5 (Resend magic link) · Drizzle + Postgres
-(metadata + auth) · Cloudflare R2 (image blobs). Deployed via Docker/Coolify.
+- Next.js 15 App Router and React 19
+- Auth.js v5 with the Drizzle adapter and Resend magic links
+- Drizzle ORM and Postgres 16
+- Cloudflare R2 through its S3-compatible API
+- Tailwind CSS 4
+- Standalone Docker output for Coolify
 
-## Environment
+## Responsibilities
 
-Copy `.env.example` and fill in:
-
-- `NEXT_PUBLIC_APP_URL` — `https://app.thewcag.com`
-- `AUTH_SECRET` — `openssl rand -base64 32`
-- `AUTH_RESEND_KEY`, `AUTH_EMAIL_FROM` — [Resend](https://resend.com) magic-link email
-- `DATABASE_URL` — Postgres
-- `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` — Cloudflare R2
-
-## Database
-
-Postgres runs **co-located in the stack** (see `docker-compose.yaml` at the
-repo root) — no third-party database. The web container derives `DATABASE_URL`
-from the `postgres` service and applies the schema on boot (via
-`instrumentation.ts` → `lib/migrate.ts`, idempotent). Nothing to run by hand.
-
-## Deploy (Coolify)
-
-- New resource → **Docker Compose**
-- **Compose file**: `docker-compose.yaml` (repo root)
-- Point `app.thewcag.com` at the `web` service, port `3100`.
-
-  **Auto-set by Coolify — you never touch these** (the compose uses Coolify
-  [magic env vars](https://coolify.io/docs/knowledge-base/docker/compose#predefined-variables)):
-
-  | Var | How |
-  |---|---|
-  | `POSTGRES_PASSWORD` / `DATABASE_URL` | `SERVICE_PASSWORD_POSTGRES` — generated + injected into both |
-  | `AUTH_SECRET` | `SERVICE_BASE64_64_AUTHSECRET` — generated |
-  | `NEXT_PUBLIC_APP_URL`, `AUTH_EMAIL_FROM` | baked defaults (`https://app.thewcag.com`, verified Resend sender) |
-
-  **You must set only the external credentials** (Coolify can't generate your
-  Cloudflare/Resend secrets):
-
-  | Var | Value |
-  |---|---|
-  | `AUTH_RESEND_KEY` | Resend API key |
-  | `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_URL` | Cloudflare R2 (below) |
-
-  Override `AUTH_EMAIL_FROM` only if you change the sender (must be on a
-  **Resend-verified domain**; verify `thewcag.com` in Resend to send from
-  `login@thewcag.com`). Override `NEXT_PUBLIC_APP_URL` only if the domain changes.
-
-The whole stack (Postgres + web + migrations) was validated locally with
-`docker compose up --build`.
-
-## Cloudflare R2 (image storage)
-
-Screenshot images live entirely in R2; only metadata is in Postgres.
-
-1. **Create a bucket** (e.g. `thewcag-reports`).
-2. **API token**: R2 → Manage API Tokens → create a token with **Object Read &
-   Write** scoped to the bucket. Set `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`
-   and `R2_ENDPOINT=https://<accountid>.r2.cloudflarestorage.com`.
-3. **Public access for reads** (so Cloudflare's CDN serves images, not the app):
-   - Best: connect a **custom domain** (e.g. `cdn.thewcag.com`) to the bucket,
-     then set `R2_PUBLIC_URL=https://cdn.thewcag.com`.
-   - Or enable the managed **r2.dev** URL and set `R2_PUBLIC_URL` to it.
-   - No CORS config is needed (images are used via `<img>` and `og:image`).
-
-How it works: writes and deletes go through the S3 API (`lib/r2.ts`); reads go
-through `/api/s/[slug]/image`, which **302-redirects to `R2_PUBLIC_URL`** so the
-bytes come from Cloudflare, never the app server. `og:image` points straight at
-the CDN URL. If `R2_PUBLIC_URL` is unset (local dev), the route streams the
-object instead. The client is validated at first use and fails fast with a
-clear error if any R2 var is missing.
+- Render the marketing homepage, download page, product guides, WCAG/APCA educational pages, and accessibility statement.
+- Authenticate browser users through one-time email links.
+- Authorize desktop installations and return a `thewcag://auth` deep link.
+- Verify revocable desktop bearer tokens.
+- Accept annotated PNG reports, enforce input and storage limits, write images to R2, and write metadata to Postgres.
+- Render public unlisted reports at `/s/[slug]` and manage an owner's reports at `/screenshots`.
+- Store and apply optional white-label organization name, accent, and logo.
+- Provide a hidden, email-allowlisted admin area for users, devices, reports, views, and storage.
+- Resolve stable download URLs to the newest platform-specific GitHub release asset.
 
 ## Routes
 
-| Route | Purpose |
-|---|---|
-| `/signin`, `/signin/check` | magic-link sign-in |
-| `/connect` | device authorization → `thewcag://auth?token=…` deep link |
-| `POST /api/device/reports` | publish (bearer device token) → R2 + metadata |
-| `GET /api/device/entitlements` | who am I (bearer) |
-| `GET /api/reports/[slug]/image` | stream image from R2 |
-| `/reports/[slug]` | public share page (OG cards) |
-| `/reports` | my shared reports (manage / delete) |
-| `/downloads/desktop/latest.json` | desktop updater manifest (no-cache) |
+| Route | Access | Purpose |
+|---|---|---|
+| `/` and content pages | Public | Product, download, WCAG, APCA, CVD, alt-text, screenshot, and accessibility content. |
+| `/signin`, `/signin/check` | Public | Request and confirm a magic-link sign-in. |
+| `/connect` | Signed-in browser user | Authorize a desktop device and return to the app through `thewcag://auth`. |
+| `/screenshots` | Signed-in owner | List, copy, and delete published screenshots. |
+| `/brand` | Signed-in owner | Configure report logo, organization name, and accent color. |
+| `/s/[slug]` | Public, unlisted | View a published accessibility report. |
+| `/admin`, `/admin/users`, `/admin/reports` | `ADMIN_EMAILS` only | Platform metrics and destructive administration. |
+| `GET /api/device/entitlements` | Desktop bearer token | Return device identity, publish feature status, and storage use/quota. |
+| `POST /api/device/screenshots` | Desktop bearer token | Validate and publish a PNG report to R2 and Postgres. |
+| `GET /api/s/[slug]/image` | Public | Redirect to the R2 CDN or stream the report image. |
+| `GET /api/brand/[id]/logo` | Public | Redirect to or stream the report owner's logo. |
+| `GET /api/desktop/download` | Public | Redirect to the latest macOS or Windows GitHub release asset. |
+| `/api/auth/[...nextauth]` | Auth.js | Auth.js request handling. |
+
+Public report pages are marked `noindex`. The sitemap contains only indexable marketing and guide pages; robots output excludes API, auth, account, and admin routes.
+
+## Environment
+
+Copy `.env.example` to `.env.local`. Required variables and local service values are documented in the [root README](../../README.md#environment-variables).
+
+In development, an absent `AUTH_RESEND_KEY` causes the magic link to be printed to the server console. R2 configuration is validated on first object operation. `R2_PUBLIC_URL` is optional: when configured, image routes redirect to the CDN; otherwise they stream from the S3-compatible service.
+
+## Local services
+
+From the monorepo root:
+
+```sh
+docker compose -f apps/web/docker-compose.dev.yml up -d
+```
+
+Then, from this directory:
+
+```sh
+node --env-file=.env.local scripts/dev-bucket.mjs
+pnpm dev
+```
+
+Postgres is exposed on `localhost:5433`; MinIO uses `localhost:9000` for S3 and `localhost:9001` for its console. The website runs on `localhost:3100`.
+
+Useful scripts:
+
+```sh
+node --env-file=.env.local scripts/verify-r2.mjs
+node --env-file=.env.local scripts/dev-seed.mjs
+pnpm db:generate
+```
+
+The active development and production startup path runs the embedded idempotent migration from `instrumentation.ts` and `lib/migrate.ts`. `pnpm db:generate` is schema-development tooling; do not substitute an unreviewed generated migration for the startup path. If the schema changes, update `lib/schema.ts`, add the appropriate Drizzle migration, and mirror the additive operation in `lib/migrate.ts`.
+
+## Storage and limits
+
+- Report images and brand logos are R2 objects.
+- Users, Auth.js records, device-token hashes, report metadata, branding, byte counts, and views are Postgres rows.
+- Published images must be valid PNG data and no larger than 4 MB.
+- A report accepts up to 100 issue objects, a 140-character title, and a 500-character description.
+- Each user has a 1 GiB report-image quota.
+- Brand logos accept PNG, JPEG, WEBP, or SVG and must be under 1 MB.
+- Owner/admin deletion removes both metadata and the corresponding R2 object.
+
+## Production
+
+Use the root `docker-compose.yaml` as the Coolify Docker Compose resource. Route `app.thewcag.com` to the `web` service on port `3100`. The service waits for Postgres health, runs migrations during server startup, and exposes its own HTTP health check.
+
+Coolify generates the Postgres password and Auth.js secret through its service variables. Configure Resend and R2 credentials explicitly. Set `ADMIN_EMAILS` only for accounts that should see the administration surface.
+
+Build and verify from the monorepo root:
+
+```sh
+pnpm --filter @thewcag/web typecheck
+pnpm --filter @thewcag/web build
+docker compose up --build
+```
