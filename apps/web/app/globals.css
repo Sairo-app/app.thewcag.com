@@ -6,11 +6,12 @@
  * hairline borders, restrained brand accent. Mirrors the desktop app.
  */
 :root {
-  --bg: 0 0% 100%;
+  --bg: 240 20% 98%;
   --fg: 240 6% 10%;
-  --muted: 240 4% 46%;
+  --muted: 240 5% 40%;
   --border: 240 6% 90%;
   --card: 0 0% 100%;
+  --card-2: 240 10% 96%;
   /* Brand orange, darkened until white text and orange-on-white text both
    * clear WCAG AA 4.5:1 (computed 4.85:1). This is an accessibility product;
    * the CTA must pass the standard it sells. */
@@ -26,6 +27,7 @@
     --muted: 240 5% 60%;
     --border: 240 5% 20%;
     --card: 240 6% 11%;
+    --card-2: 240 5% 15%;
     /* Dark: the vivid orange reads fine AS text on the dark surface (6.9:1),
      * but white text ON it fails, so the button foreground flips to near-black
      * (6.5:1). Ring stays vivid for visibility on dark surfaces. */
@@ -54,6 +56,7 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 body {
+  min-height: 100vh;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -69,13 +72,25 @@ body {
 
 /* Quiet, consistent interaction transitions. */
 a,
-button {
+button,
+summary {
   transition:
     color 150ms ease,
     background-color 150ms ease,
     border-color 150ms ease,
     opacity 150ms ease,
     box-shadow 150ms ease;
+}
+
+a,
+button,
+summary {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:not(:disabled),
+summary {
+  cursor: pointer;
 }
 
 /* Keyboard focus - brand ring (walk the walk on an accessibility product). */

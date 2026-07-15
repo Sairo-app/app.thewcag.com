@@ -81,6 +81,12 @@ export const ArrowRightIcon = (p: { size?: number }) => (
   </Icon>
 );
 
+export const MenuIcon = (p: { size?: number }) => (
+  <Icon {...p}>
+    <path d="M4 7h16M4 12h16M4 17h16" />
+  </Icon>
+);
+
 export const MailIcon = (p: { size?: number }) => (
   <Icon {...p}>
     <rect x="2" y="4" width="20" height="16" rx="2" />

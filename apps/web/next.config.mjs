@@ -12,13 +12,22 @@ const nextConfig = {
   outputFileTracingRoot: path.join(__dirname, '../../'),
   reactStrictMode: true,
   poweredByHeader: false,
-  // Types + lint are verified in dev and CI; skip the in-container passes so
-  // `next build` stays within a small deploy server's RAM (they're the two
-  // most memory-hungry steps and OOM the build on constrained hosts).
+  // Keep lint out of the constrained image build, but never publish a bundle
+  // that failed TypeScript validation.
   eslint: { ignoreDuringBuilds: true },
-  typescript: { ignoreBuildErrors: true },
+  typescript: { ignoreBuildErrors: false },
   async headers() {
+    const securityHeaders = [
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+      { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+      { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
+    ]
     return [
+      {
+        source: '/(.*)',
+        headers: securityHeaders,
+      },
       {
         // The desktop updater must always see the freshest manifest.
         source: '/downloads/desktop/latest.json',

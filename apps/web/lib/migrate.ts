@@ -101,7 +101,16 @@ export async function runMigrations(): Promise<void> {
     }
     console.log("[migrate] schema ready");
   } catch (e) {
-    console.error("[migrate] failed:", e instanceof Error ? e.message : e);
+    ran = false;
+    const message = e instanceof Error ? e.message || e.name : String(e);
+    console.error("[migrate] failed:", message);
+    // A production server with an unusable schema is not healthy: auth,
+    // reports, and device connections would fail later with less actionable
+    // errors. Development stays available for static UI work while the local
+    // database is offline.
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(`Database migration failed: ${message}`, { cause: e });
+    }
   } finally {
     await sql.end();
   }

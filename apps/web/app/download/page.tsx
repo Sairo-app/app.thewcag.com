@@ -24,7 +24,7 @@ const PLATFORMS = [
     os: "mac" as const,
     name: "macOS",
     icon: AppleIcon,
-    note: "macOS 13 Ventura or later, Apple Silicon & Intel",
+    note: "macOS 12 Monterey or later, Apple Silicon & Intel",
     cta: "Download for macOS",
   },
   {
