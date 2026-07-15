@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 
 export function HomeMotion() {
   useEffect(() => {
-    const page = document.querySelector<HTMLElement>(".home-page");
+    const page = document.querySelector<HTMLElement>(".cinema-home");
     const targets = Array.from(document.querySelectorAll<HTMLElement>("[data-reveal]"));
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -26,15 +26,22 @@ export function HomeMotion() {
       { rootMargin: "0px 0px -8% 0px", threshold: 0.08 },
     );
 
-    targets.forEach((target) => observer.observe(target));
+    targets.forEach((target) => {
+      const bounds = target.getBoundingClientRect();
+      if (bounds.top < window.innerHeight && bounds.bottom > 0) {
+        target.setAttribute("data-visible", "true");
+        return;
+      }
+      observer.observe(target);
+    });
     return () => observer.disconnect();
   }, []);
 
   return null;
 }
 
-export function AuditField() {
-  const fieldRef = useRef<HTMLDivElement>(null);
+export function InspectionStage() {
+  const stageRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<number | null>(null);
 
   useEffect(
@@ -47,72 +54,60 @@ export function AuditField() {
   function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
     if (event.pointerType === "touch" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
-    const field = fieldRef.current;
-    if (!field) return;
-    const bounds = field.getBoundingClientRect();
-    const x = Math.max(28, Math.min(bounds.width - 28, event.clientX - bounds.left));
-    const y = Math.max(28, Math.min(bounds.height - 28, event.clientY - bounds.top));
+    const stage = stageRef.current;
+    if (!stage) return;
+    const bounds = stage.getBoundingClientRect();
+    const x = Math.max(42, Math.min(bounds.width - 42, event.clientX - bounds.left));
+    const y = Math.max(64, Math.min(bounds.height - 118, event.clientY - bounds.top));
 
     if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
     frameRef.current = requestAnimationFrame(() => {
-      field.style.setProperty("--pointer-x", `${x}px`);
-      field.style.setProperty("--pointer-y", `${y}px`);
+      stage.style.setProperty("--focus-x", `${x}px`);
+      stage.style.setProperty("--focus-y", `${y}px`);
     });
   }
 
   return (
     <div
-      ref={fieldRef}
-      className="audit-field"
+      ref={stageRef}
+      className="inspection-stage"
       role="img"
       aria-label="TheWCAG inspecting a checkout interface and reporting a 6.83 to 1 contrast ratio that passes WCAG AA and AAA"
       onPointerMove={handlePointerMove}
     >
-      <div className="audit-field__chrome" aria-hidden="true">
-        <div className="audit-field__identity">
-          <span className="audit-field__signal" />
-          <span>LIVE_INSPECTION</span>
-        </div>
-        <span>FRAME 0042 / WEB</span>
+      <div className="inspection-stage__top" aria-hidden="true">
+        <span>THEWCAG / INSPECT</span>
+        <span className="inspection-stage__live"><i /> LIVE</span>
       </div>
 
-      <div className="audit-field__viewport" aria-hidden="true">
-        <div className="audit-field__axis audit-field__axis--x" />
-        <div className="audit-field__axis audit-field__axis--y" />
-        <div className="audit-field__coordinates">X 0684 / Y 0312</div>
-
-        <div className="audit-field__mock">
-          <span className="audit-field__mock-label">CHECKOUT / PAYMENT</span>
-          <div className="audit-field__mock-line audit-field__mock-line--long" />
-          <div className="audit-field__mock-line" />
-          <div className="audit-field__mock-button">CONTINUE TO PAYMENT</div>
+      <div className="inspection-stage__canvas" aria-hidden="true">
+        <div className="inspection-stage__window">
+          <div className="inspection-stage__window-bar"><i /><i /><i /><span>CHECKOUT / PAYMENT</span></div>
+          <div className="inspection-stage__window-copy">
+            <small>COMPLETE ORDER</small>
+            <strong>Make payment</strong>
+            <span />
+            <span />
+            <div className="inspection-stage__mock-button">Continue to payment</div>
+          </div>
         </div>
 
-        <div className="audit-field__issue">
+        <div className="inspection-stage__focus">
+          <span className="inspection-stage__focus-ring" />
+          <span className="inspection-stage__focus-cross inspection-stage__focus-cross--x" />
+          <span className="inspection-stage__focus-cross inspection-stage__focus-cross--y" />
+        </div>
+
+        <div className="inspection-stage__finding">
           <span>01</span>
-          <strong>FOCUS INDICATOR</strong>
-        </div>
-
-        <div className="audit-field__reticle">
-          <span className="audit-field__reticle-ring" />
-          <span className="audit-field__reticle-dot" />
-          <span className="audit-field__reticle-label">SAMPLE</span>
+          <div><small>FINDING</small><strong>Focus indicator</strong></div>
         </div>
       </div>
 
-      <div className="audit-field__result" aria-hidden="true">
-        <div>
-          <span className="audit-field__eyebrow">CONTRAST RATIO</span>
-          <strong>6.83<span>:1</span></strong>
-        </div>
-        <div className="audit-field__swatches">
-          <span className="audit-field__swatch audit-field__swatch--dark">#19181C</span>
-          <span className="audit-field__swatch audit-field__swatch--light">#FAF9FC</span>
-        </div>
-        <div className="audit-field__verdicts">
-          <span>AA / PASS</span>
-          <span>AAA / PASS</span>
-        </div>
+      <div className="inspection-stage__result" aria-hidden="true">
+        <div><small>CONTRAST RATIO</small><strong>6.83<span>:1</span></strong></div>
+        <div className="inspection-stage__samples"><span>#19181C</span><span>#FAF9FC</span></div>
+        <div className="inspection-stage__verdict"><small>WCAG 2.2</small><strong>AAA / PASS</strong></div>
       </div>
     </div>
   );

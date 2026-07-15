@@ -105,6 +105,7 @@ accessibility-build-app/
 ├── docs/                        Release and platform migration notes
 ├── .github/workflows/           Quality and signed release automation
 ├── docker-compose.yaml          Production Postgres and web stack
+├── DESIGN.md                    Website visual system and accessibility rules
 ├── SKILL.md                     Repository-specific agent workflow
 ├── CHANGELOG.md                 Release history and unreleased changes
 └── PLAN.md                      Historical original product plan
@@ -336,6 +337,7 @@ Changes should preserve keyboard access, visible focus, semantic names and state
 
 ## Project documentation
 
+- [DESIGN.md](DESIGN.md): Precision Cinema visual language, responsive composition, interaction, and accessibility acceptance criteria.
 - [SKILL.md](SKILL.md): repository-specific implementation and verification workflow.
 - [CHANGELOG.md](CHANGELOG.md): shipped versions and unreleased changes.
 - [docs/RELEASING.md](docs/RELEASING.md): production signing and release operations.

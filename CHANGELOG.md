@@ -19,9 +19,11 @@
 
 **Web**
 
-- Rebuilt the homepage around the complete auditor workflow and added a
-  responsive product preview, richer feature coverage, platform guidance, and
-  SoftwareApplication metadata.
+- Rebuilt the homepage and public marketing pages as the original Precision
+  Cinema system: monumental condensed type, editorial copy, cinema-black and
+  cream chapters, restrained orange inspection signals, hairline layouts, and
+  a responsive interactive product frame. Added `DESIGN.md` to preserve the
+  visual and accessibility rules across future pages.
 - Added an accessible mobile navigation down to 320px, stronger production
   security headers, enforced build-time type validation, fail-fast production
   migrations, and aligned platform requirements with the desktop configuration.

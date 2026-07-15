@@ -57,7 +57,7 @@ export default function ApcaContrastPage() {
           })),
         }}
       />
-      <main id="main" className="mx-auto max-w-3xl px-6 py-16">
+      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-16">
         <h1 className="text-3xl font-bold tracking-tight">APCA vs the WCAG 2 contrast ratio</h1>
         <p className="mt-3 max-w-2xl text-muted">
           APCA (Accessible Perceptual Contrast Algorithm) is the contrast model being developed for

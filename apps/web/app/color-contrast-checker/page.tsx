@@ -52,7 +52,7 @@ export default function ColorContrastCheckerPage() {
           })),
         }}
       />
-      <main id="main" className="mx-auto max-w-3xl px-6 py-16">
+      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-16">
         <h1 className="text-3xl font-bold tracking-tight">Color Contrast Checker</h1>
         <p className="mt-3 max-w-2xl text-muted">
           Check WCAG color contrast <strong>anywhere on your screen</strong> - not just inside a

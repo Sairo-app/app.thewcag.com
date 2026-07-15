@@ -1,10 +1,23 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque } from "next/font/google";
+import { Bricolage_Grotesque, EB_Garamond, Saira_Condensed } from "next/font/google";
 import "./globals.css";
 
 const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
   variable: "--font-bricolage",
+  display: "swap",
+});
+
+const saira = Saira_Condensed({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600"],
+  variable: "--font-display",
+  display: "swap",
+});
+
+const garamond = EB_Garamond({
+  subsets: ["latin"],
+  variable: "--font-editorial",
   display: "swap",
 });
 
@@ -51,7 +64,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={bricolage.variable}>
+      <body className={`${bricolage.variable} ${saira.variable} ${garamond.variable}`}>
         <a
           href="#main"
           className="sr-only rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50"

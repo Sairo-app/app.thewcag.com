@@ -48,7 +48,7 @@ export default function WcagContrastPage() {
           })),
         }}
       />
-      <main id="main" className="mx-auto max-w-3xl px-6 py-16">
+      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-16">
         <h1 className="text-3xl font-bold tracking-tight">
           WCAG color contrast requirements, explained
         </h1>

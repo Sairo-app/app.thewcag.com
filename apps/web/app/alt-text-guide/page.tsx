@@ -79,7 +79,7 @@ export default function AltTextGuidePage() {
           })),
         }}
       />
-      <main id="main" className="mx-auto max-w-3xl px-6 py-16">
+      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-16">
         <h1 className="text-3xl font-bold tracking-tight">How to write alt text</h1>
         <p className="mt-3 max-w-2xl text-muted">
           Alt text is the most common accessibility failure on the web and one of the easiest to

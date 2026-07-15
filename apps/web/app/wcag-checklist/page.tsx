@@ -77,7 +77,7 @@ export default function WcagChecklistPage() {
           url: `${SITE}/wcag-checklist`,
         }}
       />
-      <main id="main" className="mx-auto max-w-3xl px-6 py-16">
+      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-16">
         <h1 className="text-3xl font-bold tracking-tight">WCAG 2.2 AA checklist</h1>
         <p className="mt-3 max-w-2xl text-muted">
           The success criteria that catch the most real-world failures, grouped by the four POUR
