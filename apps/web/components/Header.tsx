@@ -20,17 +20,18 @@ export async function Header() {
   const admin = isAdminEmail(session?.user?.email);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">
-      <div className="relative mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-6 md:gap-6">
-        <Link href="/" aria-label="TheWCAG home" className="flex items-center gap-2">
+    <header className="site-header">
+      <div className="site-header__inner">
+        <Link href="/" aria-label="TheWCAG home" className="site-brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="" width={24} height={24} className="h-6 w-6 rounded" />
-          <span className="hidden text-sm font-bold tracking-tight min-[360px]:inline">TheWCAG</span>
+          <img src="/logo.png" alt="" width={26} height={26} />
+          <span className="site-brand__name">TheWCAG</span>
+          <span className="site-brand__meta">FIELD SYSTEM</span>
         </Link>
 
         <HeaderNav />
 
-        <div className="ml-auto hidden items-center gap-3 md:flex">
+        <div className="site-account">
           {signedIn ? (
             <>
               {admin && (
@@ -71,12 +72,12 @@ export async function Header() {
           )}
         </div>
 
-        <details className="group ml-auto md:hidden">
-          <summary aria-label="Open navigation menu" className="inline-flex min-h-10 cursor-pointer list-none items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium marker:hidden hover:bg-background [&::-webkit-details-marker]:hidden">
+        <details className="group site-menu">
+          <summary aria-label="Open navigation menu" className="site-menu__trigger">
             <MenuIcon size={16} />
             <span className="hidden min-[390px]:inline">Menu</span>
           </summary>
-          <div className="absolute left-4 right-4 top-[calc(100%+0.65rem)] z-50 rounded-xl border border-border bg-card p-2 shadow-xl sm:left-auto sm:right-6 sm:w-72">
+          <div className="site-menu__panel">
             <nav aria-label="Mobile primary" className="grid gap-1">
               {[
                 ["/screenshot-tool", "Screenshot tool", <CropIcon key="crop" size={16} />],
@@ -110,7 +111,7 @@ export async function Header() {
         <Link
           href="/download"
           aria-label="Download TheWCAG"
-          className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground hover:opacity-90 sm:px-3.5"
+          className="site-header__download"
         >
           <DownloadIcon size={15} />
           <span className="hidden min-[420px]:inline">Download</span>

@@ -37,7 +37,7 @@ export function ConnectClient({ state, device, email }: { state: string; device:
         </button>
       )}
       {status === "done" && (
-        <div className="mt-6 text-sm text-muted">
+        <div className="mt-6 text-sm text-muted" role="status" aria-live="polite">
           <p>Returning you to the app…</p>
           {link && (
             <p className="mt-2">
@@ -50,7 +50,7 @@ export function ConnectClient({ state, device, email }: { state: string; device:
         </div>
       )}
       {status === "error" && (
-        <p className="mt-6 text-sm text-red-600 dark:text-red-400">
+        <p className="mt-6 text-sm text-red-600 dark:text-red-400" role="alert">
           Something went wrong. Try connecting again from the app.
         </p>
       )}

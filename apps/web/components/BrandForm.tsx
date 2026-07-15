@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { saveBrand, type BrandResult } from "@/app/brand/actions";
 import { BrandPreview } from "@/components/BrandPreview";
 import { CheckIcon } from "@/components/icons";
+import { BRAND_LOGO_MAX_BYTES, BRAND_LOGO_TYPES } from "@/lib/brand";
 
 const DEFAULT_COLOR = "#c2410c";
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -18,6 +19,7 @@ export function BrandForm({
   const [color, setColor] = useState(initial.color || DEFAULT_COLOR);
   const [logoPreview, setLogoPreview] = useState<string | null>(initial.logoUrl);
   const [removeLogo, setRemoveLogo] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const objectUrl = useRef<string | null>(null);
 
@@ -29,6 +31,17 @@ export function BrandForm({
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
+    if (!BRAND_LOGO_TYPES[f.type]) {
+      setFileError("Choose a PNG, JPG, WEBP, or SVG logo.");
+      e.target.value = "";
+      return;
+    }
+    if (f.size > BRAND_LOGO_MAX_BYTES) {
+      setFileError("Choose a logo under 1 MB.");
+      e.target.value = "";
+      return;
+    }
+    setFileError(null);
     if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
     objectUrl.current = URL.createObjectURL(f);
     setLogoPreview(objectUrl.current);
@@ -41,6 +54,7 @@ export function BrandForm({
     if (fileRef.current) fileRef.current.value = "";
     setLogoPreview(null);
     setRemoveLogo(true);
+    setFileError(null);
   }
 
   const showLogo = logoPreview && !removeLogo;
@@ -68,6 +82,7 @@ export function BrandForm({
             placeholder="Acme Design"
             className="mt-1.5 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
+          {fileError && <span role="alert" className="text-xs text-red-600 dark:text-red-400">{fileError}</span>}
         </label>
 
         <label className="block">
@@ -126,7 +141,7 @@ export function BrandForm({
       <div className="flex items-center gap-3">
         <button
           type="submit"
-          disabled={pending}
+          disabled={pending || Boolean(fileError)}
           className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60"
         >
           {pending ? "Saving…" : "Save branding"}

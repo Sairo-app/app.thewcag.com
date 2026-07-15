@@ -1,3 +1,5 @@
+import type { ReportIssue } from "./schema";
+
 export const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://app.thewcag.com";
 
 const ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -34,4 +36,28 @@ export function decodePngBase64(
 
 export function isUniqueViolation(err: unknown): boolean {
   return typeof err === "object" && err !== null && (err as { code?: string }).code === "23505";
+}
+
+const ISSUE_SEVERITIES = new Set(["blocker", "major", "minor"]);
+
+function cleanText(value: unknown, maxLength: number): string {
+  return typeof value === "string" ? value.replace(/[\u0000-\u001F\u007F]/g, " ").trim().slice(0, maxLength) : "";
+}
+
+/** Bound and normalize untrusted issue metadata before it reaches JSONB or a public report. */
+export function sanitizeReportIssues(value: unknown, maxItems = 100): ReportIssue[] {
+  if (!Array.isArray(value)) return [];
+  const issues: ReportIssue[] = [];
+  for (const candidate of value.slice(0, maxItems)) {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue;
+    const raw = candidate as Record<string, unknown>;
+    const label = cleanText(raw.label, 120) || "Accessibility issue";
+    const note = cleanText(raw.note, 1000);
+    const rawSc = cleanText(raw.sc, 20);
+    const sc = /^\d+(?:\.\d+){1,3}$/.test(rawSc) ? rawSc : undefined;
+    const rawSeverity = cleanText(raw.severity, 20).toLowerCase();
+    const severity = ISSUE_SEVERITIES.has(rawSeverity) ? rawSeverity : "major";
+    issues.push({ n: issues.length + 1, sc, label, severity, note });
+  }
+  return issues;
 }

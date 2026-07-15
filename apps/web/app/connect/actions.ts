@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { desktopDevices } from "@/lib/schema";
 import { generateDeviceToken, hashToken } from "@/lib/device-auth";
+import { isValidConnectState, normalizeDeviceName } from "./validation";
 
 /**
  * Mint a device token for the signed-in user and return the deep link the
@@ -11,6 +12,9 @@ import { generateDeviceToken, hashToken } from "@/lib/device-auth";
  * confirm it initiated this connection.
  */
 export async function authorizeDevice(state: string, device: string): Promise<string> {
+  if (!isValidConnectState(state)) {
+    throw new Error("Invalid connection request. Start again from the desktop app.");
+  }
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) throw new Error("Not signed in");
@@ -19,7 +23,7 @@ export async function authorizeDevice(state: string, device: string): Promise<st
   await db.insert(desktopDevices).values({
     userId,
     tokenHash: hashToken(token),
-    deviceName: (device || "Desktop").slice(0, 80),
+    deviceName: normalizeDeviceName(device),
   });
 
   const params = new URLSearchParams({ token, state });

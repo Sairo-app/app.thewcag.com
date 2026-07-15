@@ -1,22 +1,20 @@
 "use client";
 
-import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookIcon, ContrastIcon, CropIcon, EyeIcon } from "@/components/icons";
 
-const NAV: { href: string; label: string; icon: ReactNode }[] = [
-  { href: "/screenshot-tool", label: "Screenshot tool", icon: <CropIcon size={15} /> },
-  { href: "/color-contrast-checker", label: "Contrast checker", icon: <ContrastIcon size={15} /> },
-  { href: "/color-blindness-simulator", label: "Color blindness", icon: <EyeIcon size={15} /> },
-  { href: "/wcag-contrast", label: "Guide", icon: <BookIcon size={15} /> },
+const NAV = [
+  { href: "/screenshot-tool", label: "Capture", index: "01" },
+  { href: "/color-contrast-checker", label: "Contrast", index: "02" },
+  { href: "/color-blindness-simulator", label: "Simulate", index: "03" },
+  { href: "/wcag-contrast", label: "Learn", index: "04" },
 ];
 
 /** Primary marketing nav with active-page highlighting (needs the pathname). */
 export function HeaderNav() {
   const pathname = usePathname();
   return (
-    <nav className="hidden items-center gap-5 text-sm md:flex" aria-label="Primary">
+    <nav className="site-nav" aria-label="Primary">
       {NAV.map((n) => {
         const active = pathname === n.href;
         return (
@@ -24,12 +22,9 @@ export function HeaderNav() {
             key={n.href}
             href={n.href}
             aria-current={active ? "page" : undefined}
-            className={`inline-flex items-center gap-1.5 ${
-              active ? "font-medium text-foreground" : "text-muted hover:text-foreground"
-            }`}
+            className={`site-nav__link${active ? " site-nav__link--active" : ""}`}
           >
-            {n.icon}
-            {n.label}
+            <span>{n.index}</span>{n.label}
           </Link>
         );
       })}

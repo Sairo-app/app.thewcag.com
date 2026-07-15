@@ -49,24 +49,25 @@ const COLUMNS: { heading: string; links: { href: string; label: string; icon: Re
 
 export function Footer() {
   return (
-    <footer className="mt-24 border-t border-border">
-      <div className="mx-auto max-w-6xl px-6 py-12">
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
+    <footer className="site-footer">
+      <div className="site-footer__inner">
+        <div className="site-footer__masthead" aria-hidden="true">THEWCAG</div>
+        <div className="site-footer__grid">
           {/* Brand */}
-          <div className="sm:col-span-2">
-            <Link href="/" className="flex items-center gap-2">
+          <div className="site-footer__brand">
+            <Link href="/" className="site-footer__lockup">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.png" alt="" width={24} height={24} className="h-6 w-6" />
-              <span className="text-base font-bold tracking-tight">TheWCAG</span>
+              <img src="/logo.png" alt="" width={26} height={26} />
+              <span>TheWCAG / ACCESSIBILITY FIELD SYSTEM</span>
             </Link>
-            <p className="mt-3 max-w-xs text-sm text-muted">
+            <p className="site-footer__description">
               Check WCAG color contrast anywhere on screen, simulate color blindness, and share
               annotated accessibility reports. For macOS and Windows.
             </p>
-            <div className="mt-5 flex items-center gap-3">
+            <div className="site-footer__platforms">
               <Link
                 href="/download"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-card"
+                className="site-footer__platform"
                 aria-label="Download for macOS"
               >
                 <AppleIcon className="h-3.5 w-3.5" />
@@ -74,7 +75,7 @@ export function Footer() {
               </Link>
               <Link
                 href="/download"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-card"
+                className="site-footer__platform"
                 aria-label="Download for Windows"
               >
                 <WindowsIcon className="h-3.5 w-3.5" />
@@ -85,7 +86,7 @@ export function Footer() {
                 target="_blank"
                 rel="noreferrer"
                 aria-label="TheWCAG on GitHub"
-                className="ml-1 text-muted transition-colors hover:text-foreground"
+                className="site-footer__github"
               >
                 <GitHubIcon className="h-5 w-5" />
               </a>
@@ -94,16 +95,16 @@ export function Footer() {
 
           {/* Link columns */}
           {COLUMNS.map((col) => (
-            <nav key={col.heading} aria-label={col.heading}>
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">
+            <nav key={col.heading} aria-label={col.heading} className="site-footer__nav">
+              <h2>
                 {col.heading}
               </h2>
-              <ul className="mt-3 space-y-2">
+              <ul>
                 {col.links.map((l) => (
                   <li key={l.href}>
                     <Link
                       href={l.href}
-                      className="inline-flex items-center gap-2 text-sm text-muted hover:text-foreground"
+                      className="site-footer__link"
                     >
                       <span className="text-muted/70">{l.icon}</span>
                       {l.label}
@@ -115,7 +116,7 @@ export function Footer() {
           ))}
         </div>
 
-        <div className="mt-10 flex flex-col gap-2 border-t border-border pt-6 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
+        <div className="site-footer__bottom">
           <span>© {new Date().getFullYear()} TheWCAG. All rights reserved.</span>
           <span>Built to WCAG 2.2 AA, for macOS and Windows.</span>
         </div>

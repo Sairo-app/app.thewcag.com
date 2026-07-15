@@ -28,6 +28,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const obj = await getImage(row.key);
   if (!obj) return new NextResponse("Not found", { status: 404 });
   return new NextResponse(Buffer.from(obj.body), {
-    headers: { "Content-Type": obj.contentType, "Cache-Control": "public, max-age=3600" },
+    headers: {
+      "Content-Type": obj.contentType,
+      "Cache-Control": "public, max-age=3600",
+      "X-Content-Type-Options": "nosniff",
+      ...(obj.contentType === "image/svg+xml"
+        ? { "Content-Security-Policy": "sandbox; default-src 'none'; style-src 'unsafe-inline'" }
+        : {}),
+    },
   });
 }
