@@ -11,7 +11,7 @@ import {
   type Rgb,
 } from "@accessibility-build/a11y-core";
 import { getVersion } from "@tauri-apps/api/app";
-import { displayShortcut, events, ipc, isMac, type Account, type Shortcuts } from "../lib/ipc";
+import { displayShortcut, events, ipc, isMac, isTauriRuntime, type Account, type Shortcuts } from "../lib/ipc";
 import { CheckIcon, CloseIcon, CopyIcon, FolderIcon, SwapIcon, TimerIcon } from "../lib/icons";
 import {
   AUDIT_BRIEF_KEY,
@@ -84,6 +84,13 @@ export default function MainWindow() {
   const [version, setVersion] = useState("");
   const [auditBrief, setAuditBrief] = useState<AuditBrief | null>(null);
   const [editingAudit, setEditingAudit] = useState(false);
+  const auditTriggerRef = useRef<HTMLButtonElement>(null);
+  const wasEditingAudit = useRef(false);
+
+  useEffect(() => {
+    if (wasEditingAudit.current && !editingAudit) auditTriggerRef.current?.focus();
+    wasEditingAudit.current = editingAudit;
+  }, [editingAudit]);
 
   function appendLog(kind: LogEntry["kind"], text: string) {
     setLog((prev) => {
@@ -95,13 +102,21 @@ export default function MainWindow() {
 
   useEffect(() => {
     void refreshPermission();
-    void ipc.autostartEnabled().then(setAutostartState).catch(() => {});
-    void ipc.getShortcuts().then(setShortcuts).catch(() => {});
+    void ipc.autostartEnabled().then(setAutostartState).catch((e) => {
+      if (isTauriRuntime) setError(`Couldn't read launch-at-login settings: ${String(e)}`);
+    });
+    void ipc.getShortcuts().then(setShortcuts).catch((e) => {
+      if (isTauriRuntime) setError(`Couldn't load keyboard shortcuts: ${String(e)}`);
+    });
     // silent: dev builds have no manifest yet; failures are expected offline
     void ipc.checkUpdate().then(setUpdate).catch(() => {});
-    void ipc.getAccount().then(setAccount).catch(() => {});
+    void ipc.getAccount().then(setAccount).catch((e) => {
+      if (isTauriRuntime) setError(`Couldn't load your account: ${String(e)}`);
+    });
     void getVersion().then(setVersion).catch(() => {});
-    void ipc.storeGet(AUDIT_BRIEF_KEY).then((raw) => setAuditBrief(parseAuditBrief(raw))).catch(() => {});
+    void ipc.storeGet(AUDIT_BRIEF_KEY).then((raw) => setAuditBrief(parseAuditBrief(raw))).catch((e) => {
+      if (isTauriRuntime) setError(`Couldn't load audit context: ${String(e)}`);
+    });
     const unlisteners = [
       events.onPicked((p) => {
         setError(null);
@@ -129,7 +144,11 @@ export default function MainWindow() {
             : "Annotated capture exported",
         );
       }),
-      events.onAccountChanged(() => void ipc.getAccount().then(setAccount).catch(() => {})),
+      events.onAccountChanged(() =>
+        void ipc.getAccount().then(setAccount).catch((e) => {
+          if (isTauriRuntime) setError(`Couldn't refresh your account: ${String(e)}`);
+        }),
+      ),
     ];
     const onFocus = () => void refreshPermission();
     window.addEventListener("focus", onFocus);
@@ -165,8 +184,9 @@ export default function MainWindow() {
   async function refreshPermission() {
     try {
       setPermission(await ipc.screenPermissionStatus());
-    } catch {
+    } catch (e) {
       setPermission(null);
+      if (isTauriRuntime) setError(`Couldn't read Screen Recording permission: ${String(e)}`);
     }
   }
 
@@ -180,6 +200,11 @@ export default function MainWindow() {
     await ipc.storeSet(AUDIT_BRIEF_KEY, JSON.stringify(next));
     setAuditBrief(next);
     setEditingAudit(false);
+  }
+
+  function runAction(action: Promise<unknown>, label: string) {
+    setError(null);
+    void action.catch((e) => setError(`${label}: ${String(e)}`));
   }
 
   const fgRgb = hexToRgb(fg);
@@ -196,7 +221,7 @@ export default function MainWindow() {
       >
         <div data-tauri-drag-region className="flex w-full max-w-[1040px] items-center justify-between">
           <button
-            onClick={() => void ipc.openSite(SITE)}
+            onClick={() => runAction(ipc.openSite(SITE), "Couldn't open the website")}
             className="flex items-center gap-2.5 text-left"
             title="Open thewcag.com"
           >
@@ -260,7 +285,7 @@ export default function MainWindow() {
             Saved: {screenshot.split("/").pop()}
           </p>
           <button
-            onClick={() => void ipc.revealPath(screenshot)}
+            onClick={() => runAction(ipc.revealPath(screenshot), "Couldn't reveal the capture")}
             className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted"
           >
             <FolderIcon size={12} />
@@ -271,8 +296,9 @@ export default function MainWindow() {
 
       {permission === false && (
         <PermissionCard
-          onGrant={() => void grantPermission()}
-          onOpenSettings={() => void ipc.openScreenRecordingSettings()}
+          onGrant={() => runAction(grantPermission(), "Couldn't request Screen Recording access")}
+          onOpenSettings={() => runAction(ipc.openScreenRecordingSettings(), "Couldn't open System Settings")}
+          onRestart={() => runAction(ipc.restartApp(), "Couldn't restart the app")}
         />
       )}
 
@@ -282,29 +308,30 @@ export default function MainWindow() {
           title="Pick pair"
           hotkey={shortcuts ? displayShortcut(shortcuts.pick) : ""}
           hint="Text + background"
-          onClick={() => void ipc.beginOverlay("pair")}
-          onDelayed={() => void ipc.beginOverlay("pair", 3000)}
+          onClick={() => runAction(ipc.beginOverlay("pair"), "Couldn't start the contrast picker")}
+          onDelayed={() => runAction(ipc.beginOverlay("pair", 3000), "Couldn't start the delayed contrast picker")}
         />
         <ToolCard
           title="Capture"
           hotkey={shortcuts ? displayShortcut(shortcuts.shot) : ""}
           hint="Region + annotate"
-          onClick={() => void ipc.beginOverlay("shot")}
-          onDelayed={() => void ipc.beginOverlay("shot", 3000)}
+          onClick={() => runAction(ipc.beginOverlay("shot"), "Couldn't start capture")}
+          onDelayed={() => runAction(ipc.beginOverlay("shot", 3000), "Couldn't start the delayed capture")}
         />
         <ToolCard
           title="Lens"
           hotkey={shortcuts ? displayShortcut(shortcuts.lens) : ""}
           hint="Colorblind view"
-          onClick={() => void ipc.toggleLens()}
+          onClick={() => runAction(ipc.toggleLens(), "Couldn't open the colorblind lens")}
         />
       </section>
 
       <AuditContextCard
         brief={auditBrief}
+        editButtonRef={auditTriggerRef}
         onEdit={() => setEditingAudit(true)}
-        onFindings={() => void ipc.openToolWindow("findings")}
-        onChecklist={() => void ipc.openToolWindow("checklist")}
+        onFindings={() => runAction(ipc.openToolWindow("findings"), "Couldn't open Findings")}
+        onChecklist={() => runAction(ipc.openToolWindow("checklist"), "Couldn't open the checklist")}
       />
 
       {/* Workspace: live contrast + auditor tools on the left, your library on the right. */}
@@ -337,18 +364,18 @@ export default function MainWindow() {
           <section aria-label="Auditor tools" className="mb-3">
             <h2 className="label mb-1.5">Auditor tools</h2>
             <div className="grid grid-cols-2 gap-2 min-[560px]:grid-cols-4">
-              <AuditButton label="Measure" hint="24px targets" onClick={() => void ipc.beginOverlay("measure")} />
-              <AuditButton label="Findings" hint="Issue log" onClick={() => void ipc.openToolWindow("findings")} />
-              <AuditButton label="Checklist" hint="WCAG 2.2" onClick={() => void ipc.openToolWindow("checklist")} />
-              <AuditButton label="Palette" hint="Contrast grid" onClick={() => void ipc.openToolWindow("palette")} />
+              <AuditButton label="Measure" hint="24px targets" onClick={() => runAction(ipc.beginOverlay("measure"), "Couldn't start Measure")} />
+              <AuditButton label="Findings" hint="Issue log" onClick={() => runAction(ipc.openToolWindow("findings"), "Couldn't open Findings")} />
+              <AuditButton label="Checklist" hint="WCAG 2.2" onClick={() => runAction(ipc.openToolWindow("checklist"), "Couldn't open the checklist")} />
+              <AuditButton label="Palette" hint="Contrast grid" onClick={() => runAction(ipc.openToolWindow("palette"), "Couldn't open Palette Contrast")} />
             </div>
           </section>
         </div>
 
         <aside className="min-w-0">
-          <AccountCard account={account} />
+          <AccountCard account={account} onError={setError} />
 
-          <CapturesCard />
+          <CapturesCard onError={setError} />
 
           {history.length > 0 && (
             <section className="card mb-3 p-3">
@@ -387,6 +414,7 @@ export default function MainWindow() {
           {log.length > 0 && (
             <SessionLogCard
               log={log}
+              onError={setError}
               onClear={() => {
                 setLog([]);
                 localStorage.removeItem(LOG_KEY);
@@ -432,7 +460,7 @@ export default function MainWindow() {
         <Onboarding
           shortcuts={shortcuts}
           permission={permission}
-          onGrant={() => void grantPermission()}
+          onGrant={() => runAction(grantPermission(), "Couldn't request Screen Recording access")}
           onDone={() => {
             localStorage.setItem("onboarded-v1", "1");
             setOnboarding(false);
@@ -453,6 +481,7 @@ export default function MainWindow() {
 
 function AuditContextCard(props: {
   brief: AuditBrief | null;
+  editButtonRef: React.RefObject<HTMLButtonElement | null>;
   onEdit: () => void;
   onFindings: () => void;
   onChecklist: () => void;
@@ -487,7 +516,7 @@ function AuditContextCard(props: {
             </button>
           </>
         )}
-        <button onClick={props.onEdit} className="btn-primary control-target px-3 text-[11px]">
+        <button ref={props.editButtonRef} onClick={props.onEdit} className="btn-primary control-target px-3 text-[11px]">
           {brief ? "Edit context" : "Set up audit"}
         </button>
       </div>
@@ -616,6 +645,7 @@ function AuditBriefDialog(props: {
 /** A single capture's screenshot thumbnail, loaded from disk over IPC. */
 function CaptureThumb({ id }: { id: string }) {
   const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
     let objectUrl: string | null = null;
     let cancelled = false;
@@ -626,7 +656,7 @@ function CaptureThumb({ id }: { id: string }) {
         objectUrl = URL.createObjectURL(new Blob([buf], { type: "image/png" }));
         setUrl(objectUrl);
       })
-      .catch(() => {});
+      .catch(() => setFailed(true));
     return () => {
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
@@ -634,16 +664,26 @@ function CaptureThumb({ id }: { id: string }) {
   }, [id]);
   return url ? (
     <img src={url} alt="" className="h-full w-full object-cover" />
+  ) : failed ? (
+    <div className="flex h-full w-full items-center justify-center bg-muted px-2 text-center text-[9px] text-muted-foreground">
+      Preview unavailable
+    </div>
   ) : (
     <div className="h-full w-full animate-pulse bg-muted" />
   );
 }
 
-function CapturesCard() {
+function CapturesCard({ onError }: { onError: (message: string) => void }) {
   const [docs, setDocs] = useState<{ id: string; modified_ms: number; issues: number }[]>([]);
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
-  const refresh = () => void ipc.listAnnotationDocs().then(setDocs).catch(() => {});
+  const refresh = () =>
+    void ipc
+      .listAnnotationDocs()
+      .then(setDocs)
+      .catch((e) => {
+        if (isTauriRuntime) onError(`Couldn't load captures: ${String(e)}`);
+      });
   useEffect(() => {
     refresh();
     window.addEventListener("focus", refresh);
@@ -664,7 +704,7 @@ function CapturesCard() {
             className="group relative overflow-hidden rounded-lg border border-border bg-muted/40"
           >
             <button
-              onClick={() => void ipc.openAnnotation(d.id)}
+              onClick={() => void ipc.openAnnotation(d.id).catch((e) => onError(`Couldn't open capture: ${String(e)}`))}
               className="block w-full text-left"
               title="Reopen to edit and share this capture"
             >
@@ -691,7 +731,10 @@ function CapturesCard() {
               onClick={() => {
                 if (confirmId === d.id) {
                   setConfirmId(null);
-                  void ipc.deleteAnnotation(d.id).then(refresh).catch(refresh);
+                  void ipc
+                    .deleteAnnotation(d.id)
+                    .then(refresh)
+                    .catch((e) => onError(`Couldn't delete capture: ${String(e)}`));
                 } else {
                   setConfirmId(d.id);
                   // Auto-revert the armed state so a stray first click is harmless.
@@ -715,7 +758,7 @@ function CapturesCard() {
   );
 }
 
-function AccountCard({ account }: { account: Account | null }) {
+function AccountCard({ account, onError }: { account: Account | null; onError: (message: string) => void }) {
   if (account === null) return null; // still loading
   if (!account.signedIn) {
     return (
@@ -727,7 +770,7 @@ function AccountCard({ account }: { account: Account | null }) {
           </p>
         </div>
         <button
-          onClick={() => void ipc.signIn()}
+          onClick={() => void ipc.signIn().catch((e) => onError(`Couldn't start sign-in: ${String(e)}`))}
           className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90"
         >
           Sign in
@@ -749,20 +792,20 @@ function AccountCard({ account }: { account: Account | null }) {
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
         <button
-          onClick={() => void ipc.openSite("https://app.thewcag.com/screenshots")}
+          onClick={() => void ipc.openSite("https://app.thewcag.com/screenshots").catch((e) => onError(`Couldn't open screenshots: ${String(e)}`))}
           className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted"
         >
           Screenshots
         </button>
         <button
-          onClick={() => void ipc.openSite("https://app.thewcag.com/brand")}
+          onClick={() => void ipc.openSite("https://app.thewcag.com/brand").catch((e) => onError(`Couldn't open branding: ${String(e)}`))}
           title="Add your logo and colors to shared reports"
           className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted"
         >
           Branding
         </button>
         <button
-          onClick={() => void ipc.signOut()}
+          onClick={() => void ipc.signOut().catch((e) => onError(`Couldn't sign out: ${String(e)}`))}
           className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           Sign out
@@ -772,7 +815,7 @@ function AccountCard({ account }: { account: Account | null }) {
   );
 }
 
-function SessionLogCard(props: { log: LogEntry[]; onClear: () => void }) {
+function SessionLogCard(props: { log: LogEntry[]; onClear: () => void; onError: (message: string) => void }) {
   const [copied, setCopied] = useState(false);
 
   function toMarkdown(): string {
@@ -799,9 +842,13 @@ function SessionLogCard(props: { log: LogEntry[]; onClear: () => void }) {
         <div className="flex items-center gap-2">
           <button
             onClick={() => {
-              void ipc.copyText(toMarkdown());
-              setCopied(true);
-              setTimeout(() => setCopied(false), 1500);
+              void ipc
+                .copyText(toMarkdown())
+                .then(() => {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1500);
+                })
+                .catch((e) => props.onError(`Couldn't copy the session log: ${String(e)}`));
             }}
             className="text-[10px] text-muted-foreground hover:text-foreground"
           >
@@ -809,7 +856,9 @@ function SessionLogCard(props: { log: LogEntry[]; onClear: () => void }) {
           </button>
           <button
             onClick={() =>
-              void ipc.saveText(toMarkdown(), `a11y-session-${new Date().toISOString().slice(0, 10)}.md`)
+              void ipc
+                .saveText(toMarkdown(), `a11y-session-${new Date().toISOString().slice(0, 10)}.md`)
+                .catch((e) => props.onError(`Couldn't save the session log: ${String(e)}`))
             }
             className="text-[10px] text-muted-foreground hover:text-foreground"
           >
@@ -978,7 +1027,7 @@ function ShortcutsCard(props: {
             void ipc.resetShortcuts().then((s) => {
               props.onChanged(s);
               props.onError(null);
-            })
+            }).catch((e) => props.onError(`Couldn't reset shortcuts: ${String(e)}`))
           }
           className="text-[10px] text-muted-foreground hover:text-foreground"
         >
@@ -1004,7 +1053,7 @@ function ShortcutsCard(props: {
   );
 }
 
-function PermissionCard(props: { onGrant: () => void; onOpenSettings: () => void }) {
+function PermissionCard(props: { onGrant: () => void; onOpenSettings: () => void; onRestart: () => void }) {
   return (
     <section className="rise mb-3 rounded-xl border border-yellow/40 bg-yellow/10 p-4">
       <h2 className="text-sm font-semibold">One-time setup: Screen Recording</h2>
@@ -1026,7 +1075,7 @@ function PermissionCard(props: { onGrant: () => void; onOpenSettings: () => void
           Open System Settings
         </button>
         <button
-          onClick={() => void ipc.restartApp()}
+          onClick={props.onRestart}
           className="rounded-lg border border-border px-3 py-1.5 text-xs hover:bg-muted"
           title="macOS applies the permission when the app relaunches"
         >
@@ -1095,7 +1144,7 @@ function ContrastPanel(props: {
   return (
     <section className="rise card mb-3 p-4">
       <div className="mb-3 flex items-center gap-2">
-        <Swatch label="Text" hex={props.fg} onChange={props.onFg} pickMode="fg" />
+        <Swatch label="Text" hex={props.fg} onChange={props.onFg} pickMode="fg" onError={props.onError} />
         <button
           onClick={props.onSwap}
           aria-label="Swap text and background"
@@ -1104,7 +1153,7 @@ function ContrastPanel(props: {
         >
           <SwapIcon />
         </button>
-        <Swatch label="Background" hex={props.bg} onChange={props.onBg} pickMode="bg" />
+        <Swatch label="Background" hex={props.bg} onChange={props.onBg} pickMode="bg" onError={props.onError} />
       </div>
 
       <div
@@ -1190,7 +1239,7 @@ function ContrastPanel(props: {
           })}
         </div>
         <button
-          onClick={() => void copyFinding()}
+          onClick={() => void copyFinding().catch((e) => props.onError(`Couldn't copy the finding: ${String(e)}`))}
           className="btn control-target flex shrink-0 items-center justify-center gap-1 px-2 text-[11px]"
           title={`Copy as audit finding (WCAG ${modeInfo.sc})`}
         >
@@ -1256,6 +1305,7 @@ function Swatch(props: {
   hex: string;
   onChange: (hex: string) => void;
   pickMode: "fg" | "bg";
+  onError: (message: string | null) => void;
 }) {
   const [draft, setDraft] = useState(props.hex);
   const [copied, setCopied] = useState(false);
@@ -1265,7 +1315,11 @@ function Swatch(props: {
       <span className="label">{props.label}</span>
       <div className="mt-1 flex items-center gap-1.5">
         <button
-          onClick={() => void ipc.beginOverlay(props.pickMode)}
+          onClick={() =>
+            void ipc
+              .beginOverlay(props.pickMode)
+              .catch((e) => props.onError(`Couldn't start the color picker: ${String(e)}`))
+          }
           aria-label={`Pick ${props.label.toLowerCase()} color from screen`}
           title={`Pick ${props.label.toLowerCase()} from screen`}
           className="h-8 w-8 shrink-0 rounded-lg border border-border shadow-sm hover:scale-105"
@@ -1283,9 +1337,13 @@ function Swatch(props: {
         />
         <button
           onClick={() => {
-            void ipc.copyText(props.hex);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1200);
+            void ipc
+              .copyText(props.hex)
+              .then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1200);
+              })
+              .catch((e) => props.onError(`Couldn't copy the color: ${String(e)}`));
           }}
           aria-label={`Copy ${props.label.toLowerCase()} hex`}
           title="Copy hex"

@@ -52,7 +52,10 @@ impl ShortcutConfig {
 pub struct ShortcutSettings(pub Mutex<ShortcutConfig>);
 
 fn config_path(app: &AppHandle) -> Option<PathBuf> {
-    app.path().app_config_dir().ok().map(|d| d.join("shortcuts.json"))
+    app.path()
+        .app_config_dir()
+        .ok()
+        .map(|d| d.join("shortcuts.json"))
 }
 
 pub fn load(app: &AppHandle) -> ShortcutConfig {
@@ -62,13 +65,16 @@ pub fn load(app: &AppHandle) -> ShortcutConfig {
         .unwrap_or_default()
 }
 
-fn save(app: &AppHandle, cfg: &ShortcutConfig) {
-    if let Some(path) = config_path(app) {
-        if let Some(dir) = path.parent() {
-            let _ = std::fs::create_dir_all(dir);
-        }
-        let _ = std::fs::write(path, serde_json::to_string_pretty(cfg).unwrap());
+fn save(app: &AppHandle, cfg: &ShortcutConfig) -> Result<(), String> {
+    let path =
+        config_path(app).ok_or_else(|| "could not locate the app settings folder".to_string())?;
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)
+            .map_err(|e| format!("could not create settings folder: {e}"))?;
     }
+    let json = serde_json::to_string_pretty(cfg)
+        .map_err(|e| format!("could not encode shortcut settings: {e}"))?;
+    std::fs::write(path, json).map_err(|e| format!("could not save shortcuts: {e}"))
 }
 
 /// (Re-)register every configured shortcut. Invalid or OS-rejected combos
@@ -96,16 +102,20 @@ pub fn action_for(app: &AppHandle, fired: &Shortcut) -> Option<&'static str> {
         .find(|action| matches!(cfg.get(action).parse::<Shortcut>(), Ok(s) if &s == fired))
 }
 
-/// "alt+super+KeyP" → "⌥⌘P" for menus and UI.
+/// Format a shortcut for the conventions of the current operating system.
 pub fn display(shortcut: &str) -> String {
-    let mut mods = String::new();
+    display_for_platform(shortcut, cfg!(target_os = "macos"))
+}
+
+fn display_for_platform(shortcut: &str, macos: bool) -> String {
+    let mut mods = Vec::new();
     let mut key = String::new();
     for token in shortcut.split('+') {
         match token.to_ascii_lowercase().as_str() {
-            "ctrl" | "control" => mods.push('⌃'),
-            "alt" | "option" => mods.push('⌥'),
-            "shift" => mods.push('⇧'),
-            "super" | "cmd" | "command" | "meta" => mods.push('⌘'),
+            "ctrl" | "control" => mods.push(if macos { "⌃" } else { "Ctrl" }),
+            "alt" | "option" => mods.push(if macos { "⌥" } else { "Alt" }),
+            "shift" => mods.push(if macos { "⇧" } else { "Shift" }),
+            "super" | "cmd" | "command" | "meta" => mods.push(if macos { "⌘" } else { "Win" }),
             _ => {
                 key = token
                     .strip_prefix("Key")
@@ -123,7 +133,12 @@ pub fn display(shortcut: &str) -> String {
         "Space" => "Space".into(),
         other => other.to_uppercase(),
     };
-    format!("{mods}{key}")
+    if macos {
+        format!("{}{key}", mods.join(""))
+    } else {
+        mods.push(&key);
+        mods.join("+")
+    }
 }
 
 #[tauri::command]
@@ -160,17 +175,60 @@ pub fn set_shortcut(app: AppHandle, action: String, shortcut: String) -> Result<
         return Err(e);
     }
     let cfg = app.state::<ShortcutSettings>().0.lock().unwrap().clone();
-    save(&app, &cfg);
+    if let Err(e) = save(&app, &cfg) {
+        *app.state::<ShortcutSettings>().0.lock().unwrap() = previous;
+        let rollback = apply(&app).err();
+        return Err(match rollback {
+            Some(rollback) => {
+                format!("{e}; also could not restore the previous shortcuts: {rollback}")
+            }
+            None => e,
+        });
+    }
     crate::tray::refresh(&app);
     Ok(())
 }
 
 #[tauri::command]
 pub fn reset_shortcuts(app: AppHandle) -> Result<ShortcutConfig, String> {
-    *app.state::<ShortcutSettings>().0.lock().unwrap() = ShortcutConfig::default();
-    apply(&app)?;
+    let previous = app.state::<ShortcutSettings>().0.lock().unwrap().clone();
     let cfg = ShortcutConfig::default();
-    save(&app, &cfg);
+    *app.state::<ShortcutSettings>().0.lock().unwrap() = cfg.clone();
+    if let Err(e) = apply(&app) {
+        *app.state::<ShortcutSettings>().0.lock().unwrap() = previous;
+        let _ = apply(&app);
+        return Err(e);
+    }
+    if let Err(e) = save(&app, &cfg) {
+        *app.state::<ShortcutSettings>().0.lock().unwrap() = previous;
+        let rollback = apply(&app).err();
+        return Err(match rollback {
+            Some(rollback) => {
+                format!("{e}; also could not restore the previous shortcuts: {rollback}")
+            }
+            None => e,
+        });
+    }
     crate::tray::refresh(&app);
     Ok(cfg)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::display_for_platform;
+
+    #[test]
+    fn formats_macos_shortcuts_with_platform_glyphs() {
+        assert_eq!(display_for_platform("ctrl+alt+super+KeyP", true), "⌃⌥⌘P");
+        assert_eq!(display_for_platform("shift+ArrowDown", true), "⇧↓");
+    }
+
+    #[test]
+    fn formats_windows_shortcuts_with_named_modifiers() {
+        assert_eq!(display_for_platform("ctrl+alt+KeyP", false), "Ctrl+Alt+P");
+        assert_eq!(
+            display_for_platform("super+shift+Digit2", false),
+            "Win+Shift+2"
+        );
+    }
 }

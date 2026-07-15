@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { contrastRatio, hexToRgb, rgbToHex } from "@accessibility-build/a11y-core";
-import { ipc } from "../lib/ipc";
+import { ipc, isTauriRuntime } from "../lib/ipc";
 import { CloseIcon } from "../lib/icons";
 
 const HEX_RE = /#?[0-9a-fA-F]{6}\b|#?[0-9a-fA-F]{3}\b/g;
@@ -17,8 +17,10 @@ export default function PaletteWindow() {
   const [colors, setColors] = useState<string[]>([]);
   const [draft, setDraft] = useState("");
   const [status, setStatus] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const loaded = useRef(false);
+  const saveQueue = useRef<Promise<void>>(Promise.resolve());
 
   // Persist the palette so a pasted design system survives a window close.
   useEffect(() => {
@@ -36,10 +38,17 @@ export default function PaletteWindow() {
       })
       .catch(() => {
         loaded.current = true;
+        if (isTauriRuntime) flash("Couldn't load the saved palette", true);
       });
   }, []);
   useEffect(() => {
-    if (loaded.current) void ipc.storeSet(STORE_KEY, JSON.stringify(colors)).catch(() => {});
+    if (loaded.current) {
+      saveQueue.current = saveQueue.current
+        .then(() => ipc.storeSet(STORE_KEY, JSON.stringify(colors)))
+        .catch((e) => {
+          if (isTauriRuntime) flash(`Palette changes are not saved: ${String(e)}`, true);
+        });
+    }
   }, [colors]);
 
   useEffect(() => {
@@ -53,9 +62,10 @@ export default function PaletteWindow() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  function flash(m: string) {
+  function flash(m: string, error = false) {
     setStatus(m);
-    setTimeout(() => setStatus(null), 2000);
+    setStatusError(error);
+    setTimeout(() => setStatus(null), error ? 6000 : 2000);
   }
 
   function addColors(input: string) {
@@ -66,7 +76,7 @@ export default function PaletteWindow() {
       .filter((rgb): rgb is NonNullable<typeof rgb> => rgb !== null)
       .map(rgbToHex);
     if (normalized.length === 0) {
-      flash("No valid hex colors found");
+      flash("No valid hex colors found", true);
       return;
     }
     setColors((prev) => {
@@ -100,6 +110,10 @@ export default function PaletteWindow() {
     flash("Matrix copied as CSV");
   }
 
+  function runCopy() {
+    void copyCsv().catch((e) => flash(`Couldn't copy the matrix: ${String(e)}`, true));
+  }
+
   const pairs = colors.length * (colors.length - 1);
 
   return (
@@ -131,12 +145,12 @@ export default function PaletteWindow() {
           </button>
         </form>
         <div className="ml-auto flex items-center gap-1.5">
-          <span role="status" aria-live="polite" className="mr-1 text-[11px] text-ok">
+          <span role={statusError ? "alert" : "status"} aria-live="polite" className={`mr-1 text-[11px] ${statusError ? "text-coral" : "text-ok"}`}>
             {status}
           </span>
           {colors.length > 0 && (
             <>
-              <button onClick={() => void copyCsv()} className="btn px-2.5 py-1.5 text-xs">
+              <button onClick={runCopy} className="btn px-2.5 py-1.5 text-xs">
                 Copy CSV
               </button>
               <button

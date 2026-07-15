@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { emit } from "@tauri-apps/api/event";
 import { contrastRatio } from "@accessibility-build/a11y-core";
-import { ipc } from "../lib/ipc";
+import { ipc, isTauriRuntime } from "../lib/ipc";
 import {
   emptyDoc,
   ISSUE_TYPES,
@@ -146,7 +146,10 @@ export default function AnnotateWindow() {
         setView({ scale: s, tx: (cw - img.naturalWidth * s) / 2, ty: (ch - img.naturalHeight * s) / 2 });
       }
       setImage(img);
-      const saved = await ipc.loadAnnotationDoc(id).catch(() => null);
+      const saved = await ipc.loadAnnotationDoc(id).catch((e) => {
+        if (isTauriRuntime) flash(`Couldn't load saved annotations: ${String(e)}`, true);
+        return null;
+      });
       const doc = (saved && parseDoc(saved)) || emptyDoc();
       nextIdRef.current = doc.nextId;
       setShapes(doc.shapes);
@@ -156,7 +159,13 @@ export default function AnnotateWindow() {
     img.src = url;
   }
 
-  const refreshStrip = () => void ipc.listAnnotationDocs().then(setStrip).catch(() => {});
+  const refreshStrip = () =>
+    void ipc
+      .listAnnotationDocs()
+      .then(setStrip)
+      .catch((e) => {
+        if (isTauriRuntime) flash(`Couldn't refresh captures: ${String(e)}`, true);
+      });
 
   /** Save the current doc immediately, then swap another capture in. */
   async function switchCapture(id: string) {
@@ -164,9 +173,7 @@ export default function AnnotateWindow() {
     try {
       if (docId) {
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-        await ipc
-          .saveAnnotationDoc(docId, JSON.stringify({ version: 1, nextId: nextIdRef.current, shapes }))
-          .catch(() => {});
+        await ipc.saveAnnotationDoc(docId, JSON.stringify({ version: 1, nextId: nextIdRef.current, shapes }));
       }
       const buf = await ipc.captureImage(id, true);
       loadCapture(id, buf);
@@ -179,7 +186,9 @@ export default function AnnotateWindow() {
     void (async () => {
       const [meta, buf] = await Promise.all([ipc.annotationMeta(), ipc.annotationPng()]);
       loadCapture(meta.id, buf);
-    })();
+    })().catch((e) => {
+      if (isTauriRuntime) flash(`Couldn't open the capture: ${String(e)}`, true);
+    });
     refreshStrip();
     window.addEventListener("focus", refreshStrip);
     return () => {
@@ -195,7 +204,7 @@ export default function AnnotateWindow() {
     saveTimerRef.current = setTimeout(() => {
       void ipc
         .saveAnnotationDoc(docId, JSON.stringify({ version: 1, nextId: nextIdRef.current, shapes }))
-        .catch(() => {});
+        .catch((e) => flash(`Annotations are not saved: ${String(e)}`, true));
       // Persist a small annotated preview so the Captures gallery shows the
       // markup, not the bare screenshot. Best-effort — never blocks the save.
       if (image) void saveCaptureThumb(docId, image, shapes);
@@ -743,6 +752,15 @@ export default function AnnotateWindow() {
     statusTimer.current = setTimeout(() => setStatus(null), error ? 6000 : 2400);
   }
 
+  function runExport(action: () => Promise<void>, label: string) {
+    void action().catch((e) => flash(`${label}: ${String(e)}`, true));
+  }
+
+  async function recordExport() {
+    await emit("annotate-exported", issueSummaries());
+    if (badges.length) await ipc.addFindings(registerItems());
+  }
+
   function issueSummaries(): string[] {
     return badges.map((b) => {
       const type = issueTypeOf(b);
@@ -772,22 +790,19 @@ export default function AnnotateWindow() {
     const path = await ipc.savePng(await exportPng(), `a11y-annotated-${docId}.png`);
     if (path) {
       flash(`Saved ${path.split("/").pop()}`);
-      void emit("annotate-exported", issueSummaries());
-      if (badges.length) void ipc.addFindings(registerItems());
+      await recordExport();
     }
   }
   async function onCopy() {
     await ipc.copyPng(await exportPng());
     flash("Image copied");
-    void emit("annotate-exported", issueSummaries());
-    if (badges.length) void ipc.addFindings(registerItems());
+    await recordExport();
   }
   async function onReport() {
     const path = await ipc.savePng(await exportReport(), `a11y-report-${docId}.png`);
     if (path) {
       flash(`Report saved`);
-      void emit("annotate-exported", issueSummaries());
-      if (badges.length) void ipc.addFindings(registerItems());
+      await recordExport();
     }
   }
   async function onPublish() {
@@ -830,8 +845,7 @@ export default function AnnotateWindow() {
       await ipc.copyText(url);
       await ipc.openSite(url);
       flash("Published - link copied");
-      void emit("annotate-exported", issueSummaries());
-      if (badges.length) void ipc.addFindings(registerItems());
+      await recordExport();
     } catch (e) {
       flash(String(e), true);
     } finally {
@@ -947,7 +961,7 @@ export default function AnnotateWindow() {
           </div>
           <div className="flex flex-wrap items-center justify-end gap-1.5 pt-1.5">
             <span
-              role="status"
+              role={statusError ? "alert" : "status"}
               aria-live="polite"
               className={`mr-2 text-[11px] ${statusError ? "text-coral" : "text-ok"}`}
             >
@@ -966,9 +980,9 @@ export default function AnnotateWindow() {
                 <div role="menu" className="absolute right-0 z-50 mt-1 w-44 rounded-lg border border-border bg-card p-1 shadow-lg">
                   {(
                     [
-                      ["Copy as Markdown", () => void onCopyMarkdown()],
-                      ["Copy as Jira markup", () => void onCopyJira()],
-                      ["Save report sheet…", () => void onReport()],
+                      ["Copy as Markdown", () => runExport(onCopyMarkdown, "Couldn't copy Markdown")],
+                      ["Copy as Jira markup", () => runExport(onCopyJira, "Couldn't copy Jira markup")],
+                      ["Save report sheet…", () => runExport(onReport, "Couldn't save the report")],
                     ] as [string, () => void][]
                   ).map(([label, run]) => (
                     <button
@@ -987,10 +1001,10 @@ export default function AnnotateWindow() {
                 </div>
               )}
             </div>
-            <button onClick={() => void onCopy()} className="btn px-2.5 py-1.5 text-xs">
+            <button onClick={() => runExport(onCopy, "Couldn't copy the image")} className="btn px-2.5 py-1.5 text-xs">
               Copy PNG
             </button>
-            <button onClick={() => void onSave()} className="btn px-2.5 py-1.5 text-xs">
+            <button onClick={() => runExport(onSave, "Couldn't save the image")} className="btn px-2.5 py-1.5 text-xs">
               Save…
             </button>
             <button
@@ -1039,34 +1053,34 @@ export default function AnnotateWindow() {
           {tool === "redact" && (
             <>
               <span className="h-5 w-px bg-border" />
-              <div className="seg">
-                <button data-active={redactStyle === "solid"} onClick={() => setRedactStyle("solid")} title="Solid block - safe redaction">
+              <div className="seg" role="group" aria-label="Redaction style">
+                <button aria-pressed={redactStyle === "solid"} data-active={redactStyle === "solid"} onClick={() => setRedactStyle("solid")} title="Solid block - safe redaction">
                   Solid
                 </button>
-                <button data-active={redactStyle === "pixel"} onClick={() => setRedactStyle("pixel")} title="Pixelate - cosmetic only, can be reversed on text">
+                <button aria-pressed={redactStyle === "pixel"} data-active={redactStyle === "pixel"} onClick={() => setRedactStyle("pixel")} title="Pixelate - cosmetic only, can be reversed on text">
                   Pixel
                 </button>
               </div>
             </>
           )}
           <span className="ml-auto flex items-center gap-0.5">
-            <button onClick={undo} title="Undo (⌘Z)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+            <button onClick={undo} aria-label="Undo" title="Undo (⌘Z)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
               <UndoIcon />
             </button>
-            <button onClick={redo} title="Redo (⇧⌘Z)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+            <button onClick={redo} aria-label="Redo" title="Redo (⇧⌘Z)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
               <RedoIcon />
             </button>
             <span className="mx-1 h-5 w-px bg-border" />
-            <button onClick={() => zoomAt(containerRef.current!.clientWidth / 2, containerRef.current!.clientHeight / 2, 0.8)} title="Zoom out (⌘-)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+            <button onClick={() => zoomAt(containerRef.current!.clientWidth / 2, containerRef.current!.clientHeight / 2, 0.8)} aria-label="Zoom out" title="Zoom out (⌘-)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
               <MinusIcon />
             </button>
             <span className="w-11 text-center font-mono text-[10px] text-muted-foreground">
               {Math.round(view.scale * 100)}%
             </span>
-            <button onClick={() => zoomAt(containerRef.current!.clientWidth / 2, containerRef.current!.clientHeight / 2, 1.25)} title="Zoom in (⌘=)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+            <button onClick={() => zoomAt(containerRef.current!.clientWidth / 2, containerRef.current!.clientHeight / 2, 1.25)} aria-label="Zoom in" title="Zoom in (⌘=)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
               <PlusIcon />
             </button>
-            <button onClick={fit} title="Fit to window (⌘0)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+            <button onClick={fit} aria-label="Fit capture to window" title="Fit to window (⌘0)" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
               <FitIcon />
             </button>
           </span>
@@ -1089,6 +1103,8 @@ export default function AnnotateWindow() {
         >
           <canvas
             ref={canvasRef}
+            role="img"
+            aria-label="Captured screen with annotations. Use the annotation toolbar and the Issues panel to edit findings."
             className={`absolute inset-0 h-full w-full transition-opacity duration-200 ${
               image ? "opacity-100" : "opacity-0"
             }`}

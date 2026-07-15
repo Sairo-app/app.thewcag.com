@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { ipc } from "../lib/ipc";
+import { ipc, isTauriRuntime } from "../lib/ipc";
 import {
   AUDIT_BRIEF_KEY,
   auditMetadataLines,
@@ -134,12 +134,17 @@ export default function ChecklistWindow() {
   const [state, setState] = useState<State>({});
   const [levelFilter, setLevelFilter] = useState<Level | "all">("all");
   const [saved, setSaved] = useState<string | null>(null);
+  const [savedError, setSavedError] = useState(false);
   const [auditBrief, setAuditBrief] = useState<AuditBrief | null>(null);
+  const saveQueue = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
     void (async () => {
       const [raw, auditRaw] = await Promise.all([
-        ipc.storeGet(STORE_KEY).catch(() => null),
+        ipc.storeGet(STORE_KEY).catch((e) => {
+          if (isTauriRuntime) flash(`Couldn't load the checklist: ${String(e)}`, true);
+          return null;
+        }),
         ipc.storeGet(AUDIT_BRIEF_KEY).catch(() => null),
       ]);
       const brief = parseAuditBrief(auditRaw);
@@ -155,7 +160,11 @@ export default function ChecklistWindow() {
 
   function persist(next: State) {
     setState(next);
-    void ipc.storeSet(STORE_KEY, JSON.stringify(next)).catch(() => {});
+    saveQueue.current = saveQueue.current
+      .then(() => ipc.storeSet(STORE_KEY, JSON.stringify(next)))
+      .catch((e) => {
+        if (isTauriRuntime) flash(`Changes are not saved: ${String(e)}`, true);
+      });
   }
   function setResult(sc: string, result: Result) {
     const cur = state[sc] ?? { result: "untested", note: "" };
@@ -188,9 +197,14 @@ export default function ChecklistWindow() {
     return groups;
   }, [visible]);
 
-  function flash(m: string) {
+  function flash(m: string, error = false) {
     setSaved(m);
-    setTimeout(() => setSaved(null), 2000);
+    setSavedError(error);
+    setTimeout(() => setSaved(null), error ? 6000 : 2000);
+  }
+
+  function runExport(action: () => Promise<void>, label: string) {
+    void action().catch((e) => flash(`${label}: ${String(e)}`, true));
   }
 
   // Export only the visible (filtered) criteria, matching what the auditor sees.
@@ -287,12 +301,12 @@ th{background:#f8fafc;font-size:12px;text-transform:uppercase;color:#64748b}
             <option value="AA">Level AA</option>
           </select>
           <div className="ml-auto flex items-center gap-1.5">
-            <span role="status" aria-live="polite" className="mr-1 text-[11px] text-ok">
+            <span role={savedError ? "alert" : "status"} aria-live="polite" className={`mr-1 text-[11px] ${savedError ? "text-coral" : "text-ok"}`}>
               {saved}
             </span>
-            <button onClick={() => void exportCsv()} className="btn px-2.5 py-1.5 text-xs">CSV</button>
-            <button onClick={() => void exportMarkdown()} className="btn px-2.5 py-1.5 text-xs">Markdown</button>
-            <button onClick={() => void exportHtml()} className="btn-primary px-3 py-1.5 text-xs">HTML</button>
+            <button onClick={() => runExport(exportCsv, "Couldn't export CSV")} className="btn px-2.5 py-1.5 text-xs">CSV</button>
+            <button onClick={() => runExport(exportMarkdown, "Couldn't export Markdown")} className="btn px-2.5 py-1.5 text-xs">Markdown</button>
+            <button onClick={() => runExport(exportHtml, "Couldn't export HTML")} className="btn-primary px-3 py-1.5 text-xs">HTML</button>
           </div>
         </div>
         <div className="mt-2 flex items-center gap-3">

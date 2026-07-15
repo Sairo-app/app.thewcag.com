@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { ipc } from "../lib/ipc";
+import { ipc, isTauriRuntime } from "../lib/ipc";
 import { CloseIcon, PlusIcon } from "../lib/icons";
 import {
   AUDIT_BRIEF_KEY,
@@ -74,8 +74,10 @@ export default function FindingsWindow() {
     () => (localStorage.getItem("findings-sev") as Severity | "all") ?? "all",
   );
   const [status, setStatus] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState(false);
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
   const [auditBrief, setAuditBrief] = useState<AuditBrief | null>(null);
+  const saveQueue = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
     localStorage.setItem("findings-query", query);
@@ -93,7 +95,10 @@ export default function FindingsWindow() {
 
   async function reload() {
     const [raw, auditRaw] = await Promise.all([
-      ipc.storeGet(STORE_KEY).catch(() => null),
+      ipc.storeGet(STORE_KEY).catch((e) => {
+        if (isTauriRuntime) flash(`Couldn't load findings: ${String(e)}`, true);
+        return null;
+      }),
       ipc.storeGet(AUDIT_BRIEF_KEY).catch(() => null),
     ]);
     setAuditBrief(parseAuditBrief(auditRaw));
@@ -106,7 +111,11 @@ export default function FindingsWindow() {
 
   function persist(next: Finding[]) {
     setFindings(next);
-    void ipc.storeSet(STORE_KEY, JSON.stringify(next)).catch(() => {});
+    saveQueue.current = saveQueue.current
+      .then(() => ipc.storeSet(STORE_KEY, JSON.stringify(next)))
+      .catch((e) => {
+        if (isTauriRuntime) flash(`Changes are not saved: ${String(e)}`, true);
+      });
   }
 
   function update(key: string, patch: Partial<Finding>) {
@@ -151,9 +160,14 @@ export default function FindingsWindow() {
     return { total: findings.length, open, fixed };
   }, [findings]);
 
-  function flash(m: string) {
+  function flash(m: string, error = false) {
     setStatus(m);
-    setTimeout(() => setStatus(null), 2200);
+    setStatusError(error);
+    setTimeout(() => setStatus(null), error ? 6000 : 2200);
+  }
+
+  function runExport(action: () => Promise<void>, label: string) {
+    void action().catch((e) => flash(`${label}: ${String(e)}`, true));
   }
 
   function toRows() {
@@ -254,20 +268,20 @@ footer{margin-top:24px;color:#64748b;font-size:12px}</style></head>
           </button>
         </span>
         <div className="ml-auto flex items-center gap-1.5">
-          <span role="status" aria-live="polite" className="mr-1 text-[11px] text-ok">
+          <span role={statusError ? "alert" : "status"} aria-live="polite" className={`mr-1 text-[11px] ${statusError ? "text-coral" : "text-ok"}`}>
             {status}
           </span>
           <button onClick={addManual} className="btn flex items-center gap-1 px-2.5 py-1.5 text-xs">
             <PlusIcon size={11} />
             Add
           </button>
-          <button onClick={() => void exportCsv()} disabled={!findings.length} className="btn px-2.5 py-1.5 text-xs disabled:opacity-40">
+          <button onClick={() => runExport(exportCsv, "Couldn't export CSV")} disabled={!findings.length} className="btn px-2.5 py-1.5 text-xs disabled:opacity-40">
             CSV
           </button>
-          <button onClick={() => void exportMarkdown()} disabled={!findings.length} className="btn px-2.5 py-1.5 text-xs disabled:opacity-40">
+          <button onClick={() => runExport(exportMarkdown, "Couldn't export Markdown")} disabled={!findings.length} className="btn px-2.5 py-1.5 text-xs disabled:opacity-40">
             Markdown
           </button>
-          <button onClick={() => void exportHtml()} disabled={!findings.length} className="btn-primary px-3 py-1.5 text-xs disabled:opacity-40">
+          <button onClick={() => runExport(exportHtml, "Couldn't export HTML")} disabled={!findings.length} className="btn-primary px-3 py-1.5 text-xs disabled:opacity-40">
             HTML
           </button>
         </div>

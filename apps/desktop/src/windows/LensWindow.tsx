@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { COLORBLIND_MATRICES, type ColorblindType } from "@accessibility-build/a11y-core";
 import { GlFilter, IDENTITY_MATRIX } from "../lib/glfilter";
-import { ipc } from "../lib/ipc";
+import { ipc, isTauriRuntime } from "../lib/ipc";
 import { CloseIcon, FreezeIcon, SaveIcon, SplitIcon } from "../lib/icons";
 
 const FRAME_MS = 80; // ~12.5fps
@@ -66,6 +66,7 @@ export default function LensWindow() {
       setError(String(e));
       return;
     }
+    if (!isTauriRuntime) return;
 
     async function tick() {
       if (cancelled) return;
@@ -94,13 +95,19 @@ export default function LensWindow() {
   }, []);
 
   async function saveShot() {
-    const canvas = canvasRef.current!;
-    const blob: Blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b!), "image/png"));
-    const name = `colorblind-${filter}-${new Date().toISOString().slice(0, 10)}.png`;
-    const path = await ipc.savePng(new Uint8Array(await blob.arrayBuffer()), name);
-    if (path) {
-      setSaved(`Saved ${path.split("/").pop()}`);
-      setTimeout(() => setSaved(null), 2200);
+    try {
+      const canvas = canvasRef.current!;
+      const blob = await new Promise<Blob>((resolve, reject) =>
+        canvas.toBlob((value) => (value ? resolve(value) : reject(new Error("Could not encode the lens image"))), "image/png"),
+      );
+      const name = `colorblind-${filter}-${new Date().toISOString().slice(0, 10)}.png`;
+      const path = await ipc.savePng(new Uint8Array(await blob.arrayBuffer()), name);
+      if (path) {
+        setSaved(`Saved ${path.split("/").pop()}`);
+        setTimeout(() => setSaved(null), 2200);
+      }
+    } catch (e) {
+      setError(`Could not save the lens image: ${String(e)}`);
     }
   }
 
@@ -114,9 +121,16 @@ export default function LensWindow() {
         className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-card/80 px-2 py-1.5 backdrop-blur-xl"
       >
         <div data-tauri-drag-region className="flex flex-wrap items-center gap-2">
-          <div className="seg">
+          <div className="seg" role="radiogroup" aria-label="Color vision simulation">
             {FILTERS.map((f, i) => (
-              <button key={f.key} data-active={filter === f.key} onClick={() => setFilter(f.key)} title={`${f.title} (${i + 1})`}>
+              <button
+                key={f.key}
+                role="radio"
+                aria-checked={filter === f.key}
+                data-active={filter === f.key}
+                onClick={() => setFilter(f.key)}
+                title={`${f.title} (${i + 1})`}
+              >
                 {f.label}
               </button>
             ))}
@@ -125,6 +139,7 @@ export default function LensWindow() {
             <label className="flex items-center gap-1" title="Severity - 100% is full dichromacy, lower is anomalous trichromacy (more common)">
               <input
                 type="range"
+                aria-label="Simulation severity"
                 min={20}
                 max={100}
                 value={severity}
@@ -200,7 +215,13 @@ export default function LensWindow() {
         </div>
       </header>
       <div className="relative min-h-0 flex-1 bg-black">
-        <canvas ref={canvasRef} className="h-full w-full" style={{ filter: cssFilter }} />
+        <canvas
+          ref={canvasRef}
+          role="img"
+          aria-label={`Live screen preview with ${filter === "off" ? "no color vision filter" : filter}${lowVision !== "none" ? ` and ${lowVision}` : ""}`}
+          className="h-full w-full"
+          style={{ filter: cssFilter }}
+        />
         {split && filter !== "off" && (
           <>
             <div className="pointer-events-none absolute inset-y-0 left-1/2 w-px bg-white/60" />
@@ -213,7 +234,7 @@ export default function LensWindow() {
           </>
         )}
         {error && (
-          <div className="absolute inset-0 flex items-center justify-center p-4 text-center text-xs text-white/70">
+          <div role="alert" className="absolute inset-0 flex items-center justify-center p-4 text-center text-xs text-white/70">
             {error}
           </div>
         )}
