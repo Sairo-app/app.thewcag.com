@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { ipc } from "../lib/ipc";
+import {
+  AUDIT_BRIEF_KEY,
+  auditMetadataLines,
+  parseAuditBrief,
+  safeAuditFilename,
+  type AuditBrief,
+} from "../lib/audit";
 
 const STORE_KEY = "checklist-default";
 
@@ -127,10 +134,17 @@ export default function ChecklistWindow() {
   const [state, setState] = useState<State>({});
   const [levelFilter, setLevelFilter] = useState<Level | "all">("all");
   const [saved, setSaved] = useState<string | null>(null);
+  const [auditBrief, setAuditBrief] = useState<AuditBrief | null>(null);
 
   useEffect(() => {
     void (async () => {
-      const raw = await ipc.storeGet(STORE_KEY).catch(() => null);
+      const [raw, auditRaw] = await Promise.all([
+        ipc.storeGet(STORE_KEY).catch(() => null),
+        ipc.storeGet(AUDIT_BRIEF_KEY).catch(() => null),
+      ]);
+      const brief = parseAuditBrief(auditRaw);
+      setAuditBrief(brief);
+      setLevelFilter(brief?.standard === "WCAG 2.2 A" ? "A" : "all");
       try {
         setState(raw ? JSON.parse(raw) : {});
       } catch {
@@ -194,13 +208,31 @@ export default function ChecklistWindow() {
       ["SC", "Level", "Criterion", "Result", "Note"].join(","),
       ...rows.map((r) => [r.sc, r.level, r.name, RESULT_LABEL[r.result], r.note].map(esc).join(",")),
     ].join("\n");
-    const path = await ipc.saveText(csv, `wcag-audit-${today()}.csv`);
+    const context = auditBrief
+      ? [
+          ["Project", auditBrief.project],
+          ["Target", auditBrief.target],
+          ["Scope", auditBrief.scope],
+          ["Standard", auditBrief.standard],
+          ["Evaluator", auditBrief.auditor],
+          ["Started", auditBrief.startedAt],
+          [],
+        ].map((row) => row.map(esc).join(","))
+      : [];
+    const path = await ipc.saveText(
+      [...context, csv].join("\n"),
+      `${safeAuditFilename(auditBrief, "wcag-audit")}-checklist-${today()}.csv`,
+    );
     if (path) flash(`CSV saved (${rows.length} criteria)`);
   }
   async function exportMarkdown() {
     const rows = exportRows();
     const md = [
-      `# WCAG 2.2 audit - ${today()}`,
+      `# ${auditBrief?.project ?? "WCAG 2.2 audit"}`,
+      "",
+      ...auditMetadataLines(auditBrief),
+      ...(auditBrief ? [""] : []),
+      `## Checklist results - ${today()}`,
       "",
       `${stats.pass} pass, ${stats.fail} fail, ${stats.na} N/A, ${stats.total - stats.tested} untested`,
       "",
@@ -210,7 +242,7 @@ export default function ChecklistWindow() {
       "",
       "Audited with TheWCAG desktop.",
     ].join("\n");
-    const path = await ipc.saveText(md, `wcag-audit-${today()}.md`);
+    const path = await ipc.saveText(md, `${safeAuditFilename(auditBrief, "wcag-audit")}-checklist-${today()}.md`);
     if (path) flash(`Markdown saved (${rows.length} criteria)`);
   }
   async function exportHtml() {
@@ -222,16 +254,20 @@ export default function ChecklistWindow() {
           `<tr><td>${r.sc}</td><td>${r.level}</td><td>${esc(r.name)}</td><td class="r-${r.result}">${RESULT_LABEL[r.result]}</td><td>${esc(r.note)}</td></tr>`,
       )
       .join("");
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>WCAG 2.2 audit</title>
+    const meta = auditBrief
+      ? `<dl class="meta"><div><dt>Target</dt><dd>${esc(auditBrief.target || "Not specified")}</dd></div><div><dt>Scope</dt><dd>${esc(auditBrief.scope || "Not specified")}</dd></div><div><dt>Standard</dt><dd>${esc(auditBrief.standard)}</dd></div><div><dt>Evaluator</dt><dd>${esc(auditBrief.auditor || "Not specified")}</dd></div><div><dt>Started</dt><dd>${esc(auditBrief.startedAt)}</dd></div></dl>`
+      : "";
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(auditBrief?.project ?? "WCAG 2.2 audit")}</title>
 <style>body{font:14px -apple-system,system-ui,sans-serif;margin:40px;color:#0f172a}h1{font-size:22px}
 table{border-collapse:collapse;width:100%;margin-top:16px}th,td{border:1px solid #e2e8f0;padding:7px 10px;text-align:left}
 th{background:#f8fafc;font-size:12px;text-transform:uppercase;color:#64748b}
+.meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 24px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px}.meta div{min-width:0}.meta dt{font-size:11px;text-transform:uppercase;color:#64748b}.meta dd{margin:3px 0 0}
 .r-pass{color:#15803d;font-weight:600}.r-fail{color:#b91c1c;font-weight:600}.r-na{color:#475569}.r-untested{color:#64748b}</style></head>
-<body><h1>WCAG 2.2 audit <small style="color:#64748b">${today()}</small></h1>
+<body><h1>${esc(auditBrief?.project ?? "WCAG 2.2 audit")} <small style="color:#64748b">${today()}</small></h1>${meta}
 <p>${stats.pass} pass, ${stats.fail} fail, ${stats.na} N/A, ${stats.total - stats.tested} untested</p>
 <table><thead><tr><th>SC</th><th>Level</th><th>Criterion</th><th>Result</th><th>Note</th></tr></thead>
 <tbody>${body}</tbody></table></body></html>`;
-    const path = await ipc.saveText(html, `wcag-audit-${today()}.html`);
+    const path = await ipc.saveText(html, `${safeAuditFilename(auditBrief, "wcag-audit")}-checklist-${today()}.html`);
     if (path) flash(`HTML saved (${exportRows().length} criteria)`);
   }
 
@@ -241,7 +277,10 @@ th{background:#f8fafc;font-size:12px;text-transform:uppercase;color:#64748b}
     <div className="app-bg-solid flex h-screen flex-col font-sans text-[13px] text-foreground">
       <header className="border-b border-border bg-card/80 px-3 py-2 backdrop-blur-xl">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-sm font-bold">WCAG 2.2 Checklist</h1>
+          <div className="min-w-0">
+            <h1 className="truncate text-sm font-bold">{auditBrief?.project ?? "WCAG 2.2 Checklist"}</h1>
+            {auditBrief && <p className="truncate text-[10px] text-muted-foreground">Checklist · {auditBrief.standard}</p>}
+          </div>
           <select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value as Level | "all")} aria-label="Filter by conformance level" className="rounded-md border border-border bg-card-2/70 px-2 py-1 text-xs outline-none">
             <option value="all">A &amp; AA</option>
             <option value="A">Level A</option>
@@ -284,10 +323,10 @@ th{background:#f8fafc;font-size:12px;text-transform:uppercase;color:#64748b}
                 const entry = state[c.sc] ?? { result: "untested" as Result, note: "" };
                 return (
                   <div key={c.sc} className="card p-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-[11px] text-muted-foreground">{c.sc}</span>
                       <span className="rounded bg-muted px-1 py-0.5 text-[9px] font-semibold text-muted-foreground">{c.level}</span>
-                      <span className="min-w-0 flex-1 truncate text-xs" title={c.name}>{c.name}</span>
+                      <span className="min-w-[12rem] flex-1 truncate text-xs" title={c.name}>{c.name}</span>
                       <div className="flex shrink-0 gap-1" role="group" aria-label={`Result for ${c.sc}`}>
                         {(["pass", "fail", "na"] as const).map((r) => (
                           <button
@@ -296,7 +335,7 @@ th{background:#f8fafc;font-size:12px;text-transform:uppercase;color:#64748b}
                             aria-pressed={entry.result === r}
                             aria-label={`${RESULT_LABEL[r]} - ${c.sc} ${c.name}`}
                             title={entry.result === r ? "Click again to clear" : RESULT_LABEL[r]}
-                            className="min-h-6 rounded-md border px-2 py-1 text-[10px] font-semibold"
+                            className="min-h-7 rounded-md border px-2 py-1 text-[10px] font-semibold"
                             style={
                               entry.result === r
                                 ? { backgroundColor: RESULT_COLOR[r], color: "#fff", borderColor: RESULT_COLOR[r] }

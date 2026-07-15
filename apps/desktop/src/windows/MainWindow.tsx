@@ -13,6 +13,12 @@ import {
 import { getVersion } from "@tauri-apps/api/app";
 import { displayShortcut, events, ipc, isMac, type Account, type Shortcuts } from "../lib/ipc";
 import { CheckIcon, CloseIcon, CopyIcon, FolderIcon, SwapIcon, TimerIcon } from "../lib/icons";
+import {
+  AUDIT_BRIEF_KEY,
+  parseAuditBrief,
+  type AuditBrief,
+  type AuditStandard,
+} from "../lib/audit";
 
 const SITE = "https://thewcag.com";
 const HISTORY_KEY = "contrast-history-v1";
@@ -76,6 +82,8 @@ export default function MainWindow() {
   const [onboarding, setOnboarding] = useState(() => !localStorage.getItem("onboarded-v1"));
   const [account, setAccount] = useState<Account | null>(null);
   const [version, setVersion] = useState("");
+  const [auditBrief, setAuditBrief] = useState<AuditBrief | null>(null);
+  const [editingAudit, setEditingAudit] = useState(false);
 
   function appendLog(kind: LogEntry["kind"], text: string) {
     setLog((prev) => {
@@ -93,6 +101,7 @@ export default function MainWindow() {
     void ipc.checkUpdate().then(setUpdate).catch(() => {});
     void ipc.getAccount().then(setAccount).catch(() => {});
     void getVersion().then(setVersion).catch(() => {});
+    void ipc.storeGet(AUDIT_BRIEF_KEY).then((raw) => setAuditBrief(parseAuditBrief(raw))).catch(() => {});
     const unlisteners = [
       events.onPicked((p) => {
         setError(null);
@@ -125,7 +134,7 @@ export default function MainWindow() {
     const onFocus = () => void refreshPermission();
     window.addEventListener("focus", onFocus);
     return () => {
-      unlisteners.forEach((p) => void p.then((un) => un()));
+      unlisteners.forEach((p) => void p.then((un) => un()).catch(() => {}));
       window.removeEventListener("focus", onFocus);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -167,6 +176,12 @@ export default function MainWindow() {
     await refreshPermission();
   }
 
+  async function saveAuditBrief(next: AuditBrief) {
+    await ipc.storeSet(AUDIT_BRIEF_KEY, JSON.stringify(next));
+    setAuditBrief(next);
+    setEditingAudit(false);
+  }
+
   const fgRgb = hexToRgb(fg);
   const bgRgb = hexToRgb(bg);
 
@@ -177,7 +192,7 @@ export default function MainWindow() {
       {/* titlebar overlay: draggable strip under the traffic lights (macOS) */}
       <header
         data-tauri-drag-region
-        className={`flex shrink-0 justify-center px-6 pb-4 ${isMac ? "pt-9" : "pt-4"}`}
+        className={`flex shrink-0 justify-center px-4 pb-3 sm:px-6 sm:pb-4 ${isMac ? "pt-9" : "pt-4"}`}
       >
         <div data-tauri-drag-region className="flex w-full max-w-[1040px] items-center justify-between">
           <button
@@ -190,7 +205,7 @@ export default function MainWindow() {
               <span className="block text-[19px] font-extrabold leading-none tracking-tight">
                 The<span className="text-primary">WCAG</span>
               </span>
-              <span className="mt-1 block text-[11px] font-medium text-muted-foreground">
+              <span className="mt-1 hidden text-[11px] font-medium text-muted-foreground min-[560px]:block">
                 Accessibility, anywhere on screen
               </span>
             </span>
@@ -200,8 +215,8 @@ export default function MainWindow() {
 
       {/* scroll region: fills the window, scrolls internally (no visible bar).
           Inner wrapper caps the width so a maximized window stays readable. */}
-      <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-      <div className="mx-auto w-full max-w-[1040px] px-6 pb-4 pt-1">
+      <div className="app-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+      <div className="mx-auto w-full max-w-[1040px] px-4 pb-4 pt-1 sm:px-6">
       {error && (
         <div
           role="alert"
@@ -262,7 +277,7 @@ export default function MainWindow() {
       )}
 
       {/* Primary actions — what you reach for the moment the app opens. */}
-      <section aria-label="Capture tools" className="mb-4 grid grid-cols-3 gap-3">
+      <section aria-label="Capture tools" className="mb-3 grid grid-cols-1 gap-2 min-[540px]:grid-cols-3 min-[540px]:gap-3">
         <ToolCard
           title="Pick pair"
           hotkey={shortcuts ? displayShortcut(shortcuts.pick) : ""}
@@ -284,6 +299,13 @@ export default function MainWindow() {
           onClick={() => void ipc.toggleLens()}
         />
       </section>
+
+      <AuditContextCard
+        brief={auditBrief}
+        onEdit={() => setEditingAudit(true)}
+        onFindings={() => void ipc.openToolWindow("findings")}
+        onChecklist={() => void ipc.openToolWindow("checklist")}
+      />
 
       {/* Workspace: live contrast + auditor tools on the left, your library on the right. */}
       <div className="grid gap-4 md:grid-cols-[minmax(0,1.7fr)_minmax(264px,1fr)]">
@@ -314,7 +336,7 @@ export default function MainWindow() {
 
           <section aria-label="Auditor tools" className="mb-3">
             <h2 className="label mb-1.5">Auditor tools</h2>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 min-[560px]:grid-cols-4">
               <AuditButton label="Measure" hint="24px targets" onClick={() => void ipc.beginOverlay("measure")} />
               <AuditButton label="Findings" hint="Issue log" onClick={() => void ipc.openToolWindow("findings")} />
               <AuditButton label="Checklist" hint="WCAG 2.2" onClick={() => void ipc.openToolWindow("checklist")} />
@@ -381,9 +403,9 @@ export default function MainWindow() {
       </div>
       </div>
 
-      <footer className="flex shrink-0 justify-center border-t border-border/70 px-6 pb-4 pt-3">
+      <footer className="flex shrink-0 justify-center border-t border-border/70 px-4 pb-3 pt-3 sm:px-6 sm:pb-4">
         <div className="flex w-full max-w-[1040px] items-center justify-between">
-        <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <button
             role="switch"
             aria-checked={autostart}
@@ -401,7 +423,7 @@ export default function MainWindow() {
             data-on={autostart}
           />
           Launch at login
-        </label>
+        </div>
         <span className="text-[10px] text-muted-foreground">v{version}</span>
         </div>
       </footer>
@@ -417,6 +439,176 @@ export default function MainWindow() {
           }}
         />
       )}
+
+      {editingAudit && (
+        <AuditBriefDialog
+          value={auditBrief}
+          onCancel={() => setEditingAudit(false)}
+          onSave={(next) => void saveAuditBrief(next).catch((e) => setError(`Couldn't save audit details: ${e}`))}
+        />
+      )}
+    </div>
+  );
+}
+
+function AuditContextCard(props: {
+  brief: AuditBrief | null;
+  onEdit: () => void;
+  onFindings: () => void;
+  onChecklist: () => void;
+}) {
+  const { brief } = props;
+  return (
+    <section className="card mb-4 flex flex-col gap-3 p-3 min-[620px]:flex-row min-[620px]:items-center">
+      <div className="flex min-w-0 flex-1 items-start gap-3">
+        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/12 font-mono text-xs font-bold text-primary" aria-hidden="true">
+          {brief ? brief.standard.replace("WCAG 2.2 ", "") : "01"}
+        </span>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <h2 className="text-xs font-semibold">{brief ? brief.project : "Start an audit workspace"}</h2>
+            {brief && <span className="status-pill status-info">{brief.standard}</span>}
+          </div>
+          <p className="mt-0.5 truncate text-[11px] text-muted-foreground" title={brief?.scope || brief?.target}>
+            {brief
+              ? brief.scope || brief.target || "Add the target and scope so every export has context."
+              : "Attach project, target, scope, standard and evaluator details to your reports."}
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {brief && (
+          <>
+            <button onClick={props.onChecklist} className="btn control-target px-2.5 text-[11px]">
+              Checklist
+            </button>
+            <button onClick={props.onFindings} className="btn control-target px-2.5 text-[11px]">
+              Findings
+            </button>
+          </>
+        )}
+        <button onClick={props.onEdit} className="btn-primary control-target px-3 text-[11px]">
+          {brief ? "Edit context" : "Set up audit"}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function keepDialogFocus(event: KeyboardEvent, container: HTMLElement | null) {
+  if (event.key !== "Tab" || !container) return;
+  const focusable = Array.from(
+    container.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])',
+    ),
+  ).filter((element) => !element.hasAttribute("hidden"));
+  if (focusable.length === 0) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+function AuditBriefDialog(props: {
+  value: AuditBrief | null;
+  onCancel: () => void;
+  onSave: (value: AuditBrief) => void;
+}) {
+  const firstField = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLFormElement>(null);
+  const [project, setProject] = useState(props.value?.project ?? "");
+  const [target, setTarget] = useState(props.value?.target ?? "");
+  const [scope, setScope] = useState(props.value?.scope ?? "");
+  const [standard, setStandard] = useState<AuditStandard>(props.value?.standard ?? "WCAG 2.2 AA");
+  const [auditor, setAuditor] = useState(props.value?.auditor ?? "");
+  const [startedAt, setStartedAt] = useState(props.value?.startedAt ?? new Date().toISOString().slice(0, 10));
+
+  useEffect(() => {
+    firstField.current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") props.onCancel();
+      keepDialogFocus(event, dialogRef.current);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!project.trim()) return;
+    props.onSave({
+      project: project.trim(),
+      target: target.trim(),
+      scope: scope.trim(),
+      standard,
+      auditor: auditor.trim(),
+      startedAt,
+      updatedAt: Date.now(),
+    });
+  }
+
+  return (
+    <div className="fade fixed inset-0 z-50 flex items-center justify-center bg-background/75 p-4 backdrop-blur-sm" role="presentation">
+      <form
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="audit-dialog-title"
+        onSubmit={submit}
+        className="rise card app-scroll max-h-full w-full max-w-lg overflow-y-auto p-5"
+      >
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <h2 id="audit-dialog-title" className="text-base font-bold">Audit context</h2>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              These details are stored locally and added to checklist and findings exports.
+            </p>
+          </div>
+          <button type="button" onClick={props.onCancel} aria-label="Close audit context" className="icon-button">
+            <CloseIcon size={14} />
+          </button>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="field sm:col-span-2">
+            <span>Project or client <strong aria-hidden="true">*</strong></span>
+            <input ref={firstField} required value={project} onChange={(e) => setProject(e.target.value)} placeholder="Example: Customer portal Q3 audit" />
+          </label>
+          <label className="field sm:col-span-2">
+            <span>Target URL or application</span>
+            <input value={target} onChange={(e) => setTarget(e.target.value)} placeholder="https://example.com or Desktop checkout" spellCheck={false} />
+          </label>
+          <label className="field sm:col-span-2">
+            <span>Scope</span>
+            <textarea value={scope} onChange={(e) => setScope(e.target.value)} placeholder="Key journeys, pages, platforms, assistive technologies…" rows={3} />
+          </label>
+          <label className="field">
+            <span>Conformance target</span>
+            <select value={standard} onChange={(e) => setStandard(e.target.value as AuditStandard)}>
+              <option>WCAG 2.2 A</option>
+              <option>WCAG 2.2 AA</option>
+            </select>
+          </label>
+          <label className="field">
+            <span>Start date</span>
+            <input type="date" value={startedAt} onChange={(e) => setStartedAt(e.target.value)} />
+          </label>
+          <label className="field sm:col-span-2">
+            <span>Evaluator</span>
+            <input value={auditor} onChange={(e) => setAuditor(e.target.value)} placeholder="Name or team" autoComplete="name" />
+          </label>
+        </div>
+
+        <div className="mt-5 flex items-center justify-end gap-2 border-t border-border/70 pt-4">
+          <button type="button" onClick={props.onCancel} className="btn control-target px-3 text-xs">Cancel</button>
+          <button type="submit" className="btn-primary control-target px-4 text-xs">Save audit context</button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -527,7 +719,7 @@ function AccountCard({ account }: { account: Account | null }) {
   if (account === null) return null; // still loading
   if (!account.signedIn) {
     return (
-      <section className="card mb-3 flex items-center justify-between p-3">
+      <section className="card mb-3 flex flex-col gap-3 p-3 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between">
         <div>
           <h2 className="text-xs font-semibold">TheWCAG account</h2>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
@@ -544,7 +736,7 @@ function AccountCard({ account }: { account: Account | null }) {
     );
   }
   return (
-    <section className="card mb-3 flex items-center justify-between p-3">
+    <section className="card mb-3 flex flex-col gap-3 p-3 min-[560px]:flex-row min-[560px]:items-center min-[560px]:justify-between md:flex-col md:items-stretch lg:flex-row lg:items-center">
       <div className="min-w-0">
         <p className="truncate text-xs font-semibold" title={account.email}>
           {account.email || "Signed in"}
@@ -555,7 +747,7 @@ function AccountCard({ account }: { account: Account | null }) {
             : "Connected"}
         </p>
       </div>
-      <div className="flex shrink-0 items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         <button
           onClick={() => void ipc.openSite("https://app.thewcag.com/screenshots")}
           className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted"
@@ -666,6 +858,7 @@ function Onboarding(props: {
   ];
   const last = step === steps.length - 1;
   const nextRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   // Move focus into the dialog on each step; close on Escape.
   useEffect(() => {
@@ -674,6 +867,7 @@ function Onboarding(props: {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") props.onDone();
+      keepDialogFocus(e, dialogRef.current);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -687,7 +881,7 @@ function Onboarding(props: {
       aria-label={`Getting started: ${steps[step].title}`}
       className="fade fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-6 backdrop-blur-sm"
     >
-      <div className="rise card w-full max-w-sm p-5">
+      <div ref={dialogRef} className="rise card w-full max-w-sm p-5">
         <div className="mb-3 flex gap-1" aria-hidden="true">
           {steps.map((_, i) => (
             <span
@@ -923,7 +1117,7 @@ function ContrastPanel(props: {
         {mode !== "large" && <span className="ml-2 text-xs">jumps over the lazy dog</span>}
       </div>
 
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex flex-col items-stretch gap-2 min-[560px]:flex-row min-[560px]:items-center min-[560px]:justify-between">
         <div className="seg" role="radiogroup" aria-label="Text size">
           {TEXT_MODES.map((m) => (
             <button
@@ -944,8 +1138,8 @@ function ContrastPanel(props: {
         )}
       </div>
 
-      <div className="mb-2 flex items-end justify-between">
-        <div className="flex items-baseline gap-2">
+      <div className="mb-2 flex flex-col gap-2 min-[560px]:flex-row min-[560px]:items-end min-[560px]:justify-between">
+        <div className="flex flex-wrap items-baseline gap-2">
           <span className="font-mono text-[2.6rem] font-extrabold leading-none tracking-tight tabular-nums">
             {wcag.ratio.toFixed(2)}
           </span>
@@ -958,7 +1152,7 @@ function ContrastPanel(props: {
             {passes ? `AA ✓${passesAAA ? " AAA ✓" : ""}` : `AA ✕ (needs ${modeInfo.target}:1)`}
           </span>
         </div>
-        <div className="text-right">
+        <div className="text-left min-[560px]:text-right">
           <span
             className={`font-mono text-sm font-semibold ${
               rating === "fail" ? "text-coral" : "text-foreground"
@@ -976,8 +1170,8 @@ function ContrastPanel(props: {
         </div>
       </div>
 
-      <div className="mb-1 flex items-center justify-between">
-        <div className="flex gap-1.5" title="Ratio as seen with color-vision deficiencies">
+      <div className="mb-1 flex flex-col items-stretch gap-2 min-[560px]:flex-row min-[560px]:items-center min-[560px]:justify-between">
+        <div className="flex flex-wrap gap-1.5" title="Ratio as seen with color-vision deficiencies">
           {cvdRows.map((row) => {
             const bad = row.ratio < 3 && wcag.ratio >= modeInfo.target;
             return (
@@ -997,7 +1191,7 @@ function ContrastPanel(props: {
         </div>
         <button
           onClick={() => void copyFinding()}
-          className="btn flex shrink-0 items-center gap-1 px-2 py-1 text-[11px]"
+          className="btn control-target flex shrink-0 items-center justify-center gap-1 px-2 text-[11px]"
           title={`Copy as audit finding (WCAG ${modeInfo.sc})`}
         >
           {copied ? <CheckIcon size={12} /> : <CopyIcon size={12} />}
@@ -1110,7 +1304,7 @@ function AuditButton(props: { label: string; hint: string; onClick: () => void }
   return (
     <button
       onClick={props.onClick}
-      className="card tile p-2.5 text-left"
+      className="card tile min-h-12 p-2.5 text-left"
     >
       <span className="block text-xs font-semibold">{props.label}</span>
       <span className="block text-[10px] text-muted-foreground">{props.hint}</span>
@@ -1127,7 +1321,7 @@ function ToolCard(props: {
 }) {
   return (
     <div className="card tile group relative p-3">
-      <button onClick={props.onClick} className="w-full text-left">
+      <button onClick={props.onClick} className="min-h-10 w-full pr-10 text-left min-[540px]:pr-0">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold">{props.title}</span>
           {props.hotkey && (
@@ -1145,7 +1339,7 @@ function ToolCard(props: {
           onClick={props.onDelayed}
           aria-label={`${props.title} after a 3 second delay`}
           title="Start after a 3s delay - time to open hover states and menus"
-          className="absolute bottom-2 right-2 flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[9px] text-muted-foreground opacity-0 transition-opacity hover:bg-muted focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
+          className="absolute bottom-2 right-2 flex min-h-7 items-center gap-1 rounded-md border border-border px-2 text-[10px] text-muted-foreground opacity-100 transition-opacity hover:bg-muted min-[540px]:opacity-0 min-[540px]:focus-visible:opacity-100 min-[540px]:group-hover:opacity-100 min-[540px]:group-focus-within:opacity-100"
         >
           <TimerIcon size={10} />
           3s

@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
+export const isTauriRuntime = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
 export interface PickedColor {
   hex: string;
   r: number;
@@ -137,17 +139,16 @@ export interface PickedPair {
   worst?: boolean;
 }
 
+function onEvent<T>(name: string, cb: (payload: T) => void): Promise<UnlistenFn> {
+  if (!isTauriRuntime) return Promise.resolve(() => {});
+  return listen<T>(name, (event) => cb(event.payload));
+}
+
 export const events = {
-  onPicked: (cb: (p: PickedPair) => void): Promise<UnlistenFn> =>
-    listen<PickedPair>("overlay-picked", (e) => cb(e.payload)),
-  onScreenshotTaken: (cb: (path: string) => void): Promise<UnlistenFn> =>
-    listen<string>("screenshot-taken", (e) => cb(e.payload)),
-  onCaptureError: (cb: (message: string) => void): Promise<UnlistenFn> =>
-    listen<string>("capture-error", (e) => cb(e.payload)),
-  onPermissionNeeded: (cb: () => void): Promise<UnlistenFn> =>
-    listen("permission-needed", () => cb()),
-  onAnnotateExported: (cb: (issues: string[]) => void): Promise<UnlistenFn> =>
-    listen<string[]>("annotate-exported", (e) => cb(e.payload)),
-  onAccountChanged: (cb: () => void): Promise<UnlistenFn> =>
-    listen("account-changed", () => cb()),
+  onPicked: (cb: (p: PickedPair) => void) => onEvent<PickedPair>("overlay-picked", cb),
+  onScreenshotTaken: (cb: (path: string) => void) => onEvent<string>("screenshot-taken", cb),
+  onCaptureError: (cb: (message: string) => void) => onEvent<string>("capture-error", cb),
+  onPermissionNeeded: (cb: () => void) => onEvent<undefined>("permission-needed", cb),
+  onAnnotateExported: (cb: (issues: string[]) => void) => onEvent<string[]>("annotate-exported", cb),
+  onAccountChanged: (cb: () => void) => onEvent<undefined>("account-changed", cb),
 };

@@ -11,9 +11,14 @@ import ChecklistWindow from "./windows/ChecklistWindow";
 import PaletteWindow from "./windows/PaletteWindow";
 import "./styles.css";
 
-// One bundle, many windows: route by the Tauri window label.
+// One bundle, many windows: route by the Tauri window label. A browser-only
+// fallback keeps every view previewable with Vite (`?view=checklist`) for
+// responsive and accessibility QA without weakening the native code path.
 // Overlays are per-monitor: overlay-0, overlay-1, …
-const label = getCurrentWebviewWindow().label;
+const isTauri = "__TAURI_INTERNALS__" in window;
+const label = isTauri
+  ? getCurrentWebviewWindow().label
+  : new URLSearchParams(window.location.search).get("view") ?? "main";
 const views: Record<string, React.ComponentType> = {
   main: MainWindow,
   annotate: AnnotateWindow,
@@ -34,7 +39,7 @@ const View = label.startsWith("overlay-") ? OverlayWindow : (views[label] ?? Mai
 // real content. The main window is visible from config and needs no reveal.
 function Reveal({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
-    if (label === "main") return;
+    if (label === "main" || !isTauri) return;
     // Direct call: effects always run after commit, even in a hidden webview
     // (setTimeout can be throttled there too). The DOM exists at this point,
     // so the first visible frame has real content.

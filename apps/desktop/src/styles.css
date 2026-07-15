@@ -7,14 +7,14 @@
  * translucent and the OS blurs whatever is behind the window.
  */
 :root {
-  --background: 0 0% 100%;
+  --background: 240 20% 98%;
   --foreground: 240 6% 10%;
   --card: 0 0% 100%;
   --card-2: 240 5% 96.5%;
   --primary: 22 89% 52%;
   --primary-foreground: 0 0% 100%;
   --muted: 240 5% 95.5%;
-  --muted-foreground: 240 4% 46%;
+  --muted-foreground: 240 5% 40%;
   --border: 240 6% 90%;
   --ring: 22 89% 52%;
   --teal: 181 76% 40%;
@@ -70,10 +70,9 @@ body {
 
 /*
  * Desktop app layout contract: the webview fills the OS window, and each
- * window view (h-screen flex column) owns its internal scrolling. No
- * document-level scroll, and no scrollbar chrome anywhere in the app -
- * content stays reachable via trackpad / wheel / keyboard focus. This keeps
- * every window fully responsive to resizing with no visible scrollbars.
+ * window view owns its internal scrolling. Scroll regions keep a quiet but
+ * visible thumb so mouse and keyboard users can discover long content on
+ * Windows as easily as trackpad users can on macOS.
  */
 html,
 body,
@@ -84,15 +83,28 @@ body {
   overflow: hidden;
 }
 * {
-  scrollbar-width: none; /* Firefox / Gecko */
-  -ms-overflow-style: none; /* legacy Edge */
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent;
 }
 *::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-  background: transparent; /* WebKit / WKWebView: no visible bar */
+  width: 8px;
+  height: 8px;
 }
-/* explicit opt-in for scroll regions (scrollbar already hidden globally) */
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  min-height: 32px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: hsl(var(--muted-foreground) / 0.35);
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.55);
+  background-clip: padding-box;
+}
+/* Explicit opt-out for canvas-like surfaces where the scrollbar is noise. */
 .no-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -180,7 +192,7 @@ body {
 
 /* small-caps section label */
 .label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.055em;
   text-transform: uppercase;
@@ -204,6 +216,83 @@ textarea {
     opacity 150ms var(--ease-out),
     transform 150ms var(--ease-spring),
     box-shadow 150ms var(--ease-out);
+}
+
+button,
+select,
+[role="button"] {
+  min-height: 28px;
+}
+
+button:not(:disabled),
+select:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+.control-target {
+  min-height: 32px;
+}
+
+.icon-button {
+  display: inline-flex;
+  min-width: 32px;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid hsl(var(--border) / 0.8);
+  border-radius: 8px;
+  color: hsl(var(--muted-foreground));
+}
+.icon-button:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.status-pill {
+  display: inline-flex;
+  min-height: 20px;
+  align-items: center;
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 10px;
+  font-weight: 650;
+}
+.status-info {
+  background: hsl(var(--teal) / 0.12);
+  color: hsl(var(--teal));
+}
+
+.field {
+  display: grid;
+  gap: 5px;
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  font-weight: 600;
+}
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  background: hsl(var(--card-2) / 0.65);
+  padding: 7px 10px;
+  color: hsl(var(--foreground));
+  font-size: 12px;
+  font-weight: 400;
+  outline: none;
+}
+.field textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.16);
 }
 
 button:active:not(:disabled) {
@@ -250,9 +339,10 @@ button:active:not(:disabled) {
 /* macOS-style switch */
 .switch {
   position: relative;
-  width: 34px;
-  height: 20px;
-  border-radius: 10px;
+  width: 38px;
+  height: 24px;
+  min-height: 24px;
+  border-radius: 12px;
   background: hsl(var(--muted));
   transition: background-color 200ms var(--ease-out);
   flex-shrink: 0;
@@ -265,8 +355,8 @@ button:active:not(:disabled) {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
@@ -312,5 +402,8 @@ button:active:not(:disabled) {
   *::after {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+  }
+  button:active:not(:disabled) {
+    transform: none;
   }
 }
