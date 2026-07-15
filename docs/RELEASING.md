@@ -20,11 +20,19 @@
    | `APPLE_PASSWORD` | the app-specific password |
    | `APPLE_TEAM_ID` | your 10-character team ID |
    | `TAURI_SIGNING_PRIVATE_KEY` | contents of `~/.tauri/accessibility-build.key` |
+   | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | password for the updater signing key |
+   | `WINDOWS_CERTIFICATE` | base64-encoded Authenticode `.pfx` certificate |
+   | `WINDOWS_CERTIFICATE_PASSWORD` | password used to export the Windows `.pfx` |
+   | `WINDOWS_TIMESTAMP_URL` | optional issuer timestamp URL; defaults to DigiCert |
 
    The updater keypair already exists at `~/.tauri/accessibility-build.key`
    (private — never commit) and its public key is baked into
    `tauri.conf.json`. **Back the private key up**; losing it means shipped
    apps can never update again.
+
+   Tagged production releases fail during preflight if any required signing
+   credential is absent. This is intentional: use ordinary local builds for
+   unsigned development artifacts, never the release workflow.
 
 ## Every release
 

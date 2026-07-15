@@ -20,9 +20,9 @@ Get the latest macOS (`.dmg`) or Windows (`.exe`) installer:
 - **[app.thewcag.com/download](https://app.thewcag.com/download)** (recommended), or
 - **[GitHub Releases](https://github.com/Sairo-app/app.thewcag.com/releases/latest)**
 
-The app auto-updates. Global hotkeys are configurable in the app; defaults are `⌥⌘P` contrast, `⌥⌘S` capture, `⌥⌘L` lens (Alt+Win equivalents on Windows).
+The app auto-updates. Global hotkeys are configurable in the app; defaults are `⌥⌘P` contrast, `⌥⌘S` capture, `⌥⌘L` lens on macOS and `Ctrl+Alt+P/S/L` on Windows.
 
-> Installers are not yet code-signed, so macOS Gatekeeper and Windows SmartScreen may warn on first launch. The app still installs and updates normally.
+New tagged production releases are required to be code-signed and notarized. The tag workflow refuses to publish when the required Apple, Windows, or updater signing credentials are missing, so an unsigned installer cannot accidentally reach users. Local development builds remain unsigned.
 
 ## Repository layout
 

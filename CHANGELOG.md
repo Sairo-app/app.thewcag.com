@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased
+
+**Desktop**
+
+- Added a local audit context (project, target, scope, conformance target,
+  evaluator, and start date) that carries into checklist and findings exports.
+- Reworked the main workspace for the compact 460px Windows window while
+  retaining the two-column MacBook layout; improved target sizes, focus
+  containment, scroll affordances, contrast-panel reflow, and reduced motion.
+- Added browser-preview routing for responsive QA and enabled a restrictive
+  Tauri Content Security Policy.
+
+**Web**
+
+- Rebuilt the homepage around the complete auditor workflow and added a
+  responsive product preview, richer feature coverage, platform guidance, and
+  SoftwareApplication metadata.
+- Added an accessible mobile navigation down to 320px, stronger production
+  security headers, enforced build-time type validation, fail-fast production
+  migrations, and aligned platform requirements with the desktop configuration.
+
+**Release safety**
+
+- Added a repeatable `pnpm verify` gate and pull-request/main quality workflow.
+- Tagged releases now require updater, macOS notarization, and Windows
+  Authenticode credentials; unsigned production publishing is blocked.
+
 ## v2.4.0 — 2026-07-09
 
 The editor release: Snagit-class ergonomics, kept WCAG-native.

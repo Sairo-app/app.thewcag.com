@@ -1,4 +1,8 @@
-# Accessibility.build Desktop — v1 Plan
+# Accessibility.build Desktop — original v1 plan
+
+> Historical planning document. The current product now ships on both macOS
+> and Windows and includes auditor tools beyond this original scope. Use the
+> README, CHANGELOG, and current application code for shipped behavior.
 
 **Product**: A macOS (later Windows) menu-bar utility for developers and
 designers that makes accessibility checks instant: pick colors anywhere on

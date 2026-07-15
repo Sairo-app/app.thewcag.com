@@ -9,13 +9,47 @@ permissions:
   contents: write
 
 jobs:
-  build-mac:
-    runs-on: macos-latest
-    # True only when Apple Developer ID secrets are configured. Empty secrets
-    # arrive as "" which Tauri treats as "present" and then fails to import, so
-    # we must omit the APPLE_* env entirely for an ad-hoc build.
+  release-preflight:
+    runs-on: ubuntu-latest
     env:
-      HAS_APPLE: ${{ secrets.APPLE_CERTIFICATE != '' }}
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+      WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+    steps:
+      - name: Require production signing credentials
+        shell: bash
+        run: |
+          missing=()
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID WINDOWS_CERTIFICATE WINDOWS_CERTIFICATE_PASSWORD TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then missing+=("$name"); fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "Production release blocked. Missing signing secrets: ${missing[*]}"
+            exit 1
+          fi
+
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm verify
+
+  build-mac:
+    needs: [quality, release-preflight]
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -28,10 +62,9 @@ jobs:
         with:
           workspaces: apps/desktop/src-tauri
 
-      - run: pnpm install --frozen-lockfile=false
+      - run: pnpm install --frozen-lockfile
 
-      - name: Build (Apple Developer ID + notarized)
-        if: env.HAS_APPLE == 'true'
+      - name: Build signed and notarized app
         working-directory: apps/desktop
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -42,14 +75,6 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: pnpm tauri build
-
-      - name: Build (ad-hoc, no Apple secrets)
-        if: env.HAS_APPLE != 'true'
-        working-directory: apps/desktop
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: pnpm tauri build
 
       - name: Updater manifest partial (darwin-aarch64)
@@ -66,6 +91,7 @@ jobs:
             dist-updater/latest-mac.json
 
   build-windows:
+    needs: [quality, release-preflight]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -79,16 +105,41 @@ jobs:
         with:
           workspaces: apps/desktop/src-tauri
 
-      - run: pnpm install --frozen-lockfile=false
+      - run: pnpm install --frozen-lockfile
 
-      - name: Build signed app + updater artifacts (Windows)
-        working-directory: apps/desktop
+      - name: Import Authenticode certificate
+        shell: pwsh
         env:
-          # Same updater keypair signs both platforms. Authenticode code
-          # signing of the .exe is optional (SmartScreen warns without it).
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $pfxPath = Join-Path $env:RUNNER_TEMP "thewcag-signing.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+          $password = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -Force -AsPlainText
+          $certificate = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $password
+          if (-not $certificate) { throw "Windows signing certificate import failed" }
+          "WINDOWS_CERTIFICATE_THUMBPRINT=$($certificate.Thumbprint)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Build Authenticode-signed app + updater artifacts
+        working-directory: apps/desktop
+        shell: pwsh
+        env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: pnpm tauri build
+          WINDOWS_TIMESTAMP_URL: ${{ secrets.WINDOWS_TIMESTAMP_URL }}
+        run: |
+          $timestampUrl = if ($env:WINDOWS_TIMESTAMP_URL) { $env:WINDOWS_TIMESTAMP_URL } else { "http://timestamp.digicert.com" }
+          $signingConfig = @{
+            bundle = @{
+              windows = @{
+                certificateThumbprint = $env:WINDOWS_CERTIFICATE_THUMBPRINT
+                digestAlgorithm = "sha256"
+                timestampUrl = $timestampUrl
+              }
+            }
+          } | ConvertTo-Json -Depth 4
+          $signingConfig | Set-Content src-tauri/tauri.signing.conf.json
+          pnpm tauri build --config src-tauri/tauri.signing.conf.json
 
       - name: Updater manifest partial (windows-x86_64)
         run: node scripts/make-latest-json.mjs windows
