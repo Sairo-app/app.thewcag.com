@@ -166,9 +166,10 @@ The workspace contains three packages:
 2. Update `CHANGELOG.md`.
 3. Keep the release tag exactly `v<desktop-version>`.
 4. Preserve mandatory Apple signing/notarization, Windows Authenticode signing, and Tauri updater signing preflight.
-5. Keep macOS and Windows updater partials compatible with `merge-latest-json.mjs`.
-6. Never commit private signing keys, certificates, passwords, `.env` files, or generated updater artifacts.
-7. Read `docs/RELEASING.md` before creating a production tag.
+5. Build macOS releases as `universal-apple-darwin` and require updater entries for `darwin-aarch64`, `darwin-x86_64`, and `windows-x86_64`.
+6. Keep platform partials compatible with the strict validation in `merge-latest-json.mjs`.
+7. Never commit private signing keys, certificates, passwords, `.env` files, or generated updater artifacts.
+8. Read `docs/RELEASING.md` before creating a production tag.
 
 ## Use the command matrix
 
@@ -206,7 +207,7 @@ Run the standard repository gate:
 pnpm verify
 ```
 
-This gate runs 14 current core tests, desktop and web type checking, the desktop Vite production build, and the Next production build. If test counts change, report the observed count rather than copying this number blindly.
+This gate runs shared-core and web Vitest suites, Node release-manifest tests, desktop and web type checking, the desktop Vite production build, and the Next production build. Report observed counts from the command output rather than copying a remembered number.
 
 Validate native integration when applicable:
 

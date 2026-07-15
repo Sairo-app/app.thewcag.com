@@ -248,11 +248,13 @@ pnpm verify
 
 It currently performs:
 
-1. The 14 `a11y-core` Vitest tests.
-2. Desktop TypeScript validation.
-3. Website TypeScript validation.
-4. The desktop Vite production build.
-5. The Next.js production build and route generation.
+1. Shared `a11y-core` Vitest tests.
+2. Website payload, device-connect, and brand-logo validation tests.
+3. Node release-version and updater-manifest tests.
+4. Desktop TypeScript validation.
+5. Website TypeScript validation.
+6. The desktop Vite production build.
+7. The Next.js production build and route generation.
 
 Focused commands:
 
@@ -280,7 +282,7 @@ Pull requests and pushes to `main` run the same `pnpm verify` gate in `.github/w
 pnpm --filter @accessibility-build/desktop build
 ```
 
-The base configuration produces the macOS application/DMG. On Windows, `tauri.windows.conf.json` switches the bundle target to NSIS. Local development artifacts are unsigned unless the appropriate platform and updater signing variables are provided.
+The base configuration produces a native macOS application/DMG. The release workflow explicitly builds `universal-apple-darwin`, producing one signed package that runs natively on Apple Silicon and Intel. On Windows, `tauri.windows.conf.json` switches the bundle target to NSIS. Local development artifacts are unsigned unless the appropriate platform and updater signing variables are provided.
 
 ### Website container
 
@@ -309,13 +311,13 @@ git tag v2.4.1
 git push origin v2.4.1
 ```
 
-The release workflow refuses to publish unless all mandatory Apple, Windows, and Tauri updater signing credentials are present. It then:
+The release workflow first rejects a tag that does not exactly match all three desktop version sources, and refuses to publish unless all mandatory Apple, Windows, and Tauri updater signing credentials are present. It then:
 
 1. Runs the quality gate.
-2. Builds, signs, notarizes, and staples the macOS app and DMG.
+2. Builds, signs, notarizes, and staples a universal macOS app and DMG for Apple Silicon and Intel.
 3. Imports the Windows PFX and builds an Authenticode-signed NSIS installer.
 4. Signs both updater artifacts with the Tauri updater key.
-5. Generates platform manifest partials and merges them into `latest.json`.
+5. Generates and validates updater entries for `darwin-aarch64`, `darwin-x86_64`, and `windows-x86_64`, then merges them into `latest.json`.
 6. Publishes the installers, updater archives, signatures, and manifest to a GitHub Release.
 
 The application checks the latest GitHub Release manifest and offers an in-app update and restart. Read [docs/RELEASING.md](docs/RELEASING.md) before releasing; it is the secret and signing checklist.

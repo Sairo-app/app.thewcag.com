@@ -11,6 +11,11 @@
   containment, scroll affordances, contrast-panel reflow, and reduced motion.
 - Added browser-preview routing for responsive QA and enabled a restrictive
   Tauri Content Security Policy.
+- Made shortcut updates and resets recoverable when OS registration or disk
+  persistence fails, and corrected Windows tray shortcut labels.
+- Added visible save/export failure states, ordered persistent writes, dialog
+  focus restoration, stronger lens/editor semantics, and strict findings
+  deduplication for native exports.
 
 **Web**
 
@@ -20,12 +25,18 @@
 - Added an accessible mobile navigation down to 320px, stronger production
   security headers, enforced build-time type validation, fail-fast production
   migrations, and aligned platform requirements with the desktop configuration.
+- Hardened device authorization nonces, bounded public report issue metadata,
+  serialized per-account storage quota checks, and made logo replacement
+  rollback-safe with file-signature and active-SVG validation.
 
 **Release safety**
 
 - Added a repeatable `pnpm verify` gate and pull-request/main quality workflow.
 - Tagged releases now require updater, macOS notarization, and Windows
   Authenticode credentials; unsigned production publishing is blocked.
+- macOS releases are now universal Apple Silicon + Intel builds. Release tags
+  must match every desktop version source, and updater manifests fail unless
+  both Mac architectures and Windows are complete and on the same version.
 
 ## v2.4.0 — 2026-07-09
 

@@ -8,7 +8,7 @@ Do not manually upload production installers or updater manifests. Use local bui
 
 A successful `v*` tag publishes one GitHub Release containing:
 
-- A signed, notarized, and stapled macOS DMG.
+- A signed, notarized, and stapled universal macOS DMG for Apple Silicon and Intel.
 - The signed macOS `.app.tar.gz` updater archive and `.sig`.
 - An Authenticode-signed Windows NSIS `-setup.exe` installer and updater `.sig`.
 - A multi-platform `latest.json` updater manifest.
@@ -101,7 +101,7 @@ git push origin v2.4.1
 
 Use the exact `v<desktop-version>` format. The workflow runs four stages:
 
-1. `release-preflight` verifies all mandatory signing credentials.
+1. `release-preflight` verifies that the tag matches every desktop version source and that all mandatory signing credentials exist.
 2. `quality` installs with the frozen lockfile and runs `pnpm verify`.
 3. `build-mac` and `build-windows` build and sign platform artifacts in parallel.
 4. `publish` merges updater partials and creates the GitHub Release.
@@ -112,8 +112,8 @@ Monitor all jobs. A pushed tag is not a successful release until the `publish` j
 
 After the workflow succeeds:
 
-1. Open the GitHub Release and confirm the DMG, macOS updater archive/signature, Windows installer/signature, and `latest.json` are present.
-2. Inspect `latest.json` and confirm its version matches the tag and its platform URLs point to that same release.
+1. Open the GitHub Release and confirm the universal DMG, macOS updater archive/signature, Windows installer/signature, and `latest.json` are present.
+2. Inspect `latest.json` and confirm its version matches the tag, its platform URLs point to that same release, and it contains `darwin-aarch64`, `darwin-x86_64`, and `windows-x86_64`.
 3. Download both installers through `https://app.thewcag.com/download` or the platform-specific API redirect.
 4. Confirm the macOS package reports a valid Developer ID signature and notarization.
 5. Confirm Windows reports the expected Authenticode signer and timestamp.
@@ -134,16 +134,18 @@ Local builds are unsigned unless signing credentials are available. They are sui
 
 ### Signed macOS diagnostic build
 
-With the Developer ID certificate installed in the current keychain:
+With the Developer ID certificate installed in the current keychain, install both Rust targets and request the universal target:
 
 ```sh
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
 APPLE_SIGNING_IDENTITY="Developer ID Application: Name (TEAMID)" \
 APPLE_ID="developer@example.com" \
 APPLE_PASSWORD="app-specific-password" \
 APPLE_TEAM_ID="TEAMID1234" \
 TAURI_SIGNING_PRIVATE_KEY_PATH="/secure/path/to/updater-private-key" \
 TAURI_SIGNING_PRIVATE_KEY_PASSWORD="updater-key-password" \
-pnpm --filter @accessibility-build/desktop build
+pnpm --filter @accessibility-build/desktop tauri build --target universal-apple-darwin
 ```
 
 Use environment injection from a secure secret manager where possible. Avoid placing secrets in shell history.
@@ -158,14 +160,14 @@ node scripts/make-latest-json.mjs windows
 node scripts/merge-latest-json.mjs dist-updater
 ```
 
-Each platform command must run on a filesystem containing that platform's `target/release/bundle` output. CI runs them on separate platform workers and merges downloaded partials during `publish`.
+The macOS command expects `target/universal-apple-darwin/release/bundle`; Windows expects `target/release/bundle`. CI runs them on separate platform workers and merges downloaded partials during `publish`.
 
 `dist-updater/` is generated and ignored. Never commit generated manifests or signatures.
 
 ## Platform notes
 
-- The base Tauri bundle configuration targets macOS app/DMG output and requires macOS 12 or later.
+- The base Tauri bundle configuration targets macOS app/DMG output and requires macOS 12 or later. Production uses Tauri's `universal-apple-darwin` target so one package supports both Apple Silicon and Intel.
 - `tauri.windows.conf.json` changes the Windows bundle to NSIS and supplies the compact Windows main-window configuration.
-- The current updater scripts emit `darwin-aarch64` and `windows-x86_64` platform keys. Adding another architecture requires a build job, an updater artifact, and a manifest entry for that exact Tauri target.
+- The updater scripts emit `darwin-aarch64` and `darwin-x86_64` entries for the universal Mac archive plus `windows-x86_64`. The merge step fails when any expected target is missing, duplicated, incomplete, or on a different version.
 - The bundle identifier currently ends in `.app`. Tauri warns about this on macOS; changing it is an application identity, permission, keychain, and update migration—not a routine patch-release edit.
 - A future Mac App Store build requires separate sandbox entitlements, no direct updater, `macOSPrivateApi` disabled, and the lens migration described in `SCK-MIGRATION.md`.
