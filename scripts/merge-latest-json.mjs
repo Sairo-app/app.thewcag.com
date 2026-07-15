@@ -8,6 +8,7 @@
 import { readFileSync, readdirSync, writeFileSync, mkdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { mergeUpdaterPartials } from "./release-manifest-lib.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const searchDir = process.argv[2] || join(root, "dist-updater");
@@ -28,23 +29,13 @@ if (partials.length === 0) {
   process.exit(1);
 }
 
-let base = null;
-const platforms = {};
-for (const file of partials) {
-  const data = JSON.parse(readFileSync(file, "utf8"));
-  base ??= data;
-  Object.assign(platforms, data.platforms);
-  console.log(`merged ${file}: ${Object.keys(data.platforms).join(", ")}`);
+const namedPartials = partials.map((file) => ({ name: file, data: JSON.parse(readFileSync(file, "utf8")) }));
+const manifest = mergeUpdaterPartials(namedPartials);
+for (const { name, data } of namedPartials) {
+  console.log(`merged ${name}: ${Object.keys(data.platforms).join(", ")}`);
 }
-
-const manifest = {
-  version: base.version,
-  notes: base.notes,
-  pub_date: base.pub_date,
-  platforms,
-};
 
 const outDir = join(root, "dist-updater");
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, "latest.json"), JSON.stringify(manifest, null, 2));
-console.log(`wrote dist-updater/latest.json with platforms: ${Object.keys(platforms).join(", ")}`);
+console.log(`wrote dist-updater/latest.json with platforms: ${Object.keys(manifest.platforms).join(", ")}`);

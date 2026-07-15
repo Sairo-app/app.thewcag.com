@@ -7,7 +7,7 @@
     "build": "pnpm --filter @accessibility-build/desktop build",
     "build:web": "pnpm --filter @thewcag/web build",
     "typecheck": "pnpm --filter @accessibility-build/desktop typecheck && pnpm --filter @thewcag/web typecheck",
-    "test": "pnpm --filter @accessibility-build/a11y-core test",
+    "test": "pnpm --filter @accessibility-build/a11y-core test && pnpm --filter @thewcag/web test && node --test scripts/*.test.mjs",
     "verify": "pnpm test && pnpm typecheck && pnpm --filter @accessibility-build/desktop build:vite && pnpm build:web"
   },
   "packageManager": "pnpm@9.15.4"
