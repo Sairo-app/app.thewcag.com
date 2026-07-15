@@ -32,8 +32,8 @@ export async function Header() {
         <Link href="/" aria-label="TheWCAG home" className="site-brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="" width={26} height={26} />
-          <span className="site-brand__name">THEWCAG</span>
-          <span className="site-brand__meta">ACCESSIBILITY INSTRUMENTS</span>
+          <span className="site-brand__name">TheWCAG</span>
+          <span className="site-brand__meta">Auditor toolkit</span>
         </Link>
 
         <HeaderNav />

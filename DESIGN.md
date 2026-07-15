@@ -1,130 +1,143 @@
-# TheWCAG Design System — Precision Cinema
+# TheWCAG Design System — Audit Lab
 
-This document is the reusable visual and interaction brief for TheWCAG's website. It adapts the cinema-black, monumental-type, editorial-restraint principles seen in GetDesign's Bugatti analysis to TheWCAG's own accessibility-auditing identity. It is an original product system, not a copy of Bugatti's branding or components.
+This document is the reusable visual and interaction brief for TheWCAG's website. It translates the warm, developer-friendly, anti-corporate principles in GetDesign's PostHog analysis into an original accessibility-auditing identity. It does not copy PostHog's brand, mascot, assets, or page compositions.
 
 ## Brand idea
 
-- **Essence:** Exactitude.
-- **Visual tension:** Cinematic restraint versus diagnostic signal.
-- **Signature moment:** Monumental condensed typography beside a live screen-inspection frame.
-- **Product promise:** Make inaccessible states visible, reviewable, and defensible.
-- **Voice:** Precise, assured, concise, never playful or alarmist.
+- **Essence:** Practical proof.
+- **Visual tension:** Friendly engineering notebook versus rigorous audit record.
+- **Signature moment:** A real, keyboard-operable audit playground surrounded by small hand-authored annotations.
+- **Product promise:** Find the issue, keep the proof, and hand it off without rebuilding the context.
+- **Voice:** Candid, capable, direct, lightly playful, and never flippant about accessibility.
 
 ## Principles
 
-1. Typography carries the atmosphere; interface chrome stays quiet.
-2. Orange is an inspection signal, not general decoration.
-3. Hairlines and whitespace organize information instead of rounded cards and shadows.
-4. Product evidence is the imagery. Prefer real or code-native auditing views over stock photography.
-5. Motion guides attention and never gates content.
-6. Accessibility is a design constraint: readable measures, visible focus, semantic order, 44px targets, reduced-motion support, and AA contrast minimums.
+1. Make dense auditor workflows feel approachable without hiding their detail.
+2. Use warm cream as the canvas, olive-black as the ink, and TheWCAG orange as the single dominant action color.
+3. Prefer flat hairline surfaces, 4–8px corners, compact labels, and documentation-like organization.
+4. Product evidence is the illustration. Use authentic interface states instead of stock imagery or borrowed mascots.
+5. Supporting pastels clarify categories and callouts; they never replace text, icons, or status labels.
+6. Motion confirms hierarchy and state, but content remains usable without it.
+7. Accessibility is part of the system: semantic order, visible focus, 44px targets, reduced motion, forced colors, reflow, and AA contrast.
 
 ## Color
 
 | Token | Value | Use |
 | --- | --- | --- |
-| Cinema black | `#070707` | Marketing canvas and shared shell |
-| Panel | `#10100f` | Subtle elevation on dark |
-| Elevated | `#171716` | Hover and nested surfaces |
-| Ink | `#f4f1ea` | Primary text on dark |
-| Muted ink | `#aaa59c` | Supporting text on dark |
-| Hairline | `#292826` | Dark dividers and boundaries |
-| Signal orange | `#ff5a1f` | Primary action, inspection state, evidence band |
-| Accessible orange text | `#c94312` | Orange text on light surfaces |
-| Editorial cream | `#f1ede5` | Light product chapter |
-| Light ink | `#151311` | Text on cream and orange |
+| Canvas | `#eeefe9` | Primary website background |
+| Soft surface | `#e5e7e0` | Navigation strip, secondary panels, inactive chrome |
+| Paper | `#fcfcfa` | Cards, documentation sections, product UI |
+| Ink | `#23251d` | Headings, high-emphasis copy, dark inverted surface |
+| Body | `#4d4f46` | Paragraphs and supporting UI copy |
+| Muted | `#606258` | Metadata and low-emphasis labels |
+| Hairline | `#bfc1b7` | Card, table, and navigation boundaries |
+| TheWCAG orange | `#f15a29` | Primary buttons, inspection marks, proof bands |
+| Accessible orange text | `#a8330d` | Links and orange text on light surfaces |
+| Soft green | `#d9eddf` | Success and vision-tool category |
+| Soft blue | `#dceaf6` | Informational and finding-tool category |
+| Soft red | `#f7d6d3` | Warnings and open findings |
+| Soft purple | `#e7d8ee` | Standards and checklist category |
+| Soft yellow | `#f6e7b7` | Palette and analysis category |
 
-Orange-on-cream body text uses the darker `#c94312`. The vivid signal orange is reserved for large UI, backgrounds, borders, and dark-surface text.
+Orange is not the only signifier for any state. Small orange text on cream uses the darker accessible token. Vivid orange is used for large fills, boundaries, focus marks, and text in the ink color.
 
 ## Typography
 
-- **Display:** Saira Condensed, weights 300–500. Uppercase, monumental, slightly tracked. Used for hero and chapter titles.
-- **Editorial:** EB Garamond, weight 400. Used for narrative marketing copy and considered descriptions.
-- **Interface:** Bricolage Grotesque. Used for product pages, controls, forms, and dense UI.
-- **Technical:** platform monospace stack. Used for navigation, labels, specifications, state, and metadata.
-
-Display-to-body scale should be at least 8:1 on large screens. Marketing headlines use controlled line breaks. Body content stays between 45 and 75 characters per line.
+- **Interface and display:** IBM Plex Sans, weights 400–700. Headings are bold, tightly tracked, and sentence case.
+- **Technical:** IBM Plex Mono, weights 400–600. Used for labels, shortcuts, metadata, ratios, code, and small status text.
+- The largest marketing headline uses a responsive `3.5rem–6.4rem` range with approximately `0.92` line height.
+- Section headlines use a responsive `2.6rem–5rem` range.
+- Default marketing body copy is `16–20px` with `1.55–1.62` line height.
+- Body measures stay under roughly 75 characters; technical labels remain concise at small sizes.
 
 ## Composition
 
-- Marketing content caps at `100rem` with a responsive `1.125rem–3.5rem` gutter.
-- Use a 12-column editorial grid at desktop sizes.
-- Prefer asymmetric compositions and deliberate overlap.
-- Alternate dense inspection moments with large areas of breathing room.
-- Product groups use hairline-divided cells rather than floating card grids.
-- Corners are square. Pill geometry is reserved for primary navigation actions and badges.
-- Avoid gradients except subtle atmospheric light inside product evidence scenes.
+- Shared marketing content caps at `90rem` with a responsive `1.125rem–3.5rem` gutter.
+- The hero uses a copy/product split on wide screens and becomes sequential below `1024px`.
+- Major sections use generous `5–9rem` vertical rhythm.
+- Cards are flat, separated by olive hairlines, and use 6px corners. Shadows are not part of the default vocabulary.
+- Small circular stickers and slightly rotated annotations are reserved for marketing emphasis, never form controls or content-heavy panels.
+- Dark ink surfaces are limited to code-like evidence sequences and the footer so that inversion stays meaningful.
 
 ## Components
 
 ### Header
 
-- Sticky cinema-black shell with a single bottom hairline.
-- Widely tracked uppercase wordmark and technical navigation labels.
-- Download is a signal-orange outline pill that fills on hover.
-- Mobile navigation uses a full-width dark panel with at least 48px rows.
+- Sticky translucent cream surface with a single hairline.
+- Active navigation lifts onto a white 6px card with an orange underline.
+- Download is the persistent orange primary action.
+- Mobile navigation is a bordered paper panel with 48px rows and complete authenticated actions.
 
 ### Buttons
 
-- Primary: signal-orange fill, black label, pill geometry.
-- Secondary: transparent, quiet gray outline, light label.
-- Light-context: transparent black outline, inverts on hover.
-- Labels are uppercase monospace at `0.625rem` with `0.13em` tracking.
-- Minimum height is `3.15rem` on marketing surfaces.
+- Primary: orange fill, ink label, 6px radius, 48px minimum height.
+- Secondary: paper fill, olive hairline, ink label.
+- Dark: ink fill, white label, used on orange surfaces.
+- Hover may lift by 2px. Focus uses a 3px dark-orange outline with a 3px offset.
 
-### Product evidence
+### Audit playground
 
-- The product frame should read as a real instrument, not a decorative mockup.
-- Use authentic values, clear states, subtle depth, and a single movable inspection focus.
-- Product scenes are non-essential illustrations with complete accessible labels.
+- This is a functional preview, not a static illustration.
+- Contrast, Evidence, and Vision are real ARIA tabs with arrow, Home, and End key behavior.
+- Each mode demonstrates authentic vocabulary and values without claiming a live audit is occurring.
+- Its essential meaning is available through the surrounding heading and copy; decorative mock-interface details remain hidden from assistive technology.
 
-### Editorial feature cells
+### Tool cards
 
-- Two columns on desktop, one on small screens.
-- Hairline boundary, large condensed title, serif explanation, technical text link.
-- Dark inversion on hover is allowed when text contrast remains compliant.
+- Three columns on wide screens, two on laptop/tablet, and one on mobile.
+- A pastel category surface, explicit text label, icon, headline, explanation, and deep link are always present.
+- Hover introduces a small lift/rotation only when motion is allowed.
+
+### Public field-guide pages
+
+- Use a readable `70rem` content shell and a compact `THEWCAG FIELD GUIDE` label.
+- Each section is a bordered paper surface with a clear heading marker.
+- Tables retain visible rules and links use underlines, not color alone.
+- Existing semantic content and heading hierarchy remain authoritative.
 
 ### Footer
 
-- Oversized outline statement rather than a solid-color brand wall.
-- Hairline-divided columns, restrained link motion, visible platform actions.
+- Ink inversion reads like the system's final code block.
+- A large `AUDIT. PROVE. SHIP.` statement provides the brand moment.
+- Navigation, platform downloads, repository link, and product positioning remain explicit.
 
 ## Motion
 
-- Use `cubic-bezier(0.16, 1, 0.3, 1)` for entrances and spatial transforms.
-- Reveal sections progressively through `IntersectionObserver`.
-- Animate only opacity and transforms for scroll reveals.
-- Pointer response is limited to the decorative inspection focus.
-- Never hide content indefinitely if scripting or observation is unavailable.
-- Respect `prefers-reduced-motion: reduce` globally.
+- Use `cubic-bezier(0.16, 1, 0.3, 1)` for entrances and spatial changes.
+- Reveal sections with `IntersectionObserver`; immediately reveal content when observation is unavailable.
+- Animate only opacity and transforms for scroll entrances.
+- Interactive states use `180–280ms` transitions.
+- Never scroll-hijack, animate body copy while it is being read, or add a custom cursor.
+- `prefers-reduced-motion: reduce` shortens every animation and transition to effectively immediate.
 
 ## Responsive behavior
 
-- **Wide (`> 1184px`):** full asymmetric hero, 12-column editorial compositions.
-- **Laptop (`992–1184px`):** inspection frame overlaps less and typography scales down.
-- **Tablet (`768–992px`):** hero becomes sequential; two-column evidence steps remain.
-- **Mobile (`< 768px`):** single-column product features and platform panels; signal data becomes 2×2.
-- **Narrow mobile (`< 512px`):** actions stack, evidence loop becomes one column, platform specifications become rows.
+- **Wide (`> 1216px`):** copy/product hero, 3-up tool cards, two platform panels.
+- **Laptop (`1024–1216px`):** narrower product preview and reduced gaps.
+- **Tablet (`768–1024px`):** sequential hero, 2-up tool cards, stacked workflow copy.
+- **Mobile (`592–768px`):** single platform column, 2-up specification cells, compact playground.
+- **Narrow mobile (`< 592px`):** stacked actions, single tool column, compact evidence preview.
+- **Minimum (`320px`):** single proof cells where needed and simplified non-essential preview chrome.
 
-No breakpoint may introduce horizontal page scrolling. Headline sizing uses `clamp()` and should be tested at 320, 375, 768, 1024, and 1440px.
+No breakpoint may create horizontal page scrolling. Test at `320`, `375`, `768`, `1024`, and `1440px`, plus Windows compact desktop sizing and a wide MacBook workspace.
 
 ## Accessibility acceptance criteria
 
-- One `h1`; headings follow a logical hierarchy.
-- Main content has a working skip link.
-- Interactive elements have visible focus and a minimum 44×44px target where applicable.
-- Text and meaningful UI meet WCAG 2.2 AA contrast.
-- Orange is never the only indicator of status.
-- Illustrative product frames have descriptive accessible names and no nested focus targets.
-- Layout and information remain available when motion is reduced or JavaScript is unavailable.
-- Keyboard, zoom, forced-colors, and screen-reader behavior are verified before release.
+- Exactly one `h1`; headings follow a logical hierarchy.
+- The skip link reaches `#main` and is visible on focus.
+- Interactive targets are at least 44px in their tappable dimension.
+- Text, icons, borders needed for understanding, and meaningful states meet WCAG 2.2 AA contrast.
+- Status is never conveyed by color alone.
+- The audit playground implements the ARIA tabs pattern and retains keyboard focus when changing modes.
+- Layout remains readable at 320px, 200% zoom, reduced motion, forced colors, and with JavaScript unavailable.
+- Product copy does not invent customers, usage figures, certifications, or audit outcomes.
 
 ## Avoid
 
-- Generic gradient-orb SaaS heroes.
-- Repeated rounded cards and oversized corner radii.
-- Dense blueprint grids, HUD decoration, or faux-terminal noise.
-- Decorative orange everywhere.
-- Stock accessibility photography and generic accessibility icons as hero art.
-- Custom cursors, scroll hijacking, parallax on text, or motion that blocks reading.
-- Copying automotive names, imagery, logos, or brand-specific compositions.
+- Borrowed mascots, logos, illustrations, or PostHog-specific product language.
+- Generic gradient-orb SaaS heroes, glassmorphism, and excessive shadows.
+- Huge display text that pushes the product below the first viewport without purpose.
+- Decorative rounded containers around every line of copy.
+- Orange body text below the accessible text token.
+- Stock accessibility photography and performative disability imagery.
+- Custom cursors, scroll hijacking, parallax reading surfaces, or animations that gate content.

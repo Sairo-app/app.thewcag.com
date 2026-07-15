@@ -19,11 +19,11 @@
 
 **Web**
 
-- Rebuilt the homepage and public marketing pages as the original Precision
-  Cinema system: monumental condensed type, editorial copy, cinema-black and
-  cream chapters, restrained orange inspection signals, hairline layouts, and
-  a responsive interactive product frame. Added `DESIGN.md` to preserve the
-  visual and accessibility rules across future pages.
+- Rebuilt the homepage and public marketing pages as the original Audit Lab
+  system: warm cream canvas, compact IBM Plex typography, olive-ink hairlines,
+  focused orange actions, practical pastel tool cards, and a keyboard-operable
+  Contrast/Evidence/Vision playground. Added `DESIGN.md` to preserve the visual,
+  responsive, interaction, and accessibility rules across future pages.
 - Added an accessible mobile navigation down to 320px, stronger production
   security headers, enforced build-time type validation, fail-fast production
   migrations, and aligned platform requirements with the desktop configuration.

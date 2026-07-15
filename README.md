@@ -337,7 +337,7 @@ Changes should preserve keyboard access, visible focus, semantic names and state
 
 ## Project documentation
 
-- [DESIGN.md](DESIGN.md): Precision Cinema visual language, responsive composition, interaction, and accessibility acceptance criteria.
+- [DESIGN.md](DESIGN.md): Audit Lab visual language, responsive composition, interactive product-preview rules, and accessibility acceptance criteria.
 - [SKILL.md](SKILL.md): repository-specific implementation and verification workflow.
 - [CHANGELOG.md](CHANGELOG.md): shipped versions and unreleased changes.
 - [docs/RELEASING.md](docs/RELEASING.md): production signing and release operations.

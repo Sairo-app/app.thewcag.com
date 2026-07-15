@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Footer, JsonLd } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { HomeMotion, InspectionStage } from "@/components/HomeExperience";
+import { AuditPlayground, HomeMotion } from "@/components/HomeExperience";
 import {
   AppleIcon,
   ArrowRightIcon,
@@ -32,69 +32,76 @@ export const metadata: Metadata = {
   },
 };
 
-const INSTRUMENTS: {
+const TOOLS: {
   icon: ReactNode;
-  number: string;
+  label: string;
   title: string;
   body: string;
   href: string;
   link: string;
+  tone: string;
 }[] = [
   {
     icon: <ContrastIcon size={22} />,
-    number: "01",
-    title: "Contrast, measured in context.",
-    body: "Sample any foreground and background on screen. Compare WCAG 2.2, AAA, non-text, and APCA results without leaving the interface under review.",
+    label: "Measure",
+    title: "Contrast from any pixel",
+    body: "Sample foreground and background colors from websites, native apps, prototypes, documents, or video. Compare WCAG 2.2 and APCA in context.",
     href: "/color-contrast-checker",
     link: "Explore contrast",
+    tone: "orange",
   },
   {
     icon: <CropIcon size={22} />,
-    number: "02",
-    title: "Evidence that survives the meeting.",
-    body: "Capture the exact failure state, annotate it, redact sensitive detail, connect the criterion, and preserve what the auditor actually observed.",
+    label: "Capture",
+    title: "Evidence people can review",
+    body: "Capture the failure state, annotate the issue, redact sensitive detail, assign severity, and attach the exact success criterion.",
     href: "/screenshot-tool",
-    link: "See visual evidence",
+    link: "See screenshot evidence",
+    tone: "cream",
   },
   {
     icon: <EyeIcon size={22} />,
-    number: "03",
-    title: "Vision simulation, live.",
-    body: "Move a resizable lens through protanopia, deuteranopia, tritanopia, monochromacy, low acuity, and reduced-contrast views.",
+    label: "Simulate",
+    title: "Vision changes, live",
+    body: "Move a resizable lens through color-vision deficiencies, monochromacy, low acuity, and reduced contrast without leaving the interface.",
     href: "/color-blindness-simulator",
-    link: "Enter the simulator",
+    link: "Try the simulator",
+    tone: "green",
   },
   {
     icon: <FlagIcon size={22} />,
-    number: "04",
-    title: "A living findings register.",
-    body: "Search, filter, prioritize, assign status, retain auditor notes, and export a reviewable record in CSV, Markdown, or HTML.",
+    label: "Triage",
+    title: "A finding register that stays useful",
+    body: "Search, filter, prioritize, and update findings while keeping the auditor note, evidence, status, and criterion together.",
     href: "/screenshot-tool",
-    link: "Review findings",
+    link: "Review the workflow",
+    tone: "blue",
   },
   {
     icon: <BookIcon size={22} />,
-    number: "05",
-    title: "The whole WCAG 2.2 audit.",
-    body: "Track every Level A and AA criterion with pass, fail, not-applicable, notes, completion progress, and scoped exports.",
+    label: "Track",
+    title: "The whole WCAG 2.2 audit",
+    body: "Work every Level A and AA criterion with pass, fail, not applicable, notes, progress, and exports scoped to the audit.",
     href: "/wcag-checklist",
     link: "Open the checklist",
+    tone: "purple",
   },
   {
     icon: <PaletteIcon size={22} />,
-    number: "06",
-    title: "A palette under pressure.",
-    body: "Test every color pairing as a matrix and expose unsafe combinations before they become components, tokens, or production defects.",
+    label: "Stress-test",
+    title: "Every palette pairing at once",
+    body: "Turn a token set into a contrast matrix and find unsafe combinations before they become components or production defects.",
     href: "/color-contrast-checker",
-    link: "Stress-test a palette",
+    link: "Test a palette",
+    tone: "yellow",
   },
 ];
 
 const WORKFLOW = [
-  ["01", "Frame", "Record project, scope, target, evaluator, and conformance level."],
-  ["02", "Inspect", "Use global shortcuts over websites, apps, prototypes, video, and documents."],
-  ["03", "Prove", "Connect each observation to visual evidence, severity, and WCAG criteria."],
-  ["04", "Deliver", "Triage the register, export structured files, or publish one focused review link."],
+  ["01", "Frame the audit", "Record target, scope, evaluator, conformance level, and project context once."],
+  ["02", "Inspect anywhere", "Use global shortcuts over websites, desktop apps, designs, documents, and transient states."],
+  ["03", "Keep the proof", "Connect each observation to a capture, severity, criterion, status, and auditor note."],
+  ["04", "Hand it off", "Export CSV, Markdown, HTML, or a focused review link without rebuilding the finding."],
 ];
 
 const PLATFORM_FEATURES = [
@@ -106,13 +113,8 @@ const PLATFORM_FEATURES = [
   "Signed automatic updates",
 ];
 
-function Kicker({ index, children, light = false }: { index: string; children: ReactNode; light?: boolean }) {
-  return (
-    <p className={`cinema-kicker${light ? " cinema-kicker--light" : ""}`}>
-      <span>{index}</span>
-      {children}
-    </p>
-  );
+function Eyebrow({ children }: { children: ReactNode }) {
+  return <p className="lab-eyebrow"><span aria-hidden="true">✦</span>{children}</p>;
 }
 
 export default function Home() {
@@ -133,158 +135,154 @@ export default function Home() {
         }}
       />
 
-      <main id="main" className="cinema-home">
+      <main id="main" className="lab-home">
         <HomeMotion />
 
-        <section className="cinema-hero" aria-labelledby="home-heading">
-          <div className="cinema-shell">
-            <div className="cinema-hero__rail" data-reveal>
-              <span>SCREEN-LEVEL ACCESSIBILITY</span>
-              <span>MACOS / WINDOWS</span>
-              <span className="cinema-hero__live"><i /> AUDIT INSTRUMENT READY</span>
+        <div className="lab-notice">
+          <div className="lab-shell">
+            <span><i /> The desktop auditor toolkit</span>
+            <Link href="/download">Now available for macOS + Windows <ArrowRightIcon size={14} /></Link>
+          </div>
+        </div>
+
+        <section className="lab-hero" aria-labelledby="home-heading">
+          <div className="lab-shell lab-hero__layout">
+            <div className="lab-hero__copy" data-reveal>
+              <Eyebrow>Built for human accessibility audits</Eyebrow>
+              <h1 id="home-heading">
+                Find the issue.<br />
+                <span>Keep the proof.</span>
+              </h1>
+              <p className="lab-hero__lede">
+                TheWCAG is the practical desktop lab for the accessibility work browser automation cannot see—native apps, prototypes, focus states, video, documents, and everything else on screen.
+              </p>
+              <div className="lab-actions">
+                <Link href="/download" className="lab-button lab-button--primary">
+                  Download free <ArrowRightIcon size={17} />
+                </Link>
+                <Link href="/screenshot-tool" className="lab-button">
+                  Explore the toolkit
+                </Link>
+              </div>
+              <ul className="lab-hero__promises" aria-label="Product promises">
+                <li><CheckIcon size={15} /> Local-first</li>
+                <li><CheckIcon size={15} /> No account to start</li>
+                <li><CheckIcon size={15} /> WCAG 2.2 ready</li>
+              </ul>
             </div>
 
-            <div className="cinema-hero__composition">
-              <div className="cinema-hero__type" data-reveal style={{ "--reveal-delay": "70ms" } as React.CSSProperties}>
-                <p>ACCESSIBILITY, AT THE SPEED OF SIGHT</p>
-                <h1 id="home-heading">
-                  See what
-                  <span>others miss.</span>
-                </h1>
-              </div>
-
-              <div className="cinema-hero__stage" data-reveal style={{ "--reveal-delay": "170ms" } as React.CSSProperties}>
-                <InspectionStage />
-              </div>
-
-              <div className="cinema-hero__statement" data-reveal style={{ "--reveal-delay": "260ms" } as React.CSSProperties}>
-                <p>
-                  A native desktop instrument for the parts of accessibility that browser automation cannot see.
-                </p>
-                <div className="cinema-actions">
-                  <Link href="/download" className="cinema-button cinema-button--primary">
-                    Download free <ArrowRightIcon size={17} />
-                  </Link>
-                  <Link href="/screenshot-tool" className="cinema-button">
-                    Explore the workflow
-                  </Link>
-                </div>
-                <small>LOCAL-FIRST / NO ACCOUNT REQUIRED TO START</small>
-              </div>
+            <div className="lab-hero__playground" data-reveal style={{ "--reveal-delay": "120ms" } as CSSProperties}>
+              <div className="lab-doodle lab-doodle--note" aria-hidden="true">try it →</div>
+              <AuditPlayground />
+              <div className="lab-sticker" aria-hidden="true"><strong>6</strong><span>tools<br />one audit</span></div>
             </div>
           </div>
         </section>
 
-        <section className="cinema-signal" aria-label="Product specifications">
-          <div className="cinema-shell cinema-signal__grid">
-            <div><strong>6</strong><span>Connected instruments</span></div>
+        <section className="lab-proof" aria-label="Product specifications">
+          <div className="lab-shell lab-proof__grid">
+            <div><strong>6</strong><span>Connected auditor tools</span></div>
             <div><strong>2</strong><span>Native desktop platforms</span></div>
             <div><strong>2.2</strong><span>WCAG checklist coverage</span></div>
-            <div><strong>1</strong><span>Defensible evidence trail</span></div>
+            <div><strong>1</strong><span>Evidence trail from issue to handoff</span></div>
           </div>
         </section>
 
-        <section className="cinema-thesis" aria-labelledby="thesis-heading">
-          <div className="cinema-shell cinema-thesis__grid">
-            <Kicker index="01" light>THE BLIND SPOT</Kicker>
-            <div data-reveal>
-              <h2 id="thesis-heading">The interface is the evidence.</h2>
-              <p>
-                Native applications, design prototypes, transient focus states, video, documents, and menus that vanish cannot be understood by the DOM alone. TheWCAG works at screen level—where the experience actually happens.
-              </p>
-            </div>
-            <p className="cinema-thesis__aside" data-reveal>
-              Built for accessibility auditors, designers, developers, and quality teams who need to show the issue—not merely report that one exists.
-            </p>
-          </div>
-        </section>
-
-        <section className="cinema-instruments" aria-labelledby="instruments-heading">
-          <div className="cinema-shell">
-            <div className="cinema-heading" data-reveal>
-              <Kicker index="02">THE INSTRUMENTS</Kicker>
-              <h2 id="instruments-heading">One system.<br /><span>Six precise views.</span></h2>
-              <p>From the first pixel sample to the final client-ready record.</p>
+        <section className="lab-tools" aria-labelledby="tools-heading">
+          <div className="lab-shell">
+            <div className="lab-section-heading" data-reveal>
+              <div>
+                <Eyebrow>A connected accessibility workspace</Eyebrow>
+                <h2 id="tools-heading">Everything the audit needs.<br /><span>Nothing it doesn&apos;t.</span></h2>
+              </div>
+              <p>Six focused instruments share the same audit context, so evidence does not disappear between capture, analysis, and reporting.</p>
             </div>
 
-            <div className="cinema-instrument-list">
-              {INSTRUMENTS.map((instrument, index) => (
+            <div className="lab-tool-grid">
+              {TOOLS.map((tool, index) => (
                 <article
-                  className="cinema-instrument"
-                  key={instrument.number}
+                  className={`lab-tool-card lab-tool-card--${tool.tone}`}
+                  key={tool.title}
                   data-reveal
-                  style={{ "--reveal-delay": `${(index % 2) * 70}ms` } as React.CSSProperties}
+                  style={{ "--reveal-delay": `${(index % 3) * 55}ms` } as CSSProperties}
                 >
-                  <div className="cinema-instrument__meta">
-                    <span>{instrument.number}</span>
-                    {instrument.icon}
+                  <div className="lab-tool-card__top">
+                    <span>{tool.icon}</span>
+                    <small>{tool.label}</small>
                   </div>
-                  <h3>{instrument.title}</h3>
-                  <p>{instrument.body}</p>
-                  <Link href={instrument.href}>{instrument.link}<ArrowRightIcon size={15} /></Link>
+                  <h3>{tool.title}</h3>
+                  <p>{tool.body}</p>
+                  <Link href={tool.href}>{tool.link}<ArrowRightIcon size={15} /></Link>
                 </article>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="cinema-loop" aria-labelledby="loop-heading">
-          <div className="cinema-shell">
-            <div className="cinema-loop__heading" data-reveal>
-              <Kicker index="03" light>THE EVIDENCE LOOP</Kicker>
-              <h2 id="loop-heading">Observation becomes proof.</h2>
+        <section className="lab-workflow" aria-labelledby="workflow-heading">
+          <div className="lab-shell lab-workflow__layout">
+            <div className="lab-workflow__copy" data-reveal>
+              <Eyebrow>One evidence loop</Eyebrow>
+              <h2 id="workflow-heading">From “I found something” to “here&apos;s the fix.”</h2>
+              <p>Every step leaves the next person enough context to understand, reproduce, and close the issue.</p>
+              <div className="lab-workflow__code"><code>finding.status = &quot;ready_for_review&quot;</code><span>✓ saved locally</span></div>
             </div>
-            <ol className="cinema-loop__steps">
+
+            <ol className="lab-workflow__steps">
               {WORKFLOW.map(([number, title, body], index) => (
-                <li key={number} data-reveal style={{ "--reveal-delay": `${index * 60}ms` } as React.CSSProperties}>
+                <li key={number} data-reveal style={{ "--reveal-delay": `${index * 55}ms` } as CSSProperties}>
                   <span>{number}</span>
-                  <h3>{title}</h3>
-                  <p>{body}</p>
+                  <div><h3>{title}</h3><p>{body}</p></div>
+                  <CheckIcon size={17} />
                 </li>
               ))}
             </ol>
           </div>
         </section>
 
-        <section className="cinema-platform" aria-labelledby="platform-heading">
-          <div className="cinema-shell">
-            <div className="cinema-heading cinema-heading--platform" data-reveal>
-              <Kicker index="04">TWO DESKTOPS / ONE AUDIT MODEL</Kicker>
-              <h2 id="platform-heading">Native where it matters.</h2>
-              <p>One consistent workflow with platform-aware shortcuts, permissions, scaling, window behavior, and updates.</p>
+        <section className="lab-platform" aria-labelledby="platform-heading">
+          <div className="lab-shell">
+            <div className="lab-section-heading lab-section-heading--platform" data-reveal>
+              <div>
+                <Eyebrow>Native where it matters</Eyebrow>
+                <h2 id="platform-heading">One audit model.<br /><span>Two first-class desktops.</span></h2>
+              </div>
+              <p>Platform-aware permissions, shortcuts, scaling, window behavior, and signed updates—with a consistent auditor workflow.</p>
             </div>
 
-            <div className="cinema-platform__panels">
+            <div className="lab-platform__grid">
               <article data-reveal>
-                <div className="cinema-platform__icon"><AppleIcon className="h-9 w-9" /><span>01 / MACOS</span></div>
-                <h3>Mac</h3>
-                <p>Apple Silicon and Intel builds, menu-bar access, Mac-native shortcut labels, Screen Recording recovery, and resizable workspaces.</p>
+                <div className="lab-platform__top"><AppleIcon className="h-9 w-9" /><span>macOS</span></div>
+                <h3>Made for the Mac you audit on.</h3>
+                <p>Universal Apple Silicon and Intel builds, Mac-native shortcuts, menu-bar access, Screen Recording recovery, and flexible workspaces.</p>
                 <Link href="/download">Download for Mac <ArrowRightIcon size={15} /></Link>
               </article>
-              <article data-reveal style={{ "--reveal-delay": "90ms" } as React.CSSProperties}>
-                <div className="cinema-platform__icon"><WindowsIcon className="h-9 w-9" /><span>02 / WINDOWS</span></div>
-                <h3>Windows</h3>
-                <p>Compact default sizing, Windows shortcut labels, native title-bar behavior, responsive reflow, and high-DPI rendering.</p>
+              <article data-reveal style={{ "--reveal-delay": "70ms" } as CSSProperties}>
+                <div className="lab-platform__top"><WindowsIcon className="h-9 w-9" /><span>Windows</span></div>
+                <h3>Comfortable, even in a compact window.</h3>
+                <p>Native shortcut labels, compact default sizing, responsive reflow, high-DPI rendering, and Windows-aware title-bar behavior.</p>
                 <Link href="/download">Download for Windows <ArrowRightIcon size={15} /></Link>
               </article>
             </div>
 
-            <ul className="cinema-platform__specs" aria-label="Shared platform features">
+            <ul className="lab-platform__features" aria-label="Shared desktop features">
               {PLATFORM_FEATURES.map((feature) => <li key={feature}><CheckIcon size={15} />{feature}</li>)}
             </ul>
           </div>
         </section>
 
-        <section className="cinema-final" aria-labelledby="final-heading">
-          <div className="cinema-shell cinema-final__layout" data-reveal>
-            <Kicker index="05" light>BEGIN THE AUDIT</Kicker>
-            <h2 id="final-heading">Make the invisible<br /><span>reviewable.</span></h2>
-            <div className="cinema-final__action">
-              <p>Start free. Publish only when you choose to share.</p>
-              <Link href="/download" className="cinema-button cinema-button--light">
+        <section className="lab-final" aria-labelledby="final-heading">
+          <div className="lab-shell lab-final__layout" data-reveal>
+            <div>
+              <Eyebrow>Your next audit can be clearer</Eyebrow>
+              <h2 id="final-heading">Make the invisible<br />reviewable.</h2>
+            </div>
+            <div className="lab-final__action">
+              <p>Start free on macOS or Windows. Publish only when you choose to share.</p>
+              <Link href="/download" className="lab-button lab-button--dark">
                 Download TheWCAG <ArrowRightIcon size={18} />
               </Link>
-              <small>MACOS + WINDOWS / LOCAL-FIRST</small>
+              <small>No credit card · No account required to start</small>
             </div>
           </div>
         </section>

@@ -51,7 +51,7 @@ export function Footer() {
   return (
     <footer className="site-footer">
       <div className="site-footer__inner">
-        <div className="site-footer__headline" aria-hidden="true">SEE CLEARLY.</div>
+        <div className="site-footer__headline" aria-hidden="true">AUDIT. PROVE. SHIP.</div>
 
         <div className="site-footer__grid">
           <div className="site-footer__brand">
@@ -61,7 +61,7 @@ export function Footer() {
               <span>THEWCAG</span>
             </Link>
             <p className="site-footer__description">
-              Screen-level accessibility auditing for macOS and Windows. Measure, simulate, capture, and deliver evidence from the real interface.
+              A practical accessibility lab for macOS and Windows. Inspect any interface, keep the evidence, and hand off findings people can act on.
             </p>
             <div className="site-footer__platforms">
               <Link href="/download" className="site-footer__platform" aria-label="Download for macOS"><AppleIcon className="h-3.5 w-3.5" />macOS</Link>

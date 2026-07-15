@@ -1,23 +1,18 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, EB_Garamond, Saira_Condensed } from "next/font/google";
+import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
 
-const bricolage = Bricolage_Grotesque({
+const plexSans = IBM_Plex_Sans({
   subsets: ["latin"],
-  variable: "--font-bricolage",
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-plex-sans",
   display: "swap",
 });
 
-const saira = Saira_Condensed({
+const plexMono = IBM_Plex_Mono({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
-  variable: "--font-display",
-  display: "swap",
-});
-
-const garamond = EB_Garamond({
-  subsets: ["latin"],
-  variable: "--font-editorial",
+  weight: ["400", "500", "600"],
+  variable: "--font-plex-mono",
   display: "swap",
 });
 
@@ -64,7 +59,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${bricolage.variable} ${saira.variable} ${garamond.variable}`}>
+      <body className={`${plexSans.variable} ${plexMono.variable}`}>
         <a
           href="#main"
           className="sr-only rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50"
