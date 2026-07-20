@@ -27,7 +27,9 @@ export class AuthService {
   }
 
   async signIn(): Promise<void> {
-    const state = randomBytes(32).toString("hex");
+    // The web connection contract uses a 128-bit, 32-character hexadecimal
+    // nonce. Keep this in sync with apps/web/app/connect/validation.ts.
+    const state = randomBytes(16).toString("hex");
     await this.store.set("auth-pending", { state, createdAt: Date.now() });
     const device = hostname().replace(/[^a-zA-Z0-9 _-]/g, "").trim().slice(0, 80) || "Desktop";
     const url = new URL("/connect", this.site);
