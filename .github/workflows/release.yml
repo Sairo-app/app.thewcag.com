@@ -24,7 +24,7 @@ jobs:
       WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
       WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Require release tag to match desktop version
         run: node scripts/validate-release-version.mjs "${GITHUB_REF_NAME}"
       - name: Require production signing credentials
@@ -43,9 +43,9 @@ jobs:
     needs: release-preflight
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -56,9 +56,9 @@ jobs:
     needs: quality
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -73,7 +73,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: pnpm build && pnpm exec electron-builder --mac --universal --publish never
       - name: Upload macOS installers and updater metadata
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: desktop-mac
           if-no-files-found: error
@@ -87,9 +87,9 @@ jobs:
     needs: quality
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -101,7 +101,7 @@ jobs:
           CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: pnpm build && pnpm exec electron-builder --win --x64 --publish never
       - name: Upload Windows installer and updater metadata
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: desktop-windows
           if-no-files-found: error
@@ -114,8 +114,8 @@ jobs:
     needs: [build-mac, build-windows]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
       - name: Collect release files
@@ -131,7 +131,7 @@ jobs:
         shell: bash
         run: shasum -a 256 * > SHA256SUMS.txt
       - name: Publish signed Electron release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: TheWCAG ${{ github.ref_name }}
           generate_release_notes: true
