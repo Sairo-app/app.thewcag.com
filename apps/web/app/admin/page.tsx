@@ -13,7 +13,7 @@ function formatBytes(n: number): string {
 }
 
 function formatDate(d: Date | null): string {
-  return d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
+  return d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "Not set";
 }
 
 export default async function AdminOverview() {
@@ -70,7 +70,7 @@ export default async function AdminOverview() {
                 <span className="min-w-0 truncate">{u.email}</span>
                 <span className="flex shrink-0 items-center gap-2 text-xs text-muted">
                   {u.brand && (
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">brand</span>
+                    <span className="rounded-md bg-primary/10 px-2 py-0.5 font-medium text-primary">brand</span>
                   )}
                   {formatDate(u.verified)}
                 </span>
@@ -89,7 +89,7 @@ export default async function AdminOverview() {
                   {r.title}
                 </Link>
                 <span className="shrink-0 text-xs tabular-nums text-muted">
-                  {r.views} views · {formatDate(r.created)}
+                  {r.views} views, {formatDate(r.created)}
                 </span>
               </li>
             ))}

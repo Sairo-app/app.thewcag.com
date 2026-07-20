@@ -1,18 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  selectElectronInstaller,
+  type DesktopReleaseAsset,
+} from "../../../../lib/desktop-release";
 
 export const runtime = "nodejs";
 export const revalidate = 300; // cache the resolved asset for 5 minutes
 
 const REPO = "Sairo-app/app.thewcag.com";
 const RELEASES = "https://github.com/Sairo-app/app.thewcag.com/releases/latest";
-
-/** Match the release asset for a given OS. Windows ships an NSIS installer
- * (-setup.exe); macOS ships a .dmg. */
-function matchesOs(name: string, os: "mac" | "windows"): boolean {
-  const n = name.toLowerCase();
-  if (os === "windows") return n.endsWith(".exe") || n.endsWith(".msi");
-  return n.endsWith(".dmg");
-}
 
 /** Guess the OS from the User-Agent when no ?os= is supplied. */
 function osFromUserAgent(ua: string): "mac" | "windows" {
@@ -35,9 +31,9 @@ export async function GET(req: NextRequest) {
       next: { revalidate: 300 },
     });
     if (res.ok) {
-      const data = (await res.json()) as { assets?: { name: string; browser_download_url: string }[] };
-      const asset = data.assets?.find((a) => matchesOs(a.name, os));
-      if (asset) return NextResponse.redirect(asset.browser_download_url, 302);
+      const data = (await res.json()) as { assets?: DesktopReleaseAsset[] };
+      const installer = selectElectronInstaller(data.assets, os);
+      if (installer) return NextResponse.redirect(installer, 302);
     }
   } catch {
     /* fall through */

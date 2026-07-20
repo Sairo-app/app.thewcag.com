@@ -1,4 +1,4 @@
-# Local dev services for app.thewcag.com — Postgres + MinIO (R2 stand-in).
+# Local dev services for app.thewcag.com: Postgres + MinIO (R2 stand-in).
 #   docker compose -f apps/web/docker-compose.dev.yml up -d
 services:
   postgres:

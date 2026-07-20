@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 const TYPES = [
   ["Deuteranopia", "Reduced sensitivity to green - the most common form (~6% of men)."],
   ["Protanopia", "Reduced sensitivity to red; reds look darker and can blend with black."],
-  ["Tritanopia", "Rare blue–yellow deficiency; blues and greens become hard to tell apart."],
+  ["Tritanopia", "Rare blue-yellow deficiency; blues and greens become hard to tell apart."],
   ["Low acuity / blur", "Simulates reduced sharpness to test whether layout survives without fine detail."],
 ];
 

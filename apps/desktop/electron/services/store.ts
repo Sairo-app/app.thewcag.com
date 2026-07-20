@@ -1,0 +1,107 @@
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { join } from "node:path";
+import type { Finding } from "../../src/shared/desktop";
+
+const KEY = /^[a-zA-Z0-9_-]{1,64}$/;
+const MAX_JSON_BYTES = 10 * 1024 * 1024;
+
+export function assertStoreKey(key: string): void {
+  if (!KEY.test(key)) throw new Error("Invalid storage key");
+}
+
+export function mergeFindings(existing: Finding[], incoming: unknown): Finding[] {
+  if (!Array.isArray(incoming)) return existing;
+  const seen = new Set(existing.map((finding) => finding.key).filter(Boolean));
+  const next = [...existing];
+  for (const value of incoming) {
+    if (!value || typeof value !== "object") continue;
+    const finding = value as Partial<Finding>;
+    if (!finding.key || seen.has(finding.key) || typeof finding.title !== "string") continue;
+    seen.add(finding.key);
+    next.push({
+      key: finding.key,
+      title: finding.title.trim().slice(0, 240),
+      wcag: typeof finding.wcag === "string" ? finding.wcag.slice(0, 20) : "",
+      severity: ["blocker", "major", "minor"].includes(finding.severity ?? "")
+        ? finding.severity as Finding["severity"]
+        : "major",
+      status: ["open", "fixed", "accepted"].includes(finding.status ?? "")
+        ? finding.status as Finding["status"]
+        : "open",
+      note: typeof finding.note === "string" ? finding.note.slice(0, 5_000) : "",
+      captureId: typeof finding.captureId === "string" ? finding.captureId : undefined,
+      createdAt: typeof finding.createdAt === "number" ? finding.createdAt : Date.now(),
+    });
+  }
+  return next;
+}
+
+export class JsonStore {
+  readonly directory: string;
+
+  constructor(userData: string) {
+    this.directory = join(userData, "store");
+  }
+
+  async initialize(): Promise<void> {
+    await mkdir(this.directory, { recursive: true });
+  }
+
+  private pathFor(key: string): string {
+    assertStoreKey(key);
+    return join(this.directory, `${key}.json`);
+  }
+
+  async getRaw(key: string): Promise<string | null> {
+    const path = this.pathFor(key);
+    try {
+      return await readFile(path, "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw error;
+    }
+  }
+
+  async get<T>(key: string, fallback: T): Promise<T> {
+    const raw = await this.getRaw(key);
+    if (!raw) return fallback;
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      const path = this.pathFor(key);
+      await rename(path, `${path}.corrupt-${Date.now()}`).catch(() => undefined);
+      return fallback;
+    }
+  }
+
+  async setRaw(key: string, json: string): Promise<void> {
+    if (Buffer.byteLength(json, "utf8") > MAX_JSON_BYTES) throw new Error("Stored document is too large");
+    JSON.parse(json);
+    await this.atomicWrite(this.pathFor(key), json);
+  }
+
+  async set<T>(key: string, value: T): Promise<void> {
+    await this.setRaw(key, JSON.stringify(value));
+  }
+
+  async addFindings(items: unknown, auditId?: string): Promise<Finding[]> {
+    if (auditId && !/^aud-[a-z0-9-]{6,36}$/.test(auditId)) throw new Error("Invalid audit identifier");
+    const key = auditId ? `findings-${auditId}` : "findings";
+    const existing = await this.get<Finding[]>(key, []);
+    const merged = mergeFindings(existing, items);
+    await this.set(key, merged);
+    return merged;
+  }
+
+  async remove(key: string): Promise<void> {
+    await rm(this.pathFor(key), { force: true });
+  }
+
+  private async atomicWrite(path: string, contents: string | Buffer): Promise<void> {
+    await mkdir(this.directory, { recursive: true });
+    const temp = `${path}.${randomUUID()}.tmp`;
+    await writeFile(temp, contents, { mode: 0o600 });
+    await rename(temp, path);
+  }
+}

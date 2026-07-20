@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import { isAdminEmail } from "@/lib/admin";
 import { HeaderNav } from "./HeaderNav";
+import { SiteMenu } from "./SiteMenu";
 import {
   BookIcon,
   ContrastIcon,
@@ -11,14 +12,13 @@ import {
   ImageIcon,
   LogInIcon,
   LogOutIcon,
-  MenuIcon,
 } from "@/components/icons";
 
 const MOBILE_NAV = [
-  ["/screenshot-tool", "Screenshot tool", <CropIcon key="crop" size={16} />],
-  ["/color-contrast-checker", "Contrast checker", <ContrastIcon key="contrast" size={16} />],
-  ["/color-blindness-simulator", "Color blindness", <EyeIcon key="eye" size={16} />],
-  ["/wcag-checklist", "WCAG 2.2 checklist", <BookIcon key="book" size={16} />],
+  ["/#purpose", "Why it works", <BookIcon key="purpose" size={16} />],
+  ["/#tools", "Desktop tools", <ContrastIcon key="toolkit" size={16} />],
+  ["/#platforms", "Mac and Windows", <CropIcon key="platforms" size={16} />],
+  ["/wcag-contrast", "Guides", <EyeIcon key="resources" size={16} />],
 ] as const;
 
 export async function Header() {
@@ -33,31 +33,31 @@ export async function Header() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="" width={26} height={26} />
           <span className="site-brand__name">TheWCAG</span>
-          <span className="site-brand__meta">Auditor toolkit</span>
         </Link>
 
-        <HeaderNav />
-
-        <div className="site-account">
-          {signedIn ? (
-            <>
-              {admin && <Link href="/admin">Admin</Link>}
-              <Link href="/screenshots"><ImageIcon size={14} />Reports</Link>
-              <form action={async () => { "use server"; await signOut({ redirectTo: "/" }); }}>
-                <button type="submit"><LogOutIcon size={14} />Sign out</button>
-              </form>
-            </>
-          ) : (
-            <Link href="/signin"><LogInIcon size={14} />Sign in</Link>
-          )}
+        <div className="site-header__center">
+          <HeaderNav />
         </div>
 
-        <details className="site-menu">
-          <summary aria-label="Open navigation menu" className="site-menu__trigger">
-            <MenuIcon size={16} />
-            <span>Menu</span>
-          </summary>
-          <div className="site-menu__panel">
+        <div className="site-header__utilities">
+          {signedIn ? (
+            <details className="account-menu">
+              <summary>Account</summary>
+              <div className="account-menu__panel">
+                <p>{session?.user?.email}</p>
+                {admin && <Link href="/admin">Admin</Link>}
+                <Link href="/screenshots"><ImageIcon size={15} />My reports</Link>
+                <Link href="/brand">Report branding</Link>
+                <form action={async () => { "use server"; await signOut({ redirectTo: "/" }); }}>
+                  <button type="submit"><LogOutIcon size={15} />Sign out</button>
+                </form>
+              </div>
+            </details>
+          ) : (
+            <Link href="/signin" className="site-signin"><LogInIcon size={15} />Sign in</Link>
+          )}
+
+          <SiteMenu>
             <nav aria-label="Mobile primary">
               {MOBILE_NAV.map(([href, label, icon]) => (
                 <Link key={href} href={href} className="site-menu__link">
@@ -79,13 +79,13 @@ export async function Header() {
                 <Link href="/signin" className="site-menu__link"><LogInIcon size={16} />Sign in</Link>
               )}
             </div>
-          </div>
-        </details>
+          </SiteMenu>
 
-        <Link href="/download" aria-label="Download TheWCAG" className="site-header__download">
-          <DownloadIcon size={14} />
-          <span>Download</span>
-        </Link>
+          <Link href="/download" aria-label="Download TheWCAG" className="site-header__download">
+            <DownloadIcon size={15} />
+            <strong>Download</strong>
+          </Link>
+        </div>
       </div>
     </header>
   );

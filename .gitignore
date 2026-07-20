@@ -3,13 +3,18 @@ dist/
 target/
 .DS_Store
 *.local
-apps/desktop/src-tauri/gen/
-dist-updater/
+apps/desktop/out/
+apps/desktop/release/
 
 # Next.js build output
 .next/
 next-env.d.ts
 *.tsbuildinfo
+
+# Local design-tool and editor state
+.claude/
+.impeccable/
+**/.impeccable/
 
 # Env files (never commit) — keep only the example
 .env

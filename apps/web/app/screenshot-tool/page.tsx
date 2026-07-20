@@ -112,7 +112,7 @@ export default function ScreenshotToolPage() {
               <li key={s.title} className="flex gap-4">
                 <span
                   aria-hidden="true"
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground"
                 >
                   {i + 1}
                 </span>

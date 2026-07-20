@@ -63,7 +63,7 @@ export default function ApcaContrastPage() {
           APCA (Accessible Perceptual Contrast Algorithm) is the contrast model being developed for
           WCAG 3. Instead of a single ratio like 4.5:1, it produces an <strong>Lc value</strong>{" "}
           (lightness contrast, roughly -108 to +106) that tracks how readable a color pair actually
-          is — including the difference between dark-on-light and light-on-dark.
+          is, including the difference between dark-on-light and light-on-dark.
         </p>
 
         <section className="mt-12" aria-labelledby="differences">
@@ -83,7 +83,7 @@ export default function ApcaContrastPage() {
             </li>
             <li className="rounded-xl border border-border bg-card p-4">
               <strong className="text-foreground">Mid-tone pairs get re-scored.</strong> Orange, teal,
-              and grey mid-tones that scrape past 4.5:1 often fail APCA — and users squint at them.
+              and grey mid-tones that scrape past 4.5:1 often fail APCA, leaving users to squint at them.
               The reverse also happens: some pairs failing 4.5:1 are perceptually fine.
             </li>
           </ul>
@@ -112,7 +112,7 @@ export default function ApcaContrastPage() {
             </table>
           </div>
           <p className="mt-3 text-xs text-muted">
-            Values are magnitudes — an Lc of -75 (light text on dark) is as strong as +75. Thresholds
+            Values are magnitudes. An Lc of -75 (light text on dark) is as strong as +75. Thresholds
             summarize the current APCA guidance and may shift before WCAG 3 ships.
           </p>
         </section>
@@ -135,7 +135,7 @@ export default function ApcaContrastPage() {
           <h2 className="text-lg font-bold tracking-tight">Read both numbers from any pixel</h2>
           <p className="mt-2 text-sm text-muted">
             TheWCAG&apos;s desktop picker reports the WCAG 2.2 ratio with its AA/AAA verdict{" "}
-            <em>and</em> the APCA Lc value for any two pixels on screen — any app, not just the
+            <em>and</em> the APCA Lc value for any two pixels on screen in any app, not just the
             browser. Also try the{" "}
             <Link href="/color-contrast-checker" className="font-medium text-primary hover:underline">
               in-browser contrast checker

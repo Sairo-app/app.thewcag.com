@@ -111,12 +111,12 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
       : null;
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="report-page flex min-h-screen flex-col">
       {/* Minimal chrome: an accent strip (branded) and a slim logo-only bar.
-          No site nav — this page exists to show the screenshot. */}
+          No site nav. This page exists to show the screenshot. */}
       {brand?.color && <div aria-hidden="true" style={{ background: brand.color }} className="h-1 w-full" />}
-      <header className="border-b border-border">
-        <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
+      <header className="report-header border-b border-border">
+        <div className="report-header__inner mx-auto flex max-w-[1600px] items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
           {brand ? (
             <div className="flex min-w-0 items-center gap-2.5">
               {brand.logoUrl && (
@@ -128,7 +128,7 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
           ) : (
             <Link href="/" className="flex items-center gap-2" aria-label="TheWCAG home">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.png" alt="" width={22} height={22} className="h-[22px] w-[22px] rounded" />
+              <img src="/logo.png" alt="" width={22} height={22} className="h-[22px] w-[22px]" />
               <span className="text-sm font-bold tracking-tight">TheWCAG</span>
             </Link>
           )}
@@ -138,11 +138,11 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
         </div>
       </header>
 
-      <main id="main" className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-4 sm:px-6">
+      <main id="main" className="report-main mx-auto w-full max-w-[1600px] flex-1 px-4 py-4 sm:px-6">
         {/* the screenshot IS the page; findings sit in a slim side panel */}
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
-          <section className="min-w-0">
-            <div className="flex min-h-[60vh] items-center justify-center rounded-xl border border-border bg-card p-2 shadow-sm lg:min-h-[calc(100vh-110px)]">
+        <div className="report-layout grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
+          <section className="report-image min-w-0">
+            <div className="report-image__frame flex min-h-[60vh] items-center justify-center rounded-xl border border-border bg-card p-2 shadow-sm lg:min-h-[calc(100vh-110px)]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={`/api/s/${slug}/image`}
@@ -152,7 +152,7 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
             </div>
           </section>
 
-          <aside className="flex max-h-[calc(100vh-110px)] flex-col">
+          <aside className="report-sidebar flex max-h-[calc(100vh-110px)] flex-col">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h1 className="text-xl font-bold tracking-tight">{shot.title}</h1>
@@ -176,11 +176,11 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
             {shot.description && <p className="mt-2 text-sm">{shot.description}</p>}
 
             {summary.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-1.5">
+              <div className="report-summary mt-3 flex flex-wrap gap-1.5">
                 {summary.map((s) => (
                   <span
                     key={s.sev}
-                    className="rounded-full px-2 py-0.5 text-xs font-medium text-white"
+                    className="rounded-md px-2 py-0.5 text-xs font-medium text-white"
                     style={{ backgroundColor: SEVERITY_COLOR[s.sev] }}
                   >
                     {s.n} {s.sev}
@@ -191,14 +191,14 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
 
             {issues.length > 0 && (
               <ol
-                className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1"
+                className="report-findings mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1"
                 tabIndex={0}
                 aria-label="Findings"
               >
                 {issues.map((issue) => (
-                  <li key={issue.n} className="flex gap-3 rounded-lg border border-border bg-card p-3">
+                  <li key={issue.n} className="report-finding flex gap-3 rounded-lg border border-border bg-card p-3">
                     <span
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-xs font-bold text-white"
                       style={{ backgroundColor: SEVERITY_COLOR[issue.severity] ?? SEVERITY_COLOR.major }}
                       title={`Severity: ${issue.severity}`}
                     >
@@ -224,7 +224,7 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
             )}
 
             {brand ? (
-              <p className="mt-4 text-center text-[11px] text-muted">
+              <p className="report-attribution mt-4 text-center text-[11px] text-muted">
                 Prepared with{" "}
                 <a href={SITE_URL} target="_blank" rel="noopener noreferrer" className="font-medium underline hover:text-foreground">
                   TheWCAG
@@ -233,7 +233,7 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
             ) : (
               <Link
                 href="/download"
-                className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+                className="report-cta mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
               >
                 Audit with TheWCAG
                 <ArrowRightIcon size={16} />

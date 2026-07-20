@@ -1,21 +1,40 @@
 # Changelog
 
-## Unreleased
+## v3.0.0 — 2026-07-21
 
 **Desktop**
 
-- Added a local audit context (project, target, scope, conformance target,
-  evaluator, and start date) that carries into checklist and findings exports.
-- Reworked the main workspace for the compact 460px Windows window while
-  retaining the two-column MacBook layout; improved target sizes, focus
-  containment, scroll affordances, contrast-panel reflow, and reduced motion.
-- Added browser-preview routing for responsive QA and enabled a restrictive
-  Tauri Content Security Policy.
-- Made shortcut updates and resets recoverable when OS registration or disk
-  persistence fails, and corrected Windows tray shortcut labels.
-- Added visible save/export failure states, ordered persistent writes, dialog
-  focus restoration, stronger lens/editor semantics, and strict findings
-  deduplication for native exports.
+- Rebuilt the desktop product from scratch on Electron with a sandboxed main,
+  preload, and renderer architecture while preserving the existing web auth,
+  publishing, and local-data contracts.
+- Added the staged audit workstation: Inspect, Evidence, Review, and Share,
+  plus a searchable command bar, real audit switcher, contextual metrics, and
+  activity history in a light cream, charcoal, and orange visual system.
+- Isolated captures, findings, checklist state, contrast history, palettes,
+  activity, and published reports by audit, with automatic legacy migration.
+- Added an accountable report draft that requires capture selection, included
+  finding review, a sensitive-information attestation, and sign-in before the
+  existing publishing service can create a public link.
+- Rebuilt contrast inspection, multi-monitor high-DPI capture, the protected
+  color-vision lens, annotation and crop tools, capture library, findings,
+  the complete 55-criterion WCAG 2.2 checklist, palette matrix, settings,
+  secure sign-in, report publishing, and signed automatic updates.
+- Added atomic JSON and capture persistence, bounded IPC validation, one-time
+  legacy desktop data migration, OS-encrypted credentials, global shortcuts, native
+  menus and tray, reduced motion, permission guidance, and browser preview.
+- Added Electron main-process and storage tests plus desktop and compact-window
+  visual QA with explicit keyboard-label and overflow checks.
+- Added keyboard movement and semantic selection for canvas annotations,
+  filterable command navigation, visible pressed states, deletion recovery,
+  and responsive behavior down to the 920 by 640 minimum window.
+- Added clean, persistent resizing for the workflow navigation, audit status,
+  annotation tools, and annotation properties panels, with mouse, keyboard,
+  double-click reset, and compact-window safeguards.
+- Replaced every native application and installer icon with the canonical
+  orange website mark and added a reproducible macOS and Windows icon generator.
+- Removed the former Rust runtime, obsolete renderer windows, static updater
+  artifacts, and legacy release-manifest tooling. Electron is now the only
+  desktop runtime in the repository.
 
 **Web**
 
@@ -33,12 +52,16 @@
 
 **Release safety**
 
-- Added a repeatable `pnpm verify` gate and pull-request/main quality workflow.
-- Tagged releases now require updater, macOS notarization, and Windows
-  Authenticode credentials; unsigned production publishing is blocked.
-- macOS releases are now universal Apple Silicon + Intel builds. Release tags
-  must match every desktop version source, and updater manifests fail unless
-  both Mac architectures and Windows are complete and on the same version.
+- Extended `pnpm verify` to run Electron service tests and the production
+  main/preload/renderer build.
+- Replaced the Tauri release pipeline with electron-builder: universal signed
+  and notarized macOS DMG/ZIP output, Authenticode-signed Windows NSIS output,
+  differential blockmaps, and electron-updater platform manifests.
+- Tagged releases must match the desktop package version and have all required
+  signing credentials; unsigned production publishing remains blocked.
+- GitHub Releases now reject legacy Tauri assets, validate the complete Electron
+  installer and updater set, publish checksums, and explicitly mark the new
+  signed Electron release as latest.
 
 ## v2.4.0 — 2026-07-09
 

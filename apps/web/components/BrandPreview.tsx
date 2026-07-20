@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { ImageIcon } from "@/components/icons";
 
 // Same severity colors the real share page uses, so the preview is faithful.
 const SEV = { blocker: "#B91C1C", major: "#B45309", minor: "#475569" } as const;
@@ -7,7 +8,7 @@ type Sev = keyof typeof SEV;
 function Pin({ n, sev, style }: { n: number; sev: Sev; style: CSSProperties }) {
   return (
     <span
-      className="absolute flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white shadow ring-2 ring-white"
+      className="absolute flex h-5 w-5 items-center justify-center rounded-md text-[10px] font-bold text-white shadow ring-2 ring-white"
       style={{ backgroundColor: SEV[sev], ...style }}
     >
       {n}
@@ -16,11 +17,11 @@ function Pin({ n, sev, style }: { n: number; sev: Sev; style: CSSProperties }) {
 }
 
 const SAMPLE: { n: number; sev: Sev; sc: string; note: string }[] = [
-  { n: 1, sev: "major", sc: "1.4.3", note: "Body text is 3.8:1 — needs 4.5:1." },
+  { n: 1, sev: "major", sc: "1.4.3", note: "Body text is 3.8:1; it needs 4.5:1." },
   { n: 2, sev: "minor", sc: "2.4.7", note: "Focus ring is hard to see." },
 ];
 
-/** A faithful, live mock of how a shared report looks with this brand applied —
+/** A faithful, live mock of how a shared report looks with this brand applied.
  *  branded header, a sample annotated screenshot, findings, and attribution. */
 export function BrandPreview({
   name,
@@ -63,9 +64,8 @@ export function BrandPreview({
         {/* mock annotated screenshot */}
         <div className="overflow-hidden rounded-lg border border-border bg-card">
           <div className="flex items-center gap-1 border-b border-border bg-muted/40 px-2 py-1.5">
-            <span className="h-2 w-2 rounded-full bg-muted" />
-            <span className="h-2 w-2 rounded-full bg-muted" />
-            <span className="h-2 w-2 rounded-full bg-muted" />
+            <ImageIcon size={11} />
+            <span className="text-[9px] text-muted">Captured screen</span>
           </div>
           <div className="relative space-y-2 p-3">
             <div className="h-3 w-1/3 rounded bg-muted/60" />
@@ -81,12 +81,12 @@ export function BrandPreview({
         {/* findings panel */}
         <div className="min-w-0">
           <p className="text-xs font-semibold">Sample audit</p>
-          <p className="mt-0.5 text-[10px] text-muted">2 issues · today</p>
+          <p className="mt-0.5 text-[10px] text-muted">2 issues, today</p>
           <div className="mt-2 flex flex-wrap gap-1">
-            <span className="rounded-full px-1.5 py-0.5 text-[9px] font-medium text-white" style={{ background: SEV.major }}>
+            <span className="rounded-md px-1.5 py-0.5 text-[9px] font-medium text-white" style={{ background: SEV.major }}>
               1 major
             </span>
-            <span className="rounded-full px-1.5 py-0.5 text-[9px] font-medium text-white" style={{ background: SEV.minor }}>
+            <span className="rounded-md px-1.5 py-0.5 text-[9px] font-medium text-white" style={{ background: SEV.minor }}>
               1 minor
             </span>
           </div>
@@ -94,13 +94,13 @@ export function BrandPreview({
             {SAMPLE.map((f) => (
               <li key={f.n} className="flex gap-1.5">
                 <span
-                  className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[8px] font-bold text-white"
+                  className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded text-[8px] font-bold text-white"
                   style={{ background: SEV[f.sev] }}
                 >
                   {f.n}
                 </span>
                 <span className="min-w-0 text-[10px] leading-tight text-muted">
-                  <span className="font-medium text-foreground">{f.sc}</span> — {f.note}
+                  <span className="font-medium text-foreground">{f.sc}</span>, {f.note}
                 </span>
               </li>
             ))}
@@ -108,7 +108,7 @@ export function BrandPreview({
         </div>
       </div>
 
-      {/* attribution — as it appears on white-labeled reports */}
+      {/* attribution as it appears on white-labeled reports */}
       <div className="border-t border-border px-4 py-2 text-center text-[10px] text-muted">
         Prepared with <span className="font-medium">TheWCAG</span>
       </div>

@@ -21,19 +21,19 @@ export const metadata: Metadata = {
 const GROUPS: { heading: string; intro: string; items: { sc: string; name: string; test: string }[] }[] = [
   {
     heading: "Perceivable",
-    intro: "Users must be able to perceive the content — see it, hear it, or read it through assistive tech.",
+    intro: "Users must be able to perceive the content by seeing it, hearing it, or reading it through assistive tech.",
     items: [
       { sc: "1.1.1", name: "Non-text content", test: "Every informative image has alt text; decorative images have empty alt." },
       { sc: "1.3.1", name: "Info and relationships", test: "Headings, lists, and tables use real markup, not styled text." },
       { sc: "1.4.3", name: "Contrast (minimum)", test: "Normal text is at least 4.5:1 against its background; large text 3:1." },
-      { sc: "1.4.4", name: "Resize text", test: "Zoom the page to 200% — everything still readable, nothing clipped." },
+      { sc: "1.4.4", name: "Resize text", test: "Zoom the page to 200%; everything should remain readable with nothing clipped." },
       { sc: "1.4.10", name: "Reflow", test: "At 320px wide (or 400% zoom) there is no horizontal scrolling." },
       { sc: "1.4.11", name: "Non-text contrast", test: "Icons, input borders, and focus rings are at least 3:1 against adjacent colors." },
     ],
   },
   {
     heading: "Operable",
-    intro: "Users must be able to operate the interface — with a keyboard, a mouse, touch, or a switch.",
+    intro: "Users must be able to operate the interface with a keyboard, mouse, touch, or switch.",
     items: [
       { sc: "2.1.1", name: "Keyboard", test: "Every action works with only a keyboard; nothing needs a mouse." },
       { sc: "2.4.3", name: "Focus order", test: "Tabbing moves through the page in an order that makes sense." },
@@ -49,7 +49,7 @@ const GROUPS: { heading: string; intro: string; items: { sc: string; name: strin
       { sc: "3.1.1", name: "Language of page", test: "The <html> element declares the page language." },
       { sc: "3.2.2", name: "On input", test: "Changing a form control never unexpectedly navigates or submits." },
       { sc: "3.3.1", name: "Error identification", test: "Form errors are described in text, next to the field, not just by color." },
-      { sc: "3.3.8", name: "Accessible authentication (new in 2.2)", test: "Sign-in never requires memorizing or transcribing — magic links and paste-able codes pass." },
+      { sc: "3.3.8", name: "Accessible authentication (new in 2.2)", test: "Sign-in never requires memorizing or transcribing. Magic links and paste-able codes pass." },
     ],
   },
   {
@@ -82,7 +82,7 @@ export default function WcagChecklistPage() {
         <p className="mt-3 max-w-2xl text-muted">
           The success criteria that catch the most real-world failures, grouped by the four POUR
           principles, each with a plain-English test you can run today. It is not a substitute for
-          the full standard — it is the 80% that finds most issues. The three criteria marked
+          the full standard; it is the 80% that finds most issues. The three criteria marked
           &ldquo;new in 2.2&rdquo; are where most previously-passing sites now fail.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
@@ -125,7 +125,7 @@ export default function WcagChecklistPage() {
           <p className="mt-2 text-sm text-muted">
             TheWCAG&apos;s desktop app checks the visual half of this list anywhere on your screen:
             exact contrast ratios (1.4.3, 1.4.11), 24×24 target measurement (2.5.8), and a
-            color-blindness lens — then turns findings into a shareable, criterion-referenced
+            color-blindness lens, then turns findings into a shareable, criterion-referenced
             report.
           </p>
           <Link

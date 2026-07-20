@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import type { CSSProperties, ReactNode } from "react";
 import { Footer, JsonLd } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { AuditPlayground, HomeMotion } from "@/components/HomeExperience";
+import { AuditPlayground } from "@/components/HomeExperience";
 import {
   AppleIcon,
   ArrowRightIcon,
@@ -12,7 +11,7 @@ import {
   ContrastIcon,
   CropIcon,
   EyeIcon,
-  FlagIcon,
+  ImageIcon,
   PaletteIcon,
   WindowsIcon,
 } from "@/components/icons";
@@ -20,102 +19,87 @@ import {
 const SITE = process.env.NEXT_PUBLIC_APP_URL || "https://app.thewcag.com";
 
 export const metadata: Metadata = {
-  title: "Desktop accessibility auditing toolkit for macOS & Windows",
+  title: "Audit what people see",
   description:
-    "Audit accessibility anywhere on screen with WCAG contrast checks, color-blindness simulation, annotated findings, a WCAG 2.2 checklist, and shareable reports.",
+    "TheWCAG is a local-first accessibility auditing workspace for macOS and Windows. Inspect any interface, capture evidence, track WCAG 2.2 findings, and publish clear review links.",
   alternates: { canonical: "/" },
   openGraph: {
-    title: "TheWCAG - Accessibility auditing, anywhere on screen",
+    title: "TheWCAG - Audit what people see",
     description:
-      "A local-first desktop toolkit for accessibility auditors, designers, developers, and QA teams on macOS and Windows.",
+      "A local-first desktop accessibility workspace for finding, documenting, and sharing barriers across any interface.",
     url: SITE,
   },
 };
 
-const TOOLS: {
-  icon: ReactNode;
-  label: string;
-  title: string;
-  body: string;
-  href: string;
-  link: string;
-  tone: string;
-}[] = [
+const PRINCIPLES = [
   {
-    icon: <ContrastIcon size={22} />,
-    label: "Measure",
+    title: "Inspect the experience",
+    body: "Measure websites, native software, prototypes, documents, remote sessions, and temporary interface states exactly as they render.",
+  },
+  {
+    title: "Document the barrier",
+    body: "Keep the screenshot, annotation, measurement, WCAG criterion, severity, status, and auditor note connected.",
+  },
+  {
+    title: "Hand off the proof",
+    body: "Export the audit or publish a focused report that a client can open without creating an account.",
+  },
+] as const;
+
+const CAPABILITIES = [
+  {
+    icon: ContrastIcon,
     title: "Contrast from any pixel",
-    body: "Sample foreground and background colors from websites, native apps, prototypes, documents, or video. Compare WCAG 2.2 and APCA in context.",
+    body: "Check WCAG AA, AAA, and APCA across websites, desktop apps, prototypes, documents, and video.",
     href: "/color-contrast-checker",
-    link: "Explore contrast",
-    tone: "orange",
   },
   {
-    icon: <CropIcon size={22} />,
-    label: "Capture",
-    title: "Evidence people can review",
-    body: "Capture the failure state, annotate the issue, redact sensitive detail, assign severity, and attach the exact success criterion.",
+    icon: CropIcon,
+    title: "Evidence that stays editable",
+    body: "Capture a region and add issue markers, arrows, boxes, measurements, focus order, text, and redaction.",
     href: "/screenshot-tool",
-    link: "See screenshot evidence",
-    tone: "cream",
   },
   {
-    icon: <EyeIcon size={22} />,
-    label: "Simulate",
-    title: "Vision changes, live",
-    body: "Move a resizable lens through color-vision deficiencies, monochromacy, low acuity, and reduced contrast without leaving the interface.",
+    icon: EyeIcon,
+    title: "Live vision simulation",
+    body: "Move a lens over any application to test color-vision deficiencies, low acuity, and reduced contrast.",
     href: "/color-blindness-simulator",
-    link: "Try the simulator",
-    tone: "green",
   },
   {
-    icon: <FlagIcon size={22} />,
-    label: "Triage",
-    title: "A finding register that stays useful",
-    body: "Search, filter, prioritize, and update findings while keeping the auditor note, evidence, status, and criterion together.",
+    icon: ImageIcon,
+    title: "A connected findings register",
+    body: "Search and filter issues without separating the finding from its visual state or audit context.",
     href: "/screenshot-tool",
-    link: "Review the workflow",
-    tone: "blue",
   },
   {
-    icon: <BookIcon size={22} />,
-    label: "Track",
-    title: "The whole WCAG 2.2 audit",
-    body: "Work every Level A and AA criterion with pass, fail, not applicable, notes, progress, and exports scoped to the audit.",
+    icon: BookIcon,
+    title: "The full WCAG 2.2 audit",
+    body: "Track every Level A and AA criterion with pass, fail, not applicable, notes, scope, and progress.",
     href: "/wcag-checklist",
-    link: "Open the checklist",
-    tone: "purple",
   },
   {
-    icon: <PaletteIcon size={22} />,
-    label: "Stress-test",
-    title: "Every palette pairing at once",
-    body: "Turn a token set into a contrast matrix and find unsafe combinations before they become components or production defects.",
+    icon: PaletteIcon,
+    title: "Palette-wide checks",
+    body: "Compare up to sixteen colors and catch unsafe foreground and background pairings before release.",
     href: "/color-contrast-checker",
-    link: "Test a palette",
-    tone: "yellow",
   },
-];
+] as const;
+
+const SHARED_FEATURES = [
+  { title: "Global remappable shortcuts", body: "Open each audit tool from anywhere on the desktop." },
+  { title: "Light and dark appearance", body: "Follow the system while every control stays legible." },
+  { title: "Keyboard-visible focus", body: "Move through the workspace with a clear focus indicator." },
+  { title: "Reduced-motion support", body: "Keep context without unnecessary movement." },
+  { title: "High-DPI capture", body: "Preserve sharp annotations on modern displays." },
+  { title: "Signed automatic updates", body: "Install verified releases without disrupting an audit." },
+] as const;
 
 const WORKFLOW = [
-  ["01", "Frame the audit", "Record target, scope, evaluator, conformance level, and project context once."],
-  ["02", "Inspect anywhere", "Use global shortcuts over websites, desktop apps, designs, documents, and transient states."],
-  ["03", "Keep the proof", "Connect each observation to a capture, severity, criterion, status, and auditor note."],
-  ["04", "Hand it off", "Export CSV, Markdown, HTML, or a focused review link without rebuilding the finding."],
-];
-
-const PLATFORM_FEATURES = [
-  "Global remappable shortcuts",
-  "Responsive narrow-window mode",
-  "Automatic light and dark themes",
-  "Keyboard-visible focus states",
-  "Reduced-motion support",
-  "Signed automatic updates",
-];
-
-function Eyebrow({ children }: { children: ReactNode }) {
-  return <p className="lab-eyebrow"><span aria-hidden="true">✦</span>{children}</p>;
-}
+  ["Inspect", "Use a global shortcut over the interface you need to evaluate."],
+  ["Document", "Capture the exact state and connect the barrier to the standard."],
+  ["Organize", "Keep findings, checklist status, scope, and evidence together."],
+  ["Share", "Publish only what you choose, or export it in the format your team uses."],
+] as const;
 
 export default function Home() {
   return (
@@ -131,158 +115,177 @@ export default function Home() {
           url: SITE,
           offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
           description:
-            "A desktop accessibility auditing toolkit with WCAG contrast checking, vision simulation, annotated findings, checklists, and shareable reports.",
+            "A local-first desktop accessibility workspace with contrast checking, vision simulation, annotated evidence, WCAG 2.2 audits, and shareable reports.",
         }}
       />
 
-      <main id="main" className="lab-home">
-        <HomeMotion />
-
-        <div className="lab-notice">
-          <div className="lab-shell">
-            <span><i /> The desktop auditor toolkit</span>
-            <Link href="/download">Now available for macOS + Windows <ArrowRightIcon size={14} /></Link>
-          </div>
-        </div>
-
-        <section className="lab-hero" aria-labelledby="home-heading">
-          <div className="lab-shell lab-hero__layout">
-            <div className="lab-hero__copy" data-reveal>
-              <Eyebrow>Built for human accessibility audits</Eyebrow>
-              <h1 id="home-heading">
-                Find the issue.<br />
-                <span>Keep the proof.</span>
-              </h1>
-              <p className="lab-hero__lede">
-                TheWCAG is the practical desktop lab for the accessibility work browser automation cannot see—native apps, prototypes, focus states, video, documents, and everything else on screen.
-              </p>
-              <div className="lab-actions">
-                <Link href="/download" className="lab-button lab-button--primary">
-                  Download free <ArrowRightIcon size={17} />
-                </Link>
-                <Link href="/screenshot-tool" className="lab-button">
-                  Explore the toolkit
-                </Link>
+      <main id="main" className="home">
+        <section className="home-hero" aria-labelledby="home-heading">
+          <div className="home-shell home-hero__inner">
+            <div className="home-hero__intro">
+              <div className="home-hero__copy">
+                <h1 id="home-heading">
+                  <span>Find the barrier.</span>
+                  <span>Keep the proof.</span>
+                </h1>
               </div>
-              <ul className="lab-hero__promises" aria-label="Product promises">
-                <li><CheckIcon size={15} /> Local-first</li>
-                <li><CheckIcon size={15} /> No account to start</li>
-                <li><CheckIcon size={15} /> WCAG 2.2 ready</li>
-              </ul>
+              <div className="home-hero__support">
+                <p>
+                  Inspect any rendered interface, capture the exact failure, and turn it into clear WCAG evidence from one local desktop workspace.
+                </p>
+                <div className="home-actions">
+                  <Link href="/download" className="button button--primary">
+                    Download free <ArrowRightIcon size={16} />
+                  </Link>
+                  <Link href="#workflow" className="button button--secondary">
+                    See the workflow
+                  </Link>
+                </div>
+              </div>
             </div>
 
-            <div className="lab-hero__playground" data-reveal style={{ "--reveal-delay": "120ms" } as CSSProperties}>
-              <div className="lab-doodle lab-doodle--note" aria-hidden="true">try it →</div>
+            <div className="home-hero__stage">
               <AuditPlayground />
-              <div className="lab-sticker" aria-hidden="true"><strong>6</strong><span>tools<br />one audit</span></div>
             </div>
           </div>
         </section>
 
-        <section className="lab-proof" aria-label="Product specifications">
-          <div className="lab-shell lab-proof__grid">
-            <div><strong>6</strong><span>Connected auditor tools</span></div>
-            <div><strong>2</strong><span>Native desktop platforms</span></div>
-            <div><strong>2.2</strong><span>WCAG checklist coverage</span></div>
-            <div><strong>1</strong><span>Evidence trail from issue to handoff</span></div>
+        <aside className="home-proof" aria-label="Product facts">
+          <div className="home-shell home-proof__inner">
+            <span>Local-first captures</span>
+            <span>Any rendered interface</span>
+            <span>macOS and Windows</span>
+            <span>WCAG 2.2 A and AA</span>
           </div>
-        </section>
+        </aside>
 
-        <section className="lab-tools" aria-labelledby="tools-heading">
-          <div className="lab-shell">
-            <div className="lab-section-heading" data-reveal>
-              <div>
-                <Eyebrow>A connected accessibility workspace</Eyebrow>
-                <h2 id="tools-heading">Everything the audit needs.<br /><span>Nothing it doesn&apos;t.</span></h2>
-              </div>
-              <p>Six focused instruments share the same audit context, so evidence does not disappear between capture, analysis, and reporting.</p>
+        <section id="purpose" className="home-purpose" aria-labelledby="purpose-heading">
+          <div className="home-shell">
+            <div className="section-heading">
+              <h2 id="purpose-heading">Accessibility happens in the rendered experience.</h2>
+              <p>
+                Automation can inspect code. TheWCAG gives human auditors the instruments to examine the interface people actually receive.
+              </p>
             </div>
-
-            <div className="lab-tool-grid">
-              {TOOLS.map((tool, index) => (
-                <article
-                  className={`lab-tool-card lab-tool-card--${tool.tone}`}
-                  key={tool.title}
-                  data-reveal
-                  style={{ "--reveal-delay": `${(index % 3) * 55}ms` } as CSSProperties}
-                >
-                  <div className="lab-tool-card__top">
-                    <span>{tool.icon}</span>
-                    <small>{tool.label}</small>
+            <div className="home-purpose__principles">
+              {PRINCIPLES.map((principle, index) => (
+                <article key={principle.title}>
+                  <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+                  <div>
+                    <h3>{principle.title}</h3>
+                    <p>{principle.body}</p>
                   </div>
-                  <h3>{tool.title}</h3>
-                  <p>{tool.body}</p>
-                  <Link href={tool.href}>{tool.link}<ArrowRightIcon size={15} /></Link>
                 </article>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="lab-workflow" aria-labelledby="workflow-heading">
-          <div className="lab-shell lab-workflow__layout">
-            <div className="lab-workflow__copy" data-reveal>
-              <Eyebrow>One evidence loop</Eyebrow>
-              <h2 id="workflow-heading">From “I found something” to “here&apos;s the fix.”</h2>
-              <p>Every step leaves the next person enough context to understand, reproduce, and close the issue.</p>
-              <div className="lab-workflow__code"><code>finding.status = &quot;ready_for_review&quot;</code><span>✓ saved locally</span></div>
+        <section id="tools" className="home-tools" aria-labelledby="tools-heading">
+          <div className="home-shell">
+            <div className="section-heading section-heading--compact">
+              <h2 id="tools-heading">One workspace for the full evidence trail.</h2>
+              <p>Each tool shares the same audit context, from the first inspection to the final handoff.</p>
+            </div>
+            <div className="capability-map">
+              {CAPABILITIES.map((tool, index) => {
+                const Icon = tool.icon;
+                return (
+                  <Link key={tool.title} href={tool.href} className="capability-map__item">
+                    <span className="capability-map__number">{String(index + 1).padStart(2, "0")}</span>
+                    <span className="capability-map__icon" aria-hidden="true"><Icon size={22} /></span>
+                    <span className="capability-map__copy">
+                      <strong>{tool.title}</strong>
+                      <span>{tool.body}</span>
+                    </span>
+                    <span className="capability-map__arrow" aria-hidden="true"><ArrowRightIcon size={17} /></span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        <section id="platforms" className="home-platforms" aria-labelledby="platforms-heading">
+          <div className="home-shell">
+            <div className="section-heading">
+              <h2 id="platforms-heading">Built for the desktop you audit on.</h2>
+              <p>One familiar workflow, adapted to each platform's shortcuts, permissions, windows, and display systems.</p>
             </div>
 
-            <ol className="lab-workflow__steps">
-              {WORKFLOW.map(([number, title, body], index) => (
-                <li key={number} data-reveal style={{ "--reveal-delay": `${index * 55}ms` } as CSSProperties}>
-                  <span>{number}</span>
+            <div className="platform-grid">
+              <article className="platform-panel platform-panel--mac">
+                <div className="platform-panel__icon"><AppleIcon className="h-8 w-8" /></div>
+                <div className="platform-panel__copy">
+                  <h3>macOS</h3>
+                  <p>Universal Apple Silicon and Intel builds with menu-bar access and clear Screen Recording permission recovery.</p>
+                  <ul>
+                    <li><CheckIcon size={15} /> macOS 12 Monterey or later</li>
+                    <li><CheckIcon size={15} /> Apple Silicon and Intel</li>
+                    <li><CheckIcon size={15} /> <kbd>⌥⌘P</kbd> contrast picker</li>
+                  </ul>
+                </div>
+                <a href="/api/desktop/download?os=mac" className="button button--dark">
+                  Download for macOS <ArrowRightIcon size={16} />
+                </a>
+              </article>
+
+              <article className="platform-panel platform-panel--windows">
+                <div className="platform-panel__icon"><WindowsIcon className="h-8 w-8" /></div>
+                <div className="platform-panel__copy">
+                  <h3>Windows</h3>
+                  <p>Windows-aware chrome, compact layouts, native shortcut labels, and sharp output across high-DPI displays.</p>
+                  <ul>
+                    <li><CheckIcon size={15} /> Windows 10 and 11, 64-bit</li>
+                    <li><CheckIcon size={15} /> Multi-display and high-DPI ready</li>
+                    <li><CheckIcon size={15} /> <kbd>Ctrl Alt P</kbd> contrast picker</li>
+                  </ul>
+                </div>
+                <a href="/api/desktop/download?os=windows" className="button button--secondary">
+                  Download for Windows <ArrowRightIcon size={16} />
+                </a>
+              </article>
+            </div>
+
+            <ul className="feature-matrix" aria-label="Features shared across macOS and Windows">
+              {SHARED_FEATURES.map((feature, index) => (
+                <li key={feature.title}>
+                  <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+                  <strong>{feature.title}</strong>
+                  <p>{feature.body}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        <section id="workflow" className="home-workflow" aria-labelledby="workflow-heading">
+          <div className="home-shell home-workflow__grid">
+            <div className="section-heading section-heading--sticky">
+              <h2 id="workflow-heading">Local while you work. Shareable when you decide.</h2>
+              <p>Captures remain on your device until you explicitly publish a report or export a file.</p>
+            </div>
+            <ol className="workflow-list">
+              {WORKFLOW.map(([title, body], index) => (
+                <li key={title}>
+                  <span>{String(index + 1).padStart(2, "0")}</span>
                   <div><h3>{title}</h3><p>{body}</p></div>
-                  <CheckIcon size={17} />
                 </li>
               ))}
             </ol>
           </div>
         </section>
 
-        <section className="lab-platform" aria-labelledby="platform-heading">
-          <div className="lab-shell">
-            <div className="lab-section-heading lab-section-heading--platform" data-reveal>
-              <div>
-                <Eyebrow>Native where it matters</Eyebrow>
-                <h2 id="platform-heading">One audit model.<br /><span>Two first-class desktops.</span></h2>
-              </div>
-              <p>Platform-aware permissions, shortcuts, scaling, window behavior, and signed updates—with a consistent auditor workflow.</p>
-            </div>
-
-            <div className="lab-platform__grid">
-              <article data-reveal>
-                <div className="lab-platform__top"><AppleIcon className="h-9 w-9" /><span>macOS</span></div>
-                <h3>Made for the Mac you audit on.</h3>
-                <p>Universal Apple Silicon and Intel builds, Mac-native shortcuts, menu-bar access, Screen Recording recovery, and flexible workspaces.</p>
-                <Link href="/download">Download for Mac <ArrowRightIcon size={15} /></Link>
-              </article>
-              <article data-reveal style={{ "--reveal-delay": "70ms" } as CSSProperties}>
-                <div className="lab-platform__top"><WindowsIcon className="h-9 w-9" /><span>Windows</span></div>
-                <h3>Comfortable, even in a compact window.</h3>
-                <p>Native shortcut labels, compact default sizing, responsive reflow, high-DPI rendering, and Windows-aware title-bar behavior.</p>
-                <Link href="/download">Download for Windows <ArrowRightIcon size={15} /></Link>
-              </article>
-            </div>
-
-            <ul className="lab-platform__features" aria-label="Shared desktop features">
-              {PLATFORM_FEATURES.map((feature) => <li key={feature}><CheckIcon size={15} />{feature}</li>)}
-            </ul>
-          </div>
-        </section>
-
-        <section className="lab-final" aria-labelledby="final-heading">
-          <div className="lab-shell lab-final__layout" data-reveal>
+        <section className="home-trust" aria-labelledby="trust-heading">
+          <div className="home-shell home-trust__inner">
             <div>
-              <Eyebrow>Your next audit can be clearer</Eyebrow>
-              <h2 id="final-heading">Make the invisible<br />reviewable.</h2>
+              <h2 id="trust-heading">Your evidence stays yours.</h2>
+              <p>The web layer supports the workflow without turning every capture into cloud data.</p>
             </div>
-            <div className="lab-final__action">
-              <p>Start free on macOS or Windows. Publish only when you choose to share.</p>
-              <Link href="/download" className="lab-button lab-button--dark">
-                Download TheWCAG <ArrowRightIcon size={18} />
-              </Link>
-              <small>No credit card · No account required to start</small>
+            <div className="home-trust__details">
+              <article><h3>Device access</h3><p>Desktop sign-in uses your system browser and a secure app deep link. Raw device tokens are never stored in the database.</p></article>
+              <article><h3>Published reports</h3><p>Unlisted links contain only the image, findings, and branding you choose. Viewers do not need an account.</p></article>
+              <article><h3>Account controls</h3><p>Passwordless sign-in, a private report library, deletion controls, and optional client-facing branding stay in your hands.</p></article>
             </div>
           </div>
         </section>

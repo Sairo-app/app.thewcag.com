@@ -1,0 +1,87 @@
+appId: com.thewcag.app
+productName: TheWCAG
+copyright: Copyright © 2026 TheWCAG
+artifactName: TheWCAG-${version}-${os}-${arch}.${ext}
+
+directories:
+  output: release
+  buildResources: resources
+
+files:
+  - out/**/*
+  - package.json
+
+extraResources:
+  - from: public/logo.png
+    to: logo.png
+
+asar: true
+asarUnpack: []
+npmRebuild: false
+electronLanguages:
+  - en
+generateUpdatesFilesForAllChannels: true
+afterPack: resources/after-pack.mjs
+
+protocols:
+  - name: TheWCAG desktop authentication
+    schemes:
+      - thewcag
+
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - dmg
+    - zip
+  icon: resources/icon.icns
+  minimumSystemVersion: "12.0"
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: resources/entitlements.mac.plist
+  entitlementsInherit: resources/entitlements.mac.plist
+  notarize: true
+  extendInfo:
+    NSAppTransportSecurity:
+      NSAllowsArbitraryLoads: false
+      NSAllowsLocalNetworking: true
+    NSScreenCaptureUsageDescription: TheWCAG captures the screen only when you start an inspection or evidence capture.
+    NSCameraUsageDescription: TheWCAG does not access the camera.
+    NSMicrophoneUsageDescription: TheWCAG does not access the microphone.
+    NSBluetoothAlwaysUsageDescription: TheWCAG does not access Bluetooth.
+    NSBluetoothPeripheralUsageDescription: TheWCAG does not access Bluetooth.
+
+dmg:
+  sign: false
+  backgroundColor: "#F7F0DF"
+  window:
+    width: 600
+    height: 420
+  contents:
+    - x: 160
+      y: 210
+    - x: 440
+      y: 210
+      type: link
+      path: /Applications
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: resources/icon.ico
+  verifyUpdateCodeSignature: true
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: TheWCAG
+  deleteAppDataOnUninstall: false
+
+publish:
+  provider: github
+  owner: Sairo-app
+  repo: app.thewcag.com
+  releaseType: release

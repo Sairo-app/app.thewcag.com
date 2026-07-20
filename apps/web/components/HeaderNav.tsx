@@ -4,10 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV = [
-  { href: "/screenshot-tool", label: "Capture" },
-  { href: "/color-contrast-checker", label: "Contrast" },
-  { href: "/color-blindness-simulator", label: "Simulate" },
-  { href: "/wcag-contrast", label: "Learn" },
+  { href: "/#purpose", label: "Why it works" },
+  { href: "/#tools", label: "Tools" },
+  { href: "/#platforms", label: "Platforms" },
+  { href: "/wcag-contrast", label: "Guides" },
 ];
 
 /** Primary marketing nav with active-page highlighting (needs the pathname). */
@@ -16,7 +16,7 @@ export function HeaderNav() {
   return (
     <nav className="site-nav" aria-label="Primary">
       {NAV.map((n) => {
-        const active = pathname === n.href;
+        const active = n.href.startsWith("/#") ? false : pathname === n.href;
         return (
           <Link
             key={n.href}
@@ -24,7 +24,7 @@ export function HeaderNav() {
             aria-current={active ? "page" : undefined}
             className={`site-nav__link${active ? " site-nav__link--active" : ""}`}
           >
-              {n.label}
+            {n.label}
           </Link>
         );
       })}

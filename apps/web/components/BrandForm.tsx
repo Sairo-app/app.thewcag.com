@@ -6,7 +6,7 @@ import { BrandPreview } from "@/components/BrandPreview";
 import { CheckIcon } from "@/components/icons";
 import { BRAND_LOGO_MAX_BYTES, BRAND_LOGO_TYPES } from "@/lib/brand";
 
-const DEFAULT_COLOR = "#c2410c";
+const DEFAULT_COLOR = "#b83b12";
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
 export function BrandForm({
@@ -82,7 +82,7 @@ export function BrandForm({
             placeholder="Acme Design"
             className="mt-1.5 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
-          {fileError && <span role="alert" className="text-xs text-red-600 dark:text-red-400">{fileError}</span>}
+          {fileError && <span role="alert" className="text-xs text-red-700">{fileError}</span>}
         </label>
 
         <label className="block">
@@ -111,7 +111,7 @@ export function BrandForm({
           Logo
         </label>
         <p id="brand-logo-hint" className="mt-0.5 text-xs text-muted">
-          PNG, JPG, WEBP, or SVG · up to 1 MB · transparent background looks best.
+          PNG, JPG, WEBP, or SVG. Up to 1 MB. Transparent backgrounds work best.
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <input
@@ -148,11 +148,11 @@ export function BrandForm({
         </button>
         {state?.ok && (
           <span role="status" className="inline-flex items-center gap-1.5 text-sm text-muted">
-            <CheckIcon size={15} /> Saved — it’s live on your shared reports.
+            <CheckIcon size={15} /> Saved. It’s live on your shared reports.
           </span>
         )}
         {state && !state.ok && (
-          <span role="alert" className="text-sm text-red-600 dark:text-red-400">
+          <span role="alert" className="text-sm text-red-700">
             {state.error}
           </span>
         )}

@@ -1,7 +1,7 @@
 import postgres from "postgres";
 
 // Schema embedded so it is always present in the standalone bundle (no
-// filesystem/module-resolution assumptions). Idempotent — safe every boot.
+// filesystem/module-resolution assumptions). Idempotent and safe every boot.
 const INIT_SQL = `
 CREATE TABLE IF NOT EXISTS "user" (
 	"id" text PRIMARY KEY NOT NULL,

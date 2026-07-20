@@ -7,7 +7,7 @@ import { getImage, publicImageUrl } from "@/lib/r2";
 export const runtime = "nodejs";
 
 /** Serve a user's white-label logo. Redirects to the R2 CDN in production,
- *  streams from the bucket in dev. Public by design — it's on shared reports. */
+ *  streams from the bucket in dev. Public by design because it's on shared reports. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const [row] = await db

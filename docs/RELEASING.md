@@ -1,173 +1,126 @@
 # Releasing TheWCAG Desktop
 
-Production desktop releases are created by the tag-triggered GitHub Actions workflow in `.github/workflows/release.yml`. The workflow requires signed macOS, signed Windows, and signed Tauri updater artifacts; it fails before building when any mandatory credential is missing.
-
-Do not manually upload production installers or updater manifests. Use local builds only for development or release diagnosis.
+Production Electron releases are built by `.github/workflows/release.yml` from an exact `v<desktop-version>` tag. The workflow will not publish unsigned fallbacks: both platform signing configurations must pass before the build jobs run.
 
 ## Release outputs
 
-A successful `v*` tag publishes one GitHub Release containing:
+Each GitHub Release contains:
 
-- A signed, notarized, and stapled universal macOS DMG for Apple Silicon and Intel.
-- The signed macOS `.app.tar.gz` updater archive and `.sig`.
-- An Authenticode-signed Windows NSIS `-setup.exe` installer and updater `.sig`.
-- A multi-platform `latest.json` updater manifest.
+- A signed and notarized universal macOS DMG.
+- A signed and notarized universal macOS ZIP used by `electron-updater`.
+- An Authenticode-signed Windows x64 NSIS installer.
+- Differential update blockmaps.
+- `latest-mac.yml` and `latest.yml` update metadata.
+- `SHA256SUMS.txt` covering every attached Electron artifact.
 
-The application reads the manifest from:
-
-```text
-https://github.com/Sairo-app/app.thewcag.com/releases/latest/download/latest.json
-```
-
-The public website resolves `/api/desktop/download?os=mac|windows` to the corresponding installer in the latest GitHub Release.
+The website's platform download route resolves the current DMG or NSIS installer from the same GitHub repository. Installed applications use the provider configured in `apps/desktop/electron-builder.yml`.
 
 ## One-time signing setup
 
 ### Apple Developer ID
 
-1. Join the Apple Developer Program.
-2. Create a **Developer ID Application** certificate.
-3. Export the certificate and private key as a password-protected `.p12`.
-4. Create an Apple app-specific password for notarization.
-5. Record the exact signing identity and 10-character team ID.
+1. Create a Developer ID Application certificate in the Apple Developer account.
+2. Export the certificate and private key as a password-protected `.p12`.
+3. Create an Apple app-specific password for notarization.
+4. Record the 10-character Apple team ID.
 
 ### Windows Authenticode
 
-1. Obtain a Windows code-signing certificate accepted by SmartScreen and Authenticode.
-2. Export the certificate and private key as a password-protected `.pfx`.
-3. Base64-encode the `.pfx` as one uninterrupted value for GitHub Actions.
-
-### Tauri updater
-
-The updater public key is committed in `apps/desktop/src-tauri/tauri.conf.json`. Its matching private key signs updater artifacts.
-
-Back up the private key and its password securely. Never commit them. Losing this key prevents already-installed applications from accepting future updates signed by a replacement key.
+1. Obtain a Windows code-signing certificate trusted by Authenticode and SmartScreen.
+2. Export it with its private key as a password-protected `.pfx`.
+3. Base64-encode the file as one uninterrupted value.
 
 ### GitHub Actions secrets
 
-Configure these repository Actions secrets:
+| Secret | Purpose |
+|---|---|
+| `APPLE_CERTIFICATE` | Base64 `.p12` supplied to electron-builder as `CSC_LINK`. |
+| `APPLE_CERTIFICATE_PASSWORD` | `.p12` password. |
+| `APPLE_ID` | Apple Developer account used for notarization. |
+| `APPLE_APP_SPECIFIC_PASSWORD` | App-specific notarization password. |
+| `APPLE_TEAM_ID` | Apple Developer team ID. |
+| `WINDOWS_CERTIFICATE` | Base64 `.pfx` supplied to electron-builder as `CSC_LINK`. |
+| `WINDOWS_CERTIFICATE_PASSWORD` | `.pfx` password. |
 
-| Secret | Required | Value |
-|---|---:|---|
-| `APPLE_CERTIFICATE` | Yes | Base64-encoded Developer ID `.p12` |
-| `APPLE_CERTIFICATE_PASSWORD` | Yes | Password used to export the `.p12` |
-| `APPLE_SIGNING_IDENTITY` | Yes | `Developer ID Application: Name (TEAMID)` |
-| `APPLE_ID` | Yes | Apple Developer account email |
-| `APPLE_PASSWORD` | Yes | Apple app-specific password |
-| `APPLE_TEAM_ID` | Yes | 10-character Apple team ID |
-| `WINDOWS_CERTIFICATE` | Yes | Base64-encoded Authenticode `.pfx` |
-| `WINDOWS_CERTIFICATE_PASSWORD` | Yes | Password used to export the `.pfx` |
-| `TAURI_SIGNING_PRIVATE_KEY` | Yes | Full Tauri updater private key contents |
-| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Yes | Updater private-key password |
-| `WINDOWS_TIMESTAMP_URL` | No | Certificate issuer timestamp URL; defaults to DigiCert |
+Never commit certificates, passwords, exported keychain files, or signing environment files.
 
-The release preflight treats every entry marked **Yes** as mandatory. This is intentional: unsigned production artifacts must never be published as a fallback.
+## Prepare and publish
 
-## Prepare a release
+1. Update `package.json` and `apps/desktop/package.json` to the same next semantic version.
+2. If the website mark changed, regenerate and inspect both native icon formats on macOS:
 
-1. Choose the next semantic version.
-2. Synchronize that version in:
-   - `apps/desktop/package.json`
-   - `apps/desktop/src-tauri/Cargo.toml`
-   - `apps/desktop/src-tauri/tauri.conf.json`
-3. Move the relevant entries from `CHANGELOG.md`'s Unreleased section into the new version heading.
-4. Confirm the updater endpoint and public key in `tauri.conf.json` are unchanged unless performing a deliberate updater migration.
-5. Install and run the complete quality gate:
+```sh
+pnpm --filter @accessibility-build/desktop icons
+```
+
+3. Move the relevant `CHANGELOG.md` entries into that version.
+4. Run the full gate and produce an unpacked native application:
 
 ```sh
 corepack enable
 pnpm install --frozen-lockfile
 pnpm verify
+pnpm --filter @accessibility-build/desktop run pack
 ```
 
-6. Validate native integration on the current development platform:
+5. Smoke-test the unpacked app on the current platform: launch, screen permission, contrast pair, region and full-screen capture, annotation save/reopen, lens, checklist persistence, sign-in, report publishing, and update check.
+6. Commit and push the release preparation.
+7. Create and push an annotated tag that exactly matches `apps/desktop/package.json`:
 
 ```sh
-pnpm --filter @accessibility-build/desktop tauri build --debug --no-bundle
+git tag -a v3.0.0 -m "TheWCAG v3.0.0"
+git push origin v3.0.0
 ```
 
-7. Review the final diff, commit it, and push `main`.
-
-Do not use the root workspace package version as the desktop release version. The three desktop files listed above are the release source of truth.
-
-## Publish the release
-
-Create an annotated tag only after the preparation commit is present on `main`:
-
-```sh
-git tag -a v2.4.1 -m "TheWCAG v2.4.1"
-git push origin v2.4.1
-```
-
-Use the exact `v<desktop-version>` format. The workflow runs four stages:
-
-1. `release-preflight` verifies that the tag matches every desktop version source and that all mandatory signing credentials exist.
-2. `quality` installs with the frozen lockfile and runs `pnpm verify`.
-3. `build-mac` and `build-windows` build and sign platform artifacts in parallel.
-4. `publish` merges updater partials and creates the GitHub Release.
-
-Monitor all jobs. A pushed tag is not a successful release until the `publish` job completes and the GitHub Release contains every expected artifact.
+The workflow runs the repository quality gate, builds macOS and Windows in parallel, uploads their signed artifacts, and creates one GitHub Release. Release artifacts are treated as immutable by policy: fixes ship under a new patch version.
 
 ## Verify the published release
 
-After the workflow succeeds:
+1. Confirm the release contains DMG, ZIP, NSIS EXE, blockmaps, `latest-mac.yml`, and `latest.yml`.
+2. Verify the version and download URLs in both update manifests.
+3. Confirm the DMG and app report the expected Developer ID signature and a successful notarization ticket.
+4. Confirm the Windows installer reports the expected signer and timestamp.
+5. Test the website download redirect for both platforms.
+6. Launch the prior production version and verify automatic update discovery, download, restart, and version change.
+7. Repeat the core capture, annotation, lens, auth, and publishing smoke tests on both platforms.
 
-1. Open the GitHub Release and confirm the universal DMG, macOS updater archive/signature, Windows installer/signature, and `latest.json` are present.
-2. Inspect `latest.json` and confirm its version matches the tag, its platform URLs point to that same release, and it contains `darwin-aarch64`, `darwin-x86_64`, and `windows-x86_64`.
-3. Download both installers through `https://app.thewcag.com/download` or the platform-specific API redirect.
-4. Confirm the macOS package reports a valid Developer ID signature and notarization.
-5. Confirm Windows reports the expected Authenticode signer and timestamp.
-6. Launch the previous production version and verify it discovers, installs, and restarts into the new version.
-7. Smoke-test contrast capture, annotation, the lens, sign-in, report publishing, and report viewing on both platforms.
-
-Do not replace artifacts underneath an already-published updater manifest. If a shipped release is invalid, fix the problem and publish a new patch version so installed clients see an immutable, monotonic update path.
+Do not replace artifacts under an existing tag. Publish a patch version when a shipped artifact needs correction so updater metadata stays immutable and monotonic.
 
 ## Local builds
 
-### Unsigned development bundle
-
 ```sh
+# Renderer, main process, and preload only
 pnpm --filter @accessibility-build/desktop build
+
+# Unpacked app for the current platform
+pnpm --filter @accessibility-build/desktop run pack
+
+# Installers
+pnpm --filter @accessibility-build/desktop dist:mac
+pnpm --filter @accessibility-build/desktop dist:win
 ```
 
-Local builds are unsigned unless signing credentials are available. They are suitable for development and internal diagnostics, not distribution.
+Without signing credentials, local packages are development artifacts and must not be distributed as production downloads.
 
-### Signed macOS diagnostic build
-
-With the Developer ID certificate installed in the current keychain, install both Rust targets and request the universal target:
+For a signed macOS diagnostic build, provide the same variables used by CI:
 
 ```sh
-rustup target add aarch64-apple-darwin x86_64-apple-darwin
-
-APPLE_SIGNING_IDENTITY="Developer ID Application: Name (TEAMID)" \
+CSC_LINK="/secure/path/thewcag-developer-id.p12" \
+CSC_KEY_PASSWORD="certificate-password" \
 APPLE_ID="developer@example.com" \
-APPLE_PASSWORD="app-specific-password" \
+APPLE_APP_SPECIFIC_PASSWORD="app-specific-password" \
 APPLE_TEAM_ID="TEAMID1234" \
-TAURI_SIGNING_PRIVATE_KEY_PATH="/secure/path/to/updater-private-key" \
-TAURI_SIGNING_PRIVATE_KEY_PASSWORD="updater-key-password" \
-pnpm --filter @accessibility-build/desktop tauri build --target universal-apple-darwin
+pnpm --filter @accessibility-build/desktop dist:mac
 ```
 
-Use environment injection from a secure secret manager where possible. Avoid placing secrets in shell history.
+For Windows, run `dist:win` on a Windows host with `CSC_LINK` pointing to the `.pfx` and `CSC_KEY_PASSWORD` set.
 
-### Updater manifest diagnostics
+## Release invariants
 
-After a signed platform build has produced its updater archive and signature:
-
-```sh
-node scripts/make-latest-json.mjs mac
-node scripts/make-latest-json.mjs windows
-node scripts/merge-latest-json.mjs dist-updater
-```
-
-The macOS command expects `target/universal-apple-darwin/release/bundle`; Windows expects `target/release/bundle`. CI runs them on separate platform workers and merges downloaded partials during `publish`.
-
-`dist-updater/` is generated and ignored. Never commit generated manifests or signatures.
-
-## Platform notes
-
-- The base Tauri bundle configuration targets macOS app/DMG output and requires macOS 12 or later. Production uses Tauri's `universal-apple-darwin` target so one package supports both Apple Silicon and Intel.
-- `tauri.windows.conf.json` changes the Windows bundle to NSIS and supplies the compact Windows main-window configuration.
-- The updater scripts emit `darwin-aarch64` and `darwin-x86_64` entries for the universal Mac archive plus `windows-x86_64`. The merge step fails when any expected target is missing, duplicated, incomplete, or on a different version.
-- The bundle identifier currently ends in `.app`. Tauri warns about this on macOS; changing it is an application identity, permission, keychain, and update migration—not a routine patch-release edit.
-- A future Mac App Store build requires separate sandbox entitlements, no direct updater, `macOSPrivateApi` disabled, and the lens migration described in `SCK-MIGRATION.md`.
+- App identity remains `com.thewcag.app`; changing it affects permissions, protocol registration, secure storage, and update continuity.
+- The custom `thewcag://` protocol must remain registered for browser-mediated desktop sign-in.
+- macOS hardened runtime and the committed entitlements must remain enabled.
+- Windows update signature verification must remain enabled.
+- `latest-mac.yml`, `latest.yml`, installer files, and blockmaps must come from the same build and version.
+- Legacy `.app.tar.gz`, `.sig`, and `latest.json` assets are rejected. GitHub Releases contains Electron artifacts only.
+- Production renderers remain sandboxed with context isolation, no Node integration, and the IPC allowlists in preload and main kept in sync.

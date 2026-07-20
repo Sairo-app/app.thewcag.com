@@ -1,18 +1,24 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { JetBrains_Mono, Manrope, Source_Sans_3 } from "next/font/google";
 import "./globals.css";
 
-const plexSans = IBM_Plex_Sans({
+const sourceSans = Source_Sans_3({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-plex-sans",
+  variable: "--font-body",
   display: "swap",
 });
 
-const plexMono = IBM_Plex_Mono({
+const manrope = Manrope({
+  subsets: ["latin"],
+  weight: ["600", "700", "800"],
+  variable: "--font-display",
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
-  variable: "--font-plex-mono",
+  variable: "--font-mono-face",
   display: "swap",
 });
 
@@ -59,7 +65,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${plexSans.variable} ${plexMono.variable}`}>
+      <body className={`${sourceSans.variable} ${manrope.variable} ${jetbrainsMono.variable}`}>
         <a
           href="#main"
           className="sr-only rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50"

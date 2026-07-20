@@ -1,3 +1,11 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# Native packages whose published install scripts fetch verified platform
+# binaries. Keeping this list explicit lets a fresh checkout launch Electron
+# without a manual postinstall step.
+onlyBuiltDependencies:
+  - electron
+  - esbuild
+  - sharp

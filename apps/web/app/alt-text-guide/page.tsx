@@ -8,7 +8,7 @@ const SITE = process.env.NEXT_PUBLIC_APP_URL || "https://app.thewcag.com";
 export const metadata: Metadata = {
   title: "How to Write Alt Text - Rules, Examples, and Edge Cases",
   description:
-    "A practical alt-text guide for WCAG 1.1.1: when to describe, when to leave alt empty, how to handle charts, icons, logos, and screenshots — with before/after examples.",
+    "A practical alt-text guide for WCAG 1.1.1: when to describe, when to leave alt empty, and how to handle charts, icons, logos, and screenshots with before/after examples.",
   alternates: { canonical: "/alt-text-guide" },
   openGraph: {
     title: "How to Write Alt Text - Rules, Examples, and Edge Cases",
@@ -84,7 +84,7 @@ export default function AltTextGuidePage() {
         <p className="mt-3 max-w-2xl text-muted">
           Alt text is the most common accessibility failure on the web and one of the easiest to
           fix. The rules below cover WCAG 1.1.1 in practice: what to write, when to write nothing,
-          and the edge cases — charts, icons, logos, and screenshots — where teams get stuck.
+          and the edge cases, including charts, icons, logos, and screenshots, where teams get stuck.
         </p>
 
         <section className="mt-12" aria-labelledby="rules">
@@ -96,7 +96,7 @@ export default function AltTextGuidePage() {
               <li key={r.title} className="flex gap-4">
                 <span
                   aria-hidden="true"
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground"
                 >
                   {i + 1}
                 </span>
@@ -136,7 +136,7 @@ export default function AltTextGuidePage() {
                 </tr>
                 <tr>
                   <td className="px-4 py-2.5 font-mono text-xs text-muted">(no alt attribute)</td>
-                  <td className="px-4 py-2.5">alt=&quot;&quot; for decoration — never omit the attribute</td>
+                  <td className="px-4 py-2.5">alt=&quot;&quot; for decoration; never omit the attribute</td>
                 </tr>
               </tbody>
             </table>
@@ -160,8 +160,8 @@ export default function AltTextGuidePage() {
         <section className="mt-14 rounded-xl border border-border bg-card p-6">
           <h2 className="text-lg font-bold tracking-tight">Audit the rest of the page too</h2>
           <p className="mt-2 text-sm text-muted">
-            Alt text is one criterion. TheWCAG&apos;s free desktop app checks the visual ones —
-            contrast, target size, color-blind safety — anywhere on screen, and turns findings into
+            Alt text is one criterion. TheWCAG&apos;s free desktop app checks the visual ones:
+            contrast, target size, and color-blind safety anywhere on screen, and turns findings into
             a shareable report. See the{" "}
             <Link href="/wcag-checklist" className="font-medium text-primary hover:underline">
               full WCAG 2.2 checklist

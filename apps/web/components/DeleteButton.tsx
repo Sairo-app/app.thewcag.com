@@ -19,7 +19,7 @@ export function DeleteButton({ slug }: { slug: string }) {
     return (
       <button
         onClick={() => setConfirming(true)}
-        className="inline-flex items-center gap-1 text-xs text-muted hover:text-red-600 dark:hover:text-red-400"
+        className="inline-flex items-center gap-1 text-xs text-muted hover:text-red-700"
       >
         <TrashIcon size={13} />
         Delete
@@ -32,7 +32,7 @@ export function DeleteButton({ slug }: { slug: string }) {
         ref={confirmRef}
         disabled={pending}
         onClick={() => startTransition(() => deleteScreenshot(slug))}
-        className="font-medium text-red-600 hover:underline disabled:opacity-60 dark:text-red-400"
+        className="font-medium text-red-700 hover:underline disabled:opacity-60"
       >
         {pending ? "Deleting…" : "Confirm delete"}
       </button>

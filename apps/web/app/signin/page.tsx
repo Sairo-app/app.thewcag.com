@@ -21,7 +21,7 @@ export default async function SignInPage({
   return (
     <>
       <Header />
-      <main id="main" className="mx-auto flex min-h-[70vh] max-w-sm flex-col justify-center px-6">
+      <main id="main" className="auth-page mx-auto flex min-h-[70vh] max-w-sm flex-col justify-center px-6">
         <h1 className="text-xl font-bold tracking-tight">Sign in to TheWCAG</h1>
         <p className="mt-2 text-sm text-muted">
           Enter your email and we&apos;ll send you a magic link. No password needed.

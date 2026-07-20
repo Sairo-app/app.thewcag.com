@@ -1,0 +1,159 @@
+import { appendFile, mkdir } from "node:fs/promises";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
+import {
+  app,
+  nativeTheme,
+  net,
+  protocol,
+  session,
+  type Tray,
+} from "electron";
+import { AuthService } from "./services/auth";
+import { CaptureCoordinator } from "./services/capture-coordinator";
+import { CaptureRepository } from "./services/captures";
+import { ScreenCaptureService } from "./services/screen-capture";
+import { SettingsService } from "./services/settings";
+import { JsonStore } from "./services/store";
+import { UpdateService } from "./services/updater";
+import { WindowManager } from "./windows";
+import { createTray, installApplicationMenu } from "./menu";
+import { registerIpc } from "./ipc";
+import { migrateLegacyDesktopData } from "./migration";
+
+protocol.registerSchemesAsPrivileged([{
+  scheme: "thewcag-asset",
+  privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: false },
+}]);
+
+app.setName("TheWCAG");
+app.setAppUserModelId("com.thewcag.app");
+app.commandLine.appendSwitch("force-color-profile", "srgb");
+app.setPath("userData", join(app.getPath("appData"), "TheWCAG"));
+
+const lock = app.requestSingleInstanceLock();
+if (!lock) app.quit();
+
+let tray: Tray | null = null;
+let services: {
+  auth: AuthService;
+  windows: WindowManager;
+  settings: SettingsService;
+  captureCoordinator: CaptureCoordinator;
+} | null = null;
+const pendingLinks: string[] = [];
+
+function findDeepLink(args: string[]): string | null {
+  return args.find((value) => value.startsWith("thewcag://")) ?? null;
+}
+
+async function handleDeepLink(url: string): Promise<void> {
+  if (!services) {
+    pendingLinks.push(url);
+    return;
+  }
+  if (await services.auth.handleDeepLink(url)) {
+    services.windows.showMain();
+    services.windows.broadcast("account:changed", null);
+  }
+}
+
+app.on("open-url", (event, url) => {
+  event.preventDefault();
+  void handleDeepLink(url);
+});
+
+app.on("second-instance", (_event, argv) => {
+  services?.windows.showMain();
+  const link = findDeepLink(argv);
+  if (link) void handleDeepLink(link);
+});
+
+async function start(): Promise<void> {
+  await app.whenReady();
+  nativeTheme.themeSource = "light";
+  if (process.defaultApp && process.argv[1]) {
+    app.setAsDefaultProtocolClient("thewcag", process.execPath, [process.argv[1]]);
+  } else {
+    app.setAsDefaultProtocolClient("thewcag");
+  }
+
+  session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
+  session.defaultSession.setPermissionCheckHandler(() => false);
+
+  const userData = app.getPath("userData");
+  await migrateLegacyDesktopData(app.getPath("appData"), userData);
+  const store = new JsonStore(userData);
+  const captures = new CaptureRepository(userData);
+  await Promise.all([store.initialize(), captures.initialize()]);
+
+  const windows = new WindowManager();
+  const screenCapture = new ScreenCaptureService();
+  const captureCoordinator = new CaptureCoordinator(screenCapture, captures, windows);
+  const auth = new AuthService(userData, store);
+  const notifyError = (error: unknown) => windows.broadcast("notification", { text: error instanceof Error ? error.message : String(error), error: true });
+  const settings = new SettingsService(store, {
+    inspect: () => void captureCoordinator.begin("pair").catch(notifyError),
+    capture: () => void captureCoordinator.begin("capture").catch(notifyError),
+    lens: () => { windows.toggleLens(); },
+  }, (action, accelerator) => {
+    windows.broadcast("shortcut:failed", { action, accelerator });
+    windows.broadcast("notification", { text: `The ${action} shortcut ${accelerator} is already in use`, error: true });
+  },
+  (value) => screenCapture.setHighDpi(value.captureHighDpi));
+  const updates = new UpdateService((state) => windows.broadcast("update:state", state));
+
+  services = { auth, windows, settings, captureCoordinator };
+  registerIpc({ auth, captureCoordinator, captures, capture: screenCapture, settings, store, updates, windows });
+
+  protocol.handle("thewcag-asset", (request) => {
+    const url = new URL(request.url);
+    if (url.hostname !== "capture") return new Response("Not found", { status: 404 });
+    const id = decodeURIComponent(url.pathname.replace(/^\//, ""));
+    const kind = url.searchParams.get("kind") === "thumbnail" ? "thumbnail" : "raw";
+    try {
+      return net.fetch(pathToFileURL(captures.resolveAsset(id, kind)).toString());
+    } catch {
+      return new Response("Not found", { status: 404 });
+    }
+  });
+
+  await settings.initialize();
+  const actions = { windows, captures: captureCoordinator };
+  installApplicationMenu(actions);
+  tray = createTray(actions);
+  windows.createMain();
+
+  const initialLink = findDeepLink(process.argv);
+  if (initialLink) pendingLinks.push(initialLink);
+  for (const link of pendingLinks.splice(0)) await handleDeepLink(link);
+
+  setTimeout(() => { void updates.check(false); }, 8_000);
+}
+
+app.on("activate", () => services?.windows.showMain());
+app.on("before-quit", () => services?.settings.dispose());
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") app.quit();
+});
+
+async function logFatal(error: unknown): Promise<void> {
+  try {
+    const directory = join(app.getPath("userData"), "logs");
+    await mkdir(directory, { recursive: true });
+    const message = error instanceof Error ? `${error.stack || error.message}\n` : `${String(error)}\n`;
+    await appendFile(join(directory, "main.log"), `${new Date().toISOString()} ${message}`, { mode: 0o600 });
+  } catch {
+    // There is no safe recovery path if logging itself fails.
+  }
+}
+
+process.on("uncaughtException", (error) => { void logFatal(error); });
+process.on("unhandledRejection", (error) => { void logFatal(error); });
+
+void start().catch(async (error) => {
+  await logFatal(error);
+  app.quit();
+});
+
+void tray;

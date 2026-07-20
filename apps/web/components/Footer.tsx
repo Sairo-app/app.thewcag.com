@@ -3,6 +3,7 @@ import Link from "next/link";
 import {
   AccessibilityIcon,
   AppleIcon,
+  ArrowRightIcon,
   BookIcon,
   ContrastIcon,
   CropIcon,
@@ -19,30 +20,30 @@ const REPO = "https://github.com/Sairo-app/app.thewcag.com";
 
 const COLUMNS: { heading: string; links: { href: string; label: string; icon: ReactNode }[] }[] = [
   {
-    heading: "Instruments",
+    heading: "Desktop tools",
     links: [
-      { href: "/screenshot-tool", label: "Screenshot evidence", icon: <CropIcon size={14} /> },
-      { href: "/color-contrast-checker", label: "Contrast checker", icon: <ContrastIcon size={14} /> },
-      { href: "/color-blindness-simulator", label: "Vision simulator", icon: <EyeIcon size={14} /> },
-      { href: "/download", label: "Desktop download", icon: <DownloadIcon size={14} /> },
+      { href: "/screenshot-tool", label: "Screenshot evidence", icon: <CropIcon size={15} /> },
+      { href: "/color-contrast-checker", label: "Contrast checker", icon: <ContrastIcon size={15} /> },
+      { href: "/color-blindness-simulator", label: "Vision simulator", icon: <EyeIcon size={15} /> },
+      { href: "/download", label: "Download the app", icon: <DownloadIcon size={15} /> },
     ],
   },
   {
     heading: "Workspace",
     links: [
-      { href: "/signin", label: "Sign in", icon: <LogInIcon size={14} /> },
-      { href: "/screenshots", label: "My reports", icon: <ImageIcon size={14} /> },
-      { href: "/brand", label: "Report branding", icon: <PaletteIcon size={14} /> },
+      { href: "/signin", label: "Sign in", icon: <LogInIcon size={15} /> },
+      { href: "/screenshots", label: "My reports", icon: <ImageIcon size={15} /> },
+      { href: "/brand", label: "Report branding", icon: <PaletteIcon size={15} /> },
     ],
   },
   {
-    heading: "Standards",
+    heading: "Guides",
     links: [
-      { href: "/wcag-contrast", label: "WCAG contrast", icon: <BookIcon size={14} /> },
-      { href: "/wcag-checklist", label: "WCAG 2.2 checklist", icon: <BookIcon size={14} /> },
-      { href: "/apca-contrast", label: "APCA vs WCAG", icon: <ContrastIcon size={14} /> },
-      { href: "/alt-text-guide", label: "Alt text guide", icon: <ImageIcon size={14} /> },
-      { href: "/accessibility-statement", label: "Accessibility statement", icon: <AccessibilityIcon size={14} /> },
+      { href: "/wcag-contrast", label: "WCAG contrast", icon: <BookIcon size={15} /> },
+      { href: "/wcag-checklist", label: "WCAG 2.2 checklist", icon: <BookIcon size={15} /> },
+      { href: "/apca-contrast", label: "APCA vs WCAG", icon: <ContrastIcon size={15} /> },
+      { href: "/alt-text-guide", label: "Alt text guide", icon: <ImageIcon size={15} /> },
+      { href: "/accessibility-statement", label: "Accessibility statement", icon: <AccessibilityIcon size={15} /> },
     ],
   },
 ];
@@ -51,22 +52,30 @@ export function Footer() {
   return (
     <footer className="site-footer">
       <div className="site-footer__inner">
-        <div className="site-footer__headline" aria-hidden="true">AUDIT. PROVE. SHIP.</div>
+        <div className="site-footer__cta-panel">
+          <div>
+            <h2>Catch the barrier. Keep the proof.</h2>
+            <p>Download the local-first accessibility workspace for macOS and Windows.</p>
+          </div>
+          <Link href="/download" className="site-footer__cta">
+            Download free <ArrowRightIcon size={16} />
+          </Link>
+        </div>
 
         <div className="site-footer__grid">
           <div className="site-footer__brand">
             <Link href="/" className="site-footer__lockup">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.png" alt="" width={26} height={26} />
-              <span>THEWCAG</span>
+              <img src="/logo.png" alt="" width={28} height={28} />
+              <span>TheWCAG</span>
             </Link>
             <p className="site-footer__description">
-              A practical accessibility lab for macOS and Windows. Inspect any interface, keep the evidence, and hand off findings people can act on.
+              Inspect any rendered interface, document the accessibility barrier, and share the exact evidence when you choose.
             </p>
             <div className="site-footer__platforms">
-              <Link href="/download" className="site-footer__platform" aria-label="Download for macOS"><AppleIcon className="h-3.5 w-3.5" />macOS</Link>
-              <Link href="/download" className="site-footer__platform" aria-label="Download for Windows"><WindowsIcon className="h-3.5 w-3.5" />Windows</Link>
-              <a href={REPO} target="_blank" rel="noreferrer" aria-label="TheWCAG on GitHub" className="site-footer__github"><GitHubIcon className="h-5 w-5" /></a>
+              <Link href="/download" className="site-footer__platform" aria-label="Download for macOS"><AppleIcon className="h-[15px] w-[15px]" />macOS</Link>
+              <Link href="/download" className="site-footer__platform" aria-label="Download for Windows"><WindowsIcon className="h-[15px] w-[15px]" />Windows</Link>
+              <a href={REPO} target="_blank" rel="noreferrer" aria-label="TheWCAG on GitHub" className="site-footer__github"><GitHubIcon className="h-[19px] w-[19px]" /></a>
             </div>
           </div>
 
@@ -86,7 +95,9 @@ export function Footer() {
 
         <div className="site-footer__bottom">
           <span>© {new Date().getFullYear()} TheWCAG</span>
-          <span>Designed for WCAG 2.2 AA / Built for macOS + Windows</span>
+          <span>Local-first</span>
+          <span>WCAG 2.2</span>
+          <span>macOS and Windows</span>
         </div>
       </div>
     </footer>

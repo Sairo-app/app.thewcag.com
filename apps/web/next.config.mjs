@@ -7,7 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const nextConfig = {
   // Docker/Coolify: emit a minimal standalone server bundle. Trace from the
   // monorepo root so node_modules + packages land at the standalone root
-  // (server ends up at standalone/apps/web/server.js — see Dockerfile).
+  // (server ends up at standalone/apps/web/server.js; see Dockerfile).
   output: 'standalone',
   outputFileTracingRoot: path.join(__dirname, '../../'),
   reactStrictMode: true,

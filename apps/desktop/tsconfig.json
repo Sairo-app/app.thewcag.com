@@ -8,7 +8,20 @@
     "noEmit": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
-    "types": ["vite/client"]
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "types": ["vite/client", "node", "electron"]
   },
-  "include": ["src"]
+  "include": [
+    "electron/**/*.ts",
+    "src/main.tsx",
+    "src/env.d.ts",
+    "src/app/**/*.ts",
+    "src/app/**/*.tsx",
+    "src/shared/**/*.ts",
+    "src/lib/annotate/**/*.ts",
+    "electron.vite.config.ts",
+    "vite.config.ts",
+    "vitest.config.ts"
+  ]
 }

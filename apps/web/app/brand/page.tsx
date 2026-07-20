@@ -29,11 +29,11 @@ export default async function BrandPage() {
   return (
     <>
       <Header />
-      <main id="main" className="mx-auto max-w-2xl px-6 py-10">
+      <main id="main" className="app-page mx-auto max-w-2xl px-6 py-10">
         <h1 className="text-2xl font-bold tracking-tight">White-label branding</h1>
         <p className="mt-2 text-sm text-muted">
           Add your organization&apos;s logo, name, and accent color. Every report you share then
-          leads with your brand instead of ours — so a link you hand a client looks like your work.{" "}
+          leads with your brand instead of ours, so a link you hand a client looks like your work.{" "}
           <Link href="/screenshots" className="font-medium text-primary hover:underline">
             View your shared reports
           </Link>

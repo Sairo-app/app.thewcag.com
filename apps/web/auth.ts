@@ -35,10 +35,10 @@ function magicLinkEmail(url: string): { subject: string; html: string; text: str
         </td></tr>
         <tr><td style="padding:24px 32px 28px;">
           <div style="border-top:1px solid #e7e5e4;margin:0 0 16px;"></div>
-          <p style="margin:0;font:400 12px/1.5 ${font};color:#a8a29e;">If you didn't request this, you can safely ignore this email — no changes will be made to any account.</p>
+          <p style="margin:0;font:400 12px/1.5 ${font};color:#a8a29e;">If you didn't request this, you can safely ignore this email. No changes will be made to any account.</p>
         </td></tr>
       </table>
-      <p style="max-width:440px;margin:16px auto 0;font:400 12px ${font};color:#a8a29e;text-align:center;">TheWCAG — accessibility checks, anywhere on screen</p>
+      <p style="max-width:440px;margin:16px auto 0;font:400 12px ${font};color:#78716c;text-align:center;">TheWCAG, accessibility checks anywhere on screen</p>
     </td></tr>
   </table>
 </body>

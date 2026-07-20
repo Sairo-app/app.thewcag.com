@@ -1,55 +1,21 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
+import { CheckIcon, ImageIcon } from "@/components/icons";
 
 const MODES = ["Contrast", "Evidence", "Vision"] as const;
 type Mode = (typeof MODES)[number];
-
-export function HomeMotion() {
-  useEffect(() => {
-    const page = document.querySelector<HTMLElement>(".lab-home");
-    const targets = Array.from(document.querySelectorAll<HTMLElement>("[data-reveal]"));
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    page?.setAttribute("data-motion-ready", "true");
-
-    if (reducedMotion || !("IntersectionObserver" in window)) {
-      targets.forEach((target) => target.setAttribute("data-visible", "true"));
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (!entry.isIntersecting) return;
-          entry.target.setAttribute("data-visible", "true");
-          observer.unobserve(entry.target);
-        });
-      },
-      { rootMargin: "0px 0px -7% 0px", threshold: 0.08 },
-    );
-
-    targets.forEach((target) => {
-      const bounds = target.getBoundingClientRect();
-      if (bounds.top < window.innerHeight && bounds.bottom > 0) {
-        target.setAttribute("data-visible", "true");
-      } else {
-        observer.observe(target);
-      }
-    });
-
-    return () => observer.disconnect();
-  }, []);
-
-  return null;
-}
 
 function ContrastPanel() {
   return (
     <div className="audit-playground__contrast">
       <div className="audit-playground__swatches" aria-hidden="true">
-        <div className="audit-playground__swatch audit-playground__swatch--dark"><span>#24261F</span></div>
-        <div className="audit-playground__swatch audit-playground__swatch--light"><span>#F5F1E8</span></div>
+        <div className="audit-playground__swatch audit-playground__swatch--dark">
+          <b>Aa</b><span>#24261F</span>
+        </div>
+        <div className="audit-playground__swatch audit-playground__swatch--light">
+          <b>Aa</b><span>#F5F1E8</span>
+        </div>
       </div>
       <div className="audit-playground__result">
         <div>
@@ -57,11 +23,11 @@ function ContrastPanel() {
           <strong>12.78<small>:1</small></strong>
         </div>
         <div className="audit-playground__badges" aria-label="Passes WCAG AA and AAA">
-          <span><i /> AA pass</span>
-          <span><i /> AAA pass</span>
+          <span><CheckIcon size={12} /> AA pass</span>
+          <span><CheckIcon size={12} /> AAA pass</span>
         </div>
       </div>
-      <p className="audit-playground__hint">Sampled from the real screen—not reconstructed from CSS.</p>
+      <p className="audit-playground__hint">Sampled from the real screen, not reconstructed from CSS.</p>
     </div>
   );
 }
@@ -70,7 +36,7 @@ function EvidencePanel() {
   return (
     <div className="audit-playground__evidence">
       <div className="audit-playground__capture" aria-hidden="true">
-        <div className="audit-playground__capture-bar"><i /><i /><i /><span>checkout / payment</span></div>
+        <div className="audit-playground__capture-bar"><ImageIcon size={13} /><span>checkout / payment</span></div>
         <div className="audit-playground__capture-body">
           <span className="audit-playground__mock-title" />
           <span className="audit-playground__mock-line" />
@@ -83,7 +49,7 @@ function EvidencePanel() {
       <div className="audit-playground__finding">
         <span className="audit-playground__label">Finding 01</span>
         <strong>Focus indicator is obscured</strong>
-        <p>2.4.11 · Focus Not Obscured (Minimum)</p>
+        <p>WCAG 2.4.11, Focus Not Obscured (Minimum)</p>
         <div><span>Major</span><span>Open</span></div>
       </div>
     </div>
@@ -130,9 +96,9 @@ export function AuditPlayground() {
       <div className="audit-playground__chrome">
         <div className="audit-playground__title">
           <span className="audit-playground__mark" aria-hidden="true">W</span>
-          <div><strong>TheWCAG</strong><small>Audit lab · live preview</small></div>
+          <div><strong>Live screen audit</strong><small>TheWCAG desktop workspace</small></div>
         </div>
-        <span className="audit-playground__local"><i /> Local</span>
+        <span className="audit-playground__local"><CheckIcon size={12} /> Local</span>
       </div>
 
       <div className="audit-playground__tabs" role="tablist" aria-label="Preview a desktop tool">
@@ -166,7 +132,7 @@ export function AuditPlayground() {
 
       <div className="audit-playground__status">
         <span><kbd>⌘⇧C</kbd> Capture anywhere</span>
-        <span>WCAG 2.2 · AA</span>
+        <span>WCAG 2.2 AA</span>
       </div>
     </div>
   );

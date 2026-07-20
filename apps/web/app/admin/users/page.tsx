@@ -74,14 +74,14 @@ export default async function AdminUsers() {
               return (
                 <tr key={u.id}>
                   <td className="max-w-[240px] truncate px-4 py-2.5">{u.email}</td>
-                  <td className="px-4 py-2.5 text-muted">{u.brandName ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-muted">{u.brandName ?? "Not set"}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums">{rep?.n ?? 0}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums">{formatBytes(Number(rep?.bytes ?? 0))}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums">{byUserDevices.get(u.id) ?? 0}</td>
                   <td className="px-4 py-2.5 text-right text-muted">
                     {u.verified
                       ? new Date(u.verified).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
-                      : "—"}
+                      : "Not set"}
                   </td>
                   <td className="px-4 py-2.5 text-right">
                     {self ? (

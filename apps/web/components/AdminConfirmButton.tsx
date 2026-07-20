@@ -28,7 +28,7 @@ export function AdminConfirmButton({
           setArmed(true);
           timer.current = setTimeout(() => setArmed(false), 3000);
         }}
-        className="rounded-md border border-border px-2.5 py-1 text-xs text-muted hover:text-red-600 dark:hover:text-red-400"
+        className="rounded-md border border-border px-2.5 py-1 text-xs text-muted hover:text-red-700"
       >
         {label}
       </button>

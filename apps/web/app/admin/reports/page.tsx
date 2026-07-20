@@ -49,8 +49,8 @@ export default async function AdminReports() {
                 {r.title}
               </Link>
               <p className="mt-0.5 truncate text-xs text-muted">
-                {r.owner ?? "unknown"} · {r.views} view{r.views === 1 ? "" : "s"} ·{" "}
-                {formatBytes(r.size)} ·{" "}
+                {r.owner ?? "unknown"}, {r.views} view{r.views === 1 ? "" : "s"},{" "}
+                {formatBytes(r.size)},{" "}
                 {new Date(r.created).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
               </p>
             </div>

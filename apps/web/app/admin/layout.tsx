@@ -21,7 +21,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <>
       <Header />
-      <main id="main" className="mx-auto max-w-6xl px-6 py-8">
+      <main id="main" className="admin-page mx-auto max-w-6xl px-6 py-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold tracking-tight">Admin</h1>
           <nav aria-label="Admin sections" className="flex gap-1 rounded-lg border border-border p-1">

@@ -13,15 +13,15 @@ TheWCAG is a production-oriented accessibility auditing workspace for macOS and 
 
 | Capability | What it provides |
 |---|---|
-| On-screen contrast picker | Samples foreground and background pixels from any application, displays the WCAG 2.x ratio and AA/AAA verdicts, reports signed APCA Lc, detects anti-aliased edges, and suggests nearby passing colors. A dragged background region finds the worst-contrast pixel across gradients or imagery. |
+| On-screen contrast picker | Samples foreground and background pixels from any application or monitor, displays the WCAG 2.x ratio and AA/AAA verdicts, reports signed APCA Lc, and suggests nearby passing colors. |
 | Capture and annotation | Captures a region or full screen into a re-editable local document. Tools include issue badges, arrows, boxes, target measurement, contrast probes, focus-order markers, solid or pixel redaction, text, and non-destructive crop-to-new-capture. |
-| Color-vision lens | Shows the screen beneath a floating always-on-top window with protanopia, deuteranopia, tritanopia, or achromatopsia simulation, adjustable severity, split view, freeze, low-acuity blur, low-contrast simulation, and PNG export. |
-| Audit workspace | Stores project, target, scope, WCAG 2.2 A/AA standard, evaluator, and start date so findings and checklist exports carry the correct engagement context. |
-| Findings register | Combines annotated and manual issues with WCAG criterion, severity, status, notes, search, filtering, and CSV, Markdown, or standalone HTML exports. |
-| WCAG checklist | Tracks all 55 WCAG 2.2 Level A and AA criteria by POUR principle with pass, fail, not applicable, notes, progress, filters, and contextual CSV, Markdown, or HTML exports. |
+| Color-vision lens | Shows the screen beneath a protected, always-on-top window with protanopia, deuteranopia, tritanopia, or achromatopsia simulation, adjustable severity, split view, zoom, low-acuity blur, low-contrast simulation, and PNG export. |
+| Audit workspace | Treats each project as an isolated audit with its own captures, findings, checklist, palette, reports, and activity history. The four-stage Inspect, Evidence, Review, and Share workflow keeps delivery state visible. |
+| Findings register | Combines contrast and annotated issues with WCAG criterion, severity, status, notes, search, Markdown export, and report preparation. |
+| WCAG checklist | Tracks all 55 WCAG 2.2 Level A and AA criteria by POUR principle with pass, fail, not applicable, notes, progress, filters, and contextual CSV or Markdown exports. |
 | Palette matrix | Accepts up to 16 hex colors, persists the palette, calculates every foreground/background pair, visualizes AA-normal and AA-large/UI thresholds, and copies the matrix as CSV. |
-| Evidence and reporting | Exports annotated PNGs, one-page finding sheets, Markdown, Jira markup, session logs, and shareable web reports. Exported annotation issues are merged into the findings register without overwriting later triage edits. |
-| Capture library and settings | Keeps the 24 most recent captures locally with editable source data and annotated thumbnails. Includes remappable global shortcuts, launch-at-login, update installation, screen-permission guidance, and a tray/menu-bar workflow. |
+| Evidence and reporting | Exports or copies annotated PNGs, merges annotation issues without overwriting later triage, and requires a report review, capture selection, privacy attestation, and authenticated account before publishing a shareable link. |
+| Capture library and settings | Keeps up to 100 recent captures locally with editable source data and annotated thumbnails. Includes remappable global shortcuts, launch-at-login, update installation, screen-permission guidance, high-DPI capture, and a tray/menu-bar workflow. |
 
 Default global shortcuts are:
 
@@ -31,7 +31,7 @@ Default global shortcuts are:
 | Capture and annotate | `⌥⌘S` | `Ctrl+Alt+S` |
 | Toggle color-vision lens | `⌥⌘L` | `Ctrl+Alt+L` |
 
-All three shortcuts can be changed in the application. The tray also exposes delayed contrast and capture modes for hover states, full-screen capture, target measurement, auditor tools, and application controls.
+All three shortcuts can be changed in the application. The tray and native application menu also expose contrast inspection, region and full-screen capture, the vision lens, auditor tools, and application controls.
 
 ### Web platform
 
@@ -54,8 +54,8 @@ An account is required to publish and manage a report. Anyone with its link can 
 ```mermaid
 flowchart LR
     Core["a11y-core<br/>WCAG, APCA, formats, CVD"] --> DesktopUI["React desktop windows"]
-    DesktopUI <--> IPC["Typed Tauri IPC and events"]
-    IPC <--> Native["Rust native layer<br/>capture, overlay, lens, storage, tray"]
+    DesktopUI <--> IPC["Allowlisted contextBridge IPC"]
+    IPC <--> Native["Electron main process<br/>capture, overlay, lens, storage, tray"]
     Native <--> OS["macOS and Windows APIs"]
 
     Native -->|"system browser"| Connect["Next.js /connect"]
@@ -66,25 +66,23 @@ flowchart LR
     Web --> Public["Public /s/[slug] report"]
 ```
 
-The accessibility core is intentionally framework-independent and currently consumed by the desktop app. It can be reused by web surfaces without bringing Tauri or DOM dependencies into the package.
+The accessibility core is intentionally framework-independent and currently consumed by the desktop app. It can be reused by web surfaces without bringing Electron or DOM dependencies into the package.
 
 ### Desktop runtime
 
-The desktop application uses one React bundle for multiple native windows. `apps/desktop/src/main.tsx` selects the UI from the current Tauri window label:
+The desktop application uses one React bundle for multiple sandboxed Electron windows. `apps/desktop/src/main.tsx` selects the UI from the validated `view` query supplied by the main process:
 
-- `main`: audit workspace, contrast results, recent captures, account, settings, and session log.
-- `overlay-*`: one frozen full-screen capture overlay per monitor.
-- `annotate`: re-editable screenshot editor and report publisher.
+- `main`: staged audit workstation with Inspect, Evidence, Review, and Share plus palette, vision, account, and settings utilities.
+- `overlay`: one frozen full-screen inspection window per monitor.
+- `annotate`: re-editable screenshot editor with keyboard-accessible annotation selection and a handoff into report review.
 - `lens`: live color-vision and low-vision simulation.
-- `countdown`: passive delayed-capture HUD.
-- `findings`, `checklist`, `palette`: standalone auditor tools.
 
-Native commands are implemented in Rust and registered in `apps/desktop/src-tauri/src/lib.rs`; typed frontend calls and events live in `apps/desktop/src/lib/ipc.ts`. Tool windows are created hidden and revealed after React commits to prevent unpainted native-window flashes.
+Native services live in `apps/desktop/electron/`; the renderer sees only the allowlisted API exposed by `electron/preload.ts`. Context isolation, sandboxing, navigation blocking, CSP, sender validation, permission denial, bounded payload validation, ASAR packaging, hardened runtime, and signed updates form the desktop trust boundary. Electron is the repository's only desktop runtime. A bounded one-time importer preserves local data created by earlier desktop releases.
 
 ### Data and trust boundaries
 
 - Desktop captures are stored in the OS application-data directory as a raw PNG, an editable JSON annotation document, and an annotated thumbnail.
-- Audit context, findings, checklist results, palettes, and other application state are local JSON files.
+- Audit context, findings, checklist results, palettes, activity, and report history are isolated per audit in local JSON files.
 - The desktop device token is stored in macOS Keychain or Windows Credential Manager. Only its SHA-256 hash is stored in Postgres.
 - Published PNGs and brand logos live in Cloudflare R2. Postgres stores identity, sessions, device records, report metadata, issues, sizes, branding, and view counts.
 - A published image is limited to 4 MB, a report to 100 issue rows, and each user to 1 GiB of stored report images.
@@ -95,20 +93,22 @@ Native commands are implemented in Rust and registered in `apps/desktop/src-taur
 ```text
 accessibility-build-app/
 ├── apps/
-│   ├── desktop/                 Tauri 2 desktop application
-│   │   ├── src/                 React windows, IPC wrappers, annotation model
-│   │   └── src-tauri/           Rust native layer, capabilities, bundle config
+│   ├── desktop/                 Electron desktop application
+│   │   ├── electron/            Main process, preload, native services, IPC
+│   │   ├── resources/           Canonical app icons, entitlements, pack hook
+│   │   ├── src/app/             React workstation and tool views
+│   │   ├── src/lib/annotate/    Reusable annotation geometry and rendering
+│   │   └── src/shared/          Main/preload/renderer contracts
 │   └── web/                     Next.js website, API, auth, admin, and data layer
 ├── packages/
 │   └── a11y-core/               Pure TypeScript accessibility calculations
-├── scripts/                     Desktop icons and updater-manifest tooling
-├── docs/                        Release and platform migration notes
+├── scripts/                     Desktop icon and Electron release validation
+├── docs/                        Release and site-integration operations
 ├── .github/workflows/           Quality and signed release automation
 ├── docker-compose.yaml          Production Postgres and web stack
 ├── DESIGN.md                    Website visual system and accessibility rules
 ├── SKILL.md                     Repository-specific agent workflow
 ├── CHANGELOG.md                 Release history and unreleased changes
-└── PLAN.md                      Historical original product plan
 ```
 
 Important source maps:
@@ -116,26 +116,25 @@ Important source maps:
 | Concern | Location |
 |---|---|
 | Desktop window routing | `apps/desktop/src/main.tsx` |
-| Main auditor workspace | `apps/desktop/src/windows/MainWindow.tsx` |
-| Capture overlay | `apps/desktop/src/windows/OverlayWindow.tsx`, `src-tauri/src/overlay.rs` |
-| Annotation editor | `apps/desktop/src/windows/AnnotateWindow.tsx`, `src/lib/annotate/` |
-| Color-vision lens | `apps/desktop/src/windows/LensWindow.tsx`, `src-tauri/src/lens.rs` |
-| Native IPC registration | `apps/desktop/src-tauri/src/lib.rs` |
-| Local capture library | `apps/desktop/src-tauri/src/library.rs` |
-| Desktop/web authentication | `apps/desktop/src-tauri/src/auth.rs`, `apps/web/app/connect/`, `apps/web/lib/device-auth.ts` |
+| Main auditor workspace | `apps/desktop/src/app/Workspace.tsx` |
+| Capture overlay | `apps/desktop/src/app/OverlayView.tsx`, `electron/services/screen-capture.ts` |
+| Annotation editor | `apps/desktop/src/app/AnnotateView.tsx`, `src/lib/annotate/` |
+| Color-vision lens | `apps/desktop/src/app/LensView.tsx` |
+| Native IPC registration | `apps/desktop/electron/ipc.ts`, `electron/preload.ts` |
+| Local capture library | `apps/desktop/electron/services/captures.ts` |
+| Desktop/web authentication | `apps/desktop/electron/services/auth.ts`, `apps/web/app/connect/`, `apps/web/lib/device-auth.ts` |
 | Report publishing | `apps/web/app/api/device/screenshots/route.ts` |
 | Database model and startup migration | `apps/web/lib/schema.ts`, `apps/web/lib/migrate.ts` |
 | R2 and quota enforcement | `apps/web/lib/r2.ts`, `apps/web/lib/quota.ts` |
-| Release pipeline | `.github/workflows/release.yml`, `scripts/make-latest-json.mjs`, `scripts/merge-latest-json.mjs` |
+| Release pipeline | `.github/workflows/release.yml`, `apps/desktop/electron-builder.yml` |
 
 ## Requirements
 
 - Node.js 22 or later
 - pnpm 9.15.4 through Corepack
-- Rust stable and Cargo
 - Git
-- macOS: Xcode Command Line Tools and macOS 12 Monterey or later
-- Windows: 64-bit Windows 10 or 11, Microsoft C++ Build Tools, and WebView2
+- macOS: macOS 12 Monterey or later
+- Windows: 64-bit Windows 10 or 11
 - Web data features: Docker Desktop or access to Postgres and S3-compatible object storage
 
 ## Install
@@ -157,7 +156,7 @@ Start the native application:
 pnpm dev
 ```
 
-This runs `tauri dev`, which starts Vite on port `5173`, builds the Rust application, and opens the native shell.
+This runs `electron-vite dev`, starts the renderer on port `5173`, builds the sandboxed main and preload processes, and opens the native Electron shell.
 
 For browser-only responsive and accessibility inspection:
 
@@ -165,7 +164,7 @@ For browser-only responsive and accessibility inspection:
 pnpm --filter @accessibility-build/desktop dev:vite
 ```
 
-Open `http://localhost:5173/?view=main`. Other previewable views include `findings`, `checklist`, `palette`, `annotate`, `lens`, and `countdown`. Native IPC actions do not operate outside Tauri; the preview exists for rendered UI inspection.
+Open `http://localhost:5173/`. Browser preview provides safe local fallbacks for UI inspection; screen capture, global shortcuts, secure credentials, native windows, and updates operate only inside Electron.
 
 macOS prompts for Screen Recording access when capture is first used. After granting it in System Settings, restart the application so the new process receives the permission. Windows does not use this permission flow.
 
@@ -263,14 +262,14 @@ Focused commands:
 pnpm test
 pnpm typecheck
 pnpm --filter @accessibility-build/a11y-core typecheck
-pnpm --filter @accessibility-build/desktop build:vite
+pnpm --filter @accessibility-build/desktop build
 pnpm --filter @thewcag/web build
 ```
 
-Validate native Rust/Tauri integration without producing installers:
+Create an unpacked desktop application for local native validation:
 
 ```sh
-pnpm --filter @accessibility-build/desktop tauri build --debug --no-bundle
+pnpm --filter @accessibility-build/desktop run pack
 ```
 
 Pull requests and pushes to `main` run the same `pnpm verify` gate in `.github/workflows/quality.yml`.
@@ -280,10 +279,10 @@ Pull requests and pushes to `main` run the same `pnpm verify` gate in `.github/w
 ### Local desktop bundles
 
 ```sh
-pnpm --filter @accessibility-build/desktop build
+pnpm --filter @accessibility-build/desktop run pack
 ```
 
-The base configuration produces a native macOS application/DMG. The release workflow explicitly builds `universal-apple-darwin`, producing one signed package that runs natively on Apple Silicon and Intel. On Windows, `tauri.windows.conf.json` switches the bundle target to NSIS. Local development artifacts are unsigned unless the appropriate platform and updater signing variables are provided.
+`pack` creates an unpacked application for the current platform. `dist:mac` creates universal DMG and ZIP artifacts; `dist:win` creates the Windows NSIS installer. Local artifacts are unsigned unless the platform signing and notarization variables are present.
 
 ### Website container
 
@@ -301,7 +300,7 @@ The root compose file runs Postgres and the web service, waits for database heal
 
 Production desktop releases are tag-driven. Before tagging:
 
-1. Synchronize the desktop version in `apps/desktop/package.json`, `apps/desktop/src-tauri/Cargo.toml`, and `apps/desktop/src-tauri/tauri.conf.json`.
+1. Update the desktop version in `apps/desktop/package.json`.
 2. Update `CHANGELOG.md`.
 3. Run `pnpm verify` and a native build on the relevant platforms.
 4. Commit the version and changelog.
@@ -312,20 +311,19 @@ git tag v2.4.1
 git push origin v2.4.1
 ```
 
-The release workflow first rejects a tag that does not exactly match all three desktop version sources, and refuses to publish unless all mandatory Apple, Windows, and Tauri updater signing credentials are present. It then:
+The release workflow first rejects a tag that does not exactly match the desktop package version and refuses to publish unless all mandatory Apple and Windows signing credentials are present. It then:
 
 1. Runs the quality gate.
 2. Builds, signs, notarizes, and staples a universal macOS app and DMG for Apple Silicon and Intel.
 3. Imports the Windows PFX and builds an Authenticode-signed NSIS installer.
-4. Signs both updater artifacts with the Tauri updater key.
-5. Generates and validates updater entries for `darwin-aarch64`, `darwin-x86_64`, and `windows-x86_64`, then merges them into `latest.json`.
-6. Publishes the installers, updater archives, signatures, and manifest to a GitHub Release.
+4. Generates electron-updater metadata and differential blockmaps for macOS and Windows.
+5. Publishes the installers, update archives, blockmaps, and platform manifests to one immutable GitHub Release.
 
 The application checks the latest GitHub Release manifest and offers an in-app update and restart. Read [docs/RELEASING.md](docs/RELEASING.md) before releasing; it is the secret and signing checklist.
 
 ## Security and accessibility baseline
 
-- The desktop webviews use an explicit Tauri CSP and a shared capability allowlist.
+- Desktop renderers use context isolation, Chromium sandboxing, no Node integration, a strict CSP, denied web permissions, blocked navigation and popups, trusted-sender checks, and explicit IPC allowlists.
 - The website removes the framework header and sends content-type, referrer, permissions, and HSTS headers.
 - Device tokens are random 256-bit values, hashed at rest, revocable, and stored in the native credential vault.
 - Public reports use unguessable slugs and are marked `noindex`; possession of the link grants viewing access.
@@ -333,7 +331,7 @@ The application checks the latest GitHub Release manifest and offers an in-app u
 - The web root includes a skip link, semantic landmarks, responsive navigation, and page-level metadata.
 - Desktop dialogs trap focus, icon controls have accessible names, status messages use live regions, controls are sized for WCAG 2.2 target guidance, and reduced-motion preferences are respected.
 
-Changes should preserve keyboard access, visible focus, semantic names and states, contrast, 320 px website layouts, Windows compact desktop width, macOS wide desktop layout, and the `560 x 460` minimum auditor-tool windows.
+Changes should preserve keyboard access, visible focus, semantic names and states, contrast, 320 px website layouts, the `920 x 640` desktop minimum, high-DPI capture, and reduced-motion behavior.
 
 ## Project documentation
 
@@ -341,9 +339,7 @@ Changes should preserve keyboard access, visible focus, semantic names and state
 - [SKILL.md](SKILL.md): repository-specific implementation and verification workflow.
 - [CHANGELOG.md](CHANGELOG.md): shipped versions and unreleased changes.
 - [docs/RELEASING.md](docs/RELEASING.md): production signing and release operations.
-- [docs/SCK-MIGRATION.md](docs/SCK-MIGRATION.md): planned macOS lens migration from deprecated CoreGraphics capture to ScreenCaptureKit.
-- [docs/SITE-INTEGRATION.md](docs/SITE-INTEGRATION.md): historical integration plan; confirm current routes and behavior against source.
-- [PLAN.md](PLAN.md): historical original v1 plan, not the current feature specification.
+- [docs/SITE-INTEGRATION.md](docs/SITE-INTEGRATION.md): current desktop, website, authentication, publishing, and download integration.
 
 ## Downloads
 
