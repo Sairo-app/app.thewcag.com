@@ -7,7 +7,7 @@ import { getImage, publicImageUrl } from "@/lib/r2";
 export const runtime = "nodejs";
 
 /**
- * Stable image URL under app.thewcag.com (used for <img> and og:image).
+ * Stable image URL under app.thewcag.com for report images and social previews.
  * In production, redirects to the R2 CDN so Cloudflare serves the bytes and
  * the app never proxies them. In dev (no public URL) it streams from R2/MinIO.
  */

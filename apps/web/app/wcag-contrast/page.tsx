@@ -2,21 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer, JsonLd } from "@/components/Footer";
+import { ProductLinks } from "@/components/ProductLinks";
+import { createPageMetadata } from "@/lib/seo";
 
-const SITE = process.env.NEXT_PUBLIC_APP_URL || "https://app.thewcag.com";
-
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: "WCAG Color Contrast Requirements Explained (2.1 & 2.2)",
   description:
     "A clear guide to WCAG color contrast: the 4.5:1 and 3:1 minimums, success criteria 1.4.3, 1.4.6 and 1.4.11, large-text rules, and how contrast ratio is calculated.",
-  alternates: { canonical: "/wcag-contrast" },
-  openGraph: {
-    title: "WCAG Color Contrast Requirements Explained",
-    description:
-      "The 4.5:1 and 3:1 minimums, success criteria 1.4.3 / 1.4.11, large-text rules, and how the ratio is calculated.",
-    url: `${SITE}/wcag-contrast`,
-  },
-};
+  path: "/wcag-contrast",
+  keywords: ["WCAG contrast requirements", "4.5 to 1 contrast ratio", "WCAG 1.4.3", "non-text contrast"],
+});
 
 const FAQ = [
   {
@@ -139,6 +134,7 @@ export default function WcagContrastPage() {
             ))}
           </dl>
         </section>
+        <ProductLinks heading="Apply contrast requirements in the complete workflow" />
       </main>
       <Footer />
     </>

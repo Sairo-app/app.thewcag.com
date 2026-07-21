@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   AuditActivity,
   AuditBrief,
@@ -14,6 +14,9 @@ export type AuditSection =
   | "checklist"
   | "history"
   | "palette"
+  | "sampleItems"
+  | "testRuns"
+  | "findingViews"
   | "activity"
   | "reports";
 export type RecordAuditActivity = (
@@ -21,7 +24,7 @@ export type RecordAuditActivity = (
 ) => Promise<void>;
 
 const LEGACY_KEYS: Record<
-  Exclude<AuditSection, "activity" | "reports">,
+  Exclude<AuditSection, "activity" | "reports" | "sampleItems" | "testRuns" | "findingViews">,
   string
 > = {
   findings: "findings",
@@ -35,6 +38,9 @@ const SECTION_DEFAULTS: Record<AuditSection, unknown> = {
   checklist: {},
   history: [],
   palette: ["#1F2933", "#FFF9ED", "#D9480F", "#28745D"],
+  sampleItems: [],
+  testRuns: [],
+  findingViews: [],
   activity: [],
   reports: [],
 };
@@ -51,12 +57,43 @@ export function createAuditProject(name = "Untitled audit"): AuditProject {
     id: `aud-${crypto.randomUUID().slice(0, 12)}`,
     project: name.trim().slice(0, 120) || "Untitled audit",
     target: "",
+    goal: "",
     scope: "",
+    sample: "",
+    excludedScope: "",
+    environment: "",
+    assistiveTechnology: "",
+    methodology:
+      "Manual WCAG review supported by deterministic tools and assistive technology testing.",
+    executiveSummary: "",
+    limitations: "",
+    conclusion: "in-progress",
+    completedAt: "",
     standard: "WCAG 2.2 AA",
     auditor: "",
     startedAt: new Date(now).toISOString().slice(0, 10),
     updatedAt: now,
     createdAt: now,
+  };
+}
+
+export function normalizeAuditProject(audit: AuditProject): AuditProject {
+  const defaults = createAuditProject(audit.project);
+  return {
+    ...defaults,
+    ...audit,
+    id: audit.id,
+    createdAt: audit.createdAt,
+    goal: audit.goal ?? "",
+    sample: audit.sample ?? "",
+    excludedScope: audit.excludedScope ?? "",
+    environment: audit.environment ?? "",
+    assistiveTechnology: audit.assistiveTechnology ?? "",
+    methodology: audit.methodology ?? defaults.methodology,
+    executiveSummary: audit.executiveSummary ?? "",
+    limitations: audit.limitations ?? "",
+    conclusion: audit.conclusion ?? "in-progress",
+    completedAt: audit.completedAt ?? "",
   };
 }
 
@@ -93,6 +130,9 @@ async function migrateLegacyAudit(): Promise<{
     setStored(ACTIVE_AUDIT_KEY, audit.id),
     setStored(auditStoreKey(audit.id, "activity"), activity),
     setStored(auditStoreKey(audit.id, "reports"), []),
+    setStored(auditStoreKey(audit.id, "sampleItems"), []),
+    setStored(auditStoreKey(audit.id, "testRuns"), []),
+    setStored(auditStoreKey(audit.id, "findingViews"), []),
     desktop.invoke("capture:assign-unscoped", { auditId: audit.id }),
   ]);
   return { audits: [audit], activeId: audit.id };
@@ -103,9 +143,9 @@ async function loadAudits(): Promise<{
   activeId: string;
 }> {
   const stored = await getStored<AuditProject[]>(AUDITS_KEY, []);
-  const audits = stored.filter(
-    (audit) => audit && /^aud-[a-z0-9-]{6,36}$/.test(audit.id),
-  );
+  const audits = stored
+    .filter((audit) => audit && /^aud-[a-z0-9-]{6,36}$/.test(audit.id))
+    .map(normalizeAuditProject);
   if (!audits.length) return migrateLegacyAudit();
   const requested = await getStored<string>(ACTIVE_AUDIT_KEY, audits[0].id);
   const activeId = audits.some(
@@ -121,6 +161,16 @@ export function useAuditWorkspace() {
   const [audits, setAudits] = useState<AuditProject[]>([]);
   const [activeId, setActiveId] = useState("");
   const [ready, setReady] = useState(false);
+  const auditsWriteQueue = useRef<Promise<void>>(Promise.resolve());
+  const activityWriteQueue = useRef<Promise<void>>(Promise.resolve());
+
+  const persistAudits = useCallback((next: AuditProject[]) => {
+    const request = auditsWriteQueue.current.then(() =>
+      setStored(AUDITS_KEY, next),
+    );
+    auditsWriteQueue.current = request.catch(() => undefined);
+    return request;
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -159,7 +209,7 @@ export function useAuditWorkspace() {
     const audit = createAuditProject(name);
     setAudits((current) => {
       const next = [audit, ...current];
-      void setStored(AUDITS_KEY, next);
+      void persistAudits(next);
       return next;
     });
     setActiveId(audit.id);
@@ -177,7 +227,41 @@ export function useAuditWorkspace() {
       desktop.invoke("audit:activate", { auditId: audit.id }),
     ]);
     return audit;
-  }, []);
+  }, [persistAudits]);
+
+  const importAudit = useCallback((source: AuditProject) => {
+    const created = createAuditProject(source.project);
+    const audit: AuditProject = normalizeAuditProject({
+      ...created,
+      project: source.project.trim().slice(0, 120) || "Imported audit",
+      target: source.target,
+      goal: source.goal,
+      scope: source.scope,
+      sample: source.sample,
+      excludedScope: source.excludedScope,
+      environment: source.environment,
+      assistiveTechnology: source.assistiveTechnology,
+      methodology: source.methodology,
+      executiveSummary: source.executiveSummary,
+      limitations: source.limitations,
+      conclusion: source.conclusion,
+      completedAt: source.completedAt,
+      standard: source.standard,
+      auditor: source.auditor,
+      startedAt: source.startedAt,
+    });
+    setAudits((current) => {
+      const next = [audit, ...current];
+      void persistAudits(next);
+      return next;
+    });
+    setActiveId(audit.id);
+    void Promise.all([
+      setStored(ACTIVE_AUDIT_KEY, audit.id),
+      desktop.invoke("audit:activate", { auditId: audit.id }),
+    ]);
+    return audit;
+  }, [persistAudits]);
 
   const updateAudit = useCallback(
     (patch: Partial<AuditProject>) => {
@@ -188,11 +272,11 @@ export function useAuditWorkspace() {
             ? { ...audit, ...patch, id: audit.id, updatedAt: Date.now() }
             : audit,
         );
-        void setStored(AUDITS_KEY, next);
+        void persistAudits(next);
         return next;
       });
     },
-    [activeAudit],
+    [activeAudit, persistAudits],
   );
 
   const archiveAudit = useCallback(
@@ -207,28 +291,47 @@ export function useAuditWorkspace() {
           : audit,
       );
       setAudits(next);
-      void setStored(AUDITS_KEY, next);
+      void persistAudits(next);
       if (activeId === id) selectAudit(available[0].id);
       return true;
     },
-    [activeId, audits, selectAudit],
+    [activeId, audits, persistAudits, selectAudit],
+  );
+
+  const discardAudit = useCallback(
+    (id: string) => {
+      const fallback = audits.find(
+        (audit) => audit.id !== id && !audit.archivedAt,
+      );
+      if (!fallback) return false;
+      const next = audits.filter((audit) => audit.id !== id);
+      setAudits(next);
+      void persistAudits(next);
+      if (activeId === id) selectAudit(fallback.id);
+      return true;
+    },
+    [activeId, audits, persistAudits, selectAudit],
   );
 
   const recordActivity = useCallback(
     async (activity: Omit<AuditActivity, "id" | "auditId" | "createdAt">) => {
       if (!activeAudit) return;
       const key = auditStoreKey(activeAudit.id, "activity");
-      const current = await getStored<AuditActivity[]>(key, []);
-      const next: AuditActivity[] = [
-        {
-          ...activity,
-          id: crypto.randomUUID(),
-          auditId: activeAudit.id,
-          createdAt: Date.now(),
-        },
-        ...current,
-      ].slice(0, 120);
-      await setStored(key, next);
+      const request = activityWriteQueue.current.then(async () => {
+        const current = await getStored<AuditActivity[]>(key, []);
+        const next: AuditActivity[] = [
+          {
+            ...activity,
+            id: crypto.randomUUID(),
+            auditId: activeAudit.id,
+            createdAt: Date.now(),
+          },
+          ...current,
+        ].slice(0, 120);
+        await setStored(key, next);
+      });
+      activityWriteQueue.current = request.catch(() => undefined);
+      await request;
     },
     [activeAudit],
   );
@@ -239,6 +342,8 @@ export function useAuditWorkspace() {
     archiveAudit,
     audits,
     createAudit,
+    discardAudit,
+    importAudit,
     ready,
     recordActivity,
     selectAudit,

@@ -6,7 +6,7 @@ import type {
 } from "@accessibility-build/audit-contracts";
 
 export type AppView = "main" | "overlay" | "annotate" | "lens";
-export type WorkspaceStage = "inspect" | "evidence" | "review" | "share";
+export type WorkspaceStage = "plan" | "inspect" | "evidence" | "review" | "share";
 export type WorkspaceUtility = "vision" | "palette" | "settings";
 export type WorkspaceTool = WorkspaceStage | WorkspaceUtility | "capture" | "checklist";
 export type OverlayMode = "pair" | "foreground" | "background" | "capture" | "measure";
@@ -76,11 +76,73 @@ export interface CaptureEntry {
 export interface AuditBrief {
   project: string;
   target: string;
+  goal: string;
   scope: string;
+  sample: string;
+  excludedScope: string;
+  environment: string;
+  assistiveTechnology: string;
+  methodology: string;
+  executiveSummary: string;
+  limitations: string;
+  conclusion:
+    | "not-set"
+    | "in-progress"
+    | "meets-target"
+    | "does-not-meet-target";
+  completedAt: string;
   standard: "WCAG 2.2 A" | "WCAG 2.2 AA";
   auditor: string;
   startedAt: string;
   updatedAt: number;
+}
+
+export interface AuditSampleItem {
+  id: string;
+  kind: "page" | "flow" | "component" | "document" | "state";
+  label: string;
+  location: string;
+  status: "planned" | "in-progress" | "complete" | "blocked";
+  notes: string;
+  createdAt: number;
+  modifiedAt: number;
+}
+
+export interface AuditTestStepResult {
+  id: string;
+  label: string;
+  complete: boolean;
+  observation: string;
+}
+
+export interface AuditTestRun {
+  id: string;
+  scriptId: string;
+  title: string;
+  category: "authentication" | "checkout" | "forms" | "media" | "documents" | "components";
+  status: "planned" | "in-progress" | "complete" | "blocked";
+  steps: AuditTestStepResult[];
+  notes: string;
+  createdAt: number;
+  modifiedAt: number;
+}
+
+export interface AuditTemplate {
+  id: string;
+  name: string;
+  description: string;
+  source: "built-in" | "personal";
+  goal: string;
+  scope: string;
+  sample: string;
+  excludedScope: string;
+  environment: string;
+  assistiveTechnology: string;
+  methodology: string;
+  standard: AuditBrief["standard"];
+  sampleItems: Array<Pick<AuditSampleItem, "kind" | "label" | "location" | "notes">>;
+  testScriptIds: string[];
+  createdAt?: number;
 }
 
 export interface AuditProject extends AuditBrief {
@@ -111,12 +173,25 @@ export interface PublishedReport {
 
 export interface Finding {
   key: string;
+  reference?: string;
   title: string;
   wcag: string;
   severity: "blocker" | "major" | "minor";
-  status: "open" | "fixed" | "accepted";
+  status: "open" | "retest" | "fixed" | "accepted";
   note: string;
+  location?: string;
+  owner?: string;
+  ticket?: string;
+  dueDate?: string;
+  riskAcceptance?: string;
+  retestNote?: string;
+  retestedAt?: number;
   captureId?: string;
+  beforeCaptureId?: string;
+  afterCaptureId?: string;
+  comparisonNote?: string;
+  duplicateOf?: string;
+  occurrences?: FindingOccurrence[];
   createdAt: number;
   schemaVersion?: 2;
   description?: string;
@@ -145,14 +220,42 @@ export interface Finding {
   modifiedAt?: number;
 }
 
+export interface FindingOccurrence {
+  id: string;
+  location: string;
+  captureId?: string;
+  note: string;
+  createdAt: number;
+}
+
+export interface FindingSavedView {
+  id: string;
+  name: string;
+  query: string;
+  status: "all" | Finding["status"];
+  severity: "all" | Finding["severity"];
+  sort: "updated" | "severity" | "criterion" | "due";
+  createdAt: number;
+}
+
 export interface ShortcutSettings {
   inspect: string;
   capture: string;
   lens: string;
 }
 
+export interface ChecklistShortcutSettings {
+  pass: string;
+  fail: string;
+  notApplicable: string;
+  next: string;
+  previous: string;
+  expand: string;
+}
+
 export interface AppSettings {
   shortcuts: ShortcutSettings;
+  checklistShortcuts: ChecklistShortcutSettings;
   launchAtLogin: boolean;
   appearance: "light";
   reduceMotion: boolean;
@@ -204,6 +307,7 @@ export type InvokeChannel =
   | "capture:list"
   | "capture:open"
   | "capture:read-document"
+  | "capture:read-data"
   | "capture:save-document"
   | "capture:save-thumbnail"
   | "capture:delete"
@@ -216,6 +320,7 @@ export type InvokeChannel =
   | "lens:frame"
   | "store:get"
   | "store:set"
+  | "store:remove"
   | "store:add-findings"
   | "audit:activate"
   | "workspace:navigate"
@@ -228,6 +333,7 @@ export type InvokeChannel =
   | "report:publish"
   | "dialog:save-image"
   | "dialog:save-text"
+  | "dialog:open-text"
   | "clipboard:write-text"
   | "clipboard:write-image"
   | "shell:show-item"

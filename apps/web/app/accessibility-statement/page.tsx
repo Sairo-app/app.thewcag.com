@@ -2,16 +2,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { ProductLinks } from "@/components/ProductLinks";
+import { createPageMetadata } from "@/lib/seo";
 
-const SITE = process.env.NEXT_PUBLIC_APP_URL || "https://app.thewcag.com";
 const ISSUES = "https://github.com/Sairo-app/app.thewcag.com/issues";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: "Accessibility Statement",
   description:
-    "TheWCAG's accessibility statement: our WCAG 2.2 Level AA conformance target for app.thewcag.com, the measures we take, known limitations, and how to give feedback.",
-  alternates: { canonical: "/accessibility-statement" },
-};
+    "Read TheWCAG's accessibility statement for the website, macOS and Windows audit workstation, Chrome extension, known limitations, and feedback channels.",
+  path: "/accessibility-statement",
+  keywords: ["TheWCAG accessibility statement", "WCAG 2.2 conformance target", "accessibility feedback"],
+});
 
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
@@ -31,8 +33,8 @@ export default function AccessibilityStatementPage() {
       <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-16">
         <h1 className="text-3xl font-bold tracking-tight">Accessibility Statement</h1>
         <p className="mt-3 text-sm text-muted">
-          Last reviewed: 7 July 2026. This statement applies to the website at{" "}
-          <span className="font-mono">app.thewcag.com</span> and the TheWCAG desktop application.
+          Last reviewed: 21 July 2026. This statement applies to the website at{" "}
+          <span className="font-mono">app.thewcag.com</span>, the TheWCAG desktop application, and the Chrome evidence extension.
         </p>
 
         <Section id="commitment" title="Our commitment">
@@ -51,8 +53,7 @@ export default function AccessibilityStatementPage() {
             <strong>WCAG 2.2 Level AA</strong>.
           </p>
           <p>
-            The website is <strong>substantially conformant</strong> with WCAG 2.2 Level AA:
-            it meets the standard except where noted under Known limitations below.
+            We have not commissioned an independent conformance assessment and do not currently claim full WCAG conformance. We continuously test against our Level AA target and document known limitations below.
           </p>
         </Section>
 
@@ -60,18 +61,17 @@ export default function AccessibilityStatementPage() {
           <ul className="list-disc space-y-1.5 pl-5">
             <li>Semantic HTML with correct landmark, heading, and list structure.</li>
             <li>Visible keyboard focus indicators and a fully keyboard-operable interface.</li>
-            <li>Text and interface colors tested to meet AA contrast (4.5:1 text, 3:1 UI), in both light and dark themes.</li>
-            <li>Respect for the operating system&apos;s reduced-motion and color-scheme preferences.</li>
+            <li>Text and interface colors tested against AA contrast thresholds for text and user-interface components.</li>
+            <li>Respect for reduced-motion, forced-colors, zoom, text resizing, and platform accessibility settings.</li>
             <li>Alternative text on meaningful images and labels on all form controls.</li>
             <li>Responsive layouts that reflow to 320px without loss of content or horizontal scrolling.</li>
+            <li>Keyboard and screen-reader operation for the extension popup, evidence workspace, and desktop audit workflow.</li>
           </ul>
         </Section>
 
         <Section id="compatibility" title="Compatibility">
           <p>
-            The website is designed to work with recent versions of major browsers (Chrome, Edge,
-            Firefox, Safari) and common screen readers (VoiceOver, NVDA, JAWS). It is not designed to
-            support browsers more than two major versions old.
+            The website is designed for recent versions of Chrome, Edge, Firefox, and Safari with common screen readers including VoiceOver, NVDA, and JAWS. The desktop app supports macOS 12 or later and Windows 10 or 11. The extension requires Chrome 116 or later.
           </p>
         </Section>
 
@@ -87,15 +87,16 @@ export default function AccessibilityStatementPage() {
               Third-party sign-in emails are delivered by our email provider and may not fully match
               our contrast choices.
             </li>
+            <li>
+              Chrome prevents extensions from inspecting browser-owned pages such as <span className="font-mono">chrome://</span> settings. Evidence capture works on regular HTTP and HTTPS webpages.
+            </li>
           </ul>
         </Section>
 
         <Section id="assessment" title="How we assessed this">
           <p>
             We evaluate accessibility through a combination of self-evaluation, automated checks in
-            our build pipeline, manual keyboard and screen-reader testing, and the same contrast and
-            color-vision tooling that TheWCAG provides. This statement was created on 7 July 2026 and
-            is reviewed when the site materially changes.
+            our build pipeline, responsive browser checks, manual keyboard and screen-reader testing, and the same contrast and color-vision tooling that TheWCAG provides. This statement was updated on 21 July 2026 and is reviewed whenever a public surface materially changes.
           </p>
         </Section>
 
@@ -134,6 +135,7 @@ export default function AccessibilityStatementPage() {
           </Link>
           .
         </p>
+        <ProductLinks heading="Explore the product covered by this statement" />
       </main>
       <Footer />
     </>

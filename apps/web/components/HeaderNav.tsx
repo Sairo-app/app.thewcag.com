@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV = [
-  { href: "/#purpose", label: "Why it works" },
-  { href: "/#tools", label: "Tools" },
+  { href: "/accessibility-audit-software", label: "Audit software" },
+  { href: "/chrome-accessibility-extension", label: "Chrome extension" },
   { href: "/#platforms", label: "Platforms" },
   { href: "/wcag-contrast", label: "Guides" },
 ];

@@ -43,7 +43,7 @@ omission is already available before generation.
 3. Reopen the popup when its badge indicates that evidence is ready, then open
    the expanded side-panel workspace.
 4. Connect to the installed desktop application and choose an active audit.
-5. Capture a clean viewport image and an exact high-DPI crop.
+5. Capture a clean viewport image and a contextual high-DPI screenshot with the selected target clearly highlighted.
 6. Record rendered element context, accessibility properties, relevant styles,
    page context, deterministic checks, and non-destructive marker geometry.
 7. Add a short auditor observation and optional task context.
@@ -198,7 +198,7 @@ The extractor must never collect:
   that will leave the device.
 - Users can omit the screenshot, remove text context, withhold the page address,
   or cancel. Interactive crop adjustment and redaction are release-hardening
-  work; the picker already limits capture to the selected region.
+  work; the picker limits capture to a bounded context around the selected target.
 - The consent timestamp and selected payload sections are recorded locally.
 - Transport uses HTTPS; device tokens stay in OS secure storage.
 - Provider retention and training controls must be configured contractually and
@@ -212,7 +212,7 @@ The extractor must never collect:
 - Add the extension workspace, Manifest V3 build, toolbar popup, expanded side
   panel, and service worker.
 - Implement keyboard-accessible element selection and region selection.
-- Capture the viewport, calculate exact crop geometry, and display evidence.
+- Capture the viewport, calculate bounded contextual crop geometry, and display the highlighted evidence.
 - Add observation, task context, payload visibility, and local draft persistence.
 - Add deterministic local draft generation so the flow remains testable without
   credentials or a model provider.

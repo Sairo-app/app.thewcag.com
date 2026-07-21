@@ -2,21 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer, JsonLd } from "@/components/Footer";
+import { ProductLinks } from "@/components/ProductLinks";
+import { createPageMetadata } from "@/lib/seo";
 
-const SITE = process.env.NEXT_PUBLIC_APP_URL || "https://app.thewcag.com";
-
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: "APCA vs WCAG 2 Contrast - What Changes and What to Use",
   description:
     "APCA explained in plain terms: how it differs from the WCAG 2 contrast ratio, what Lc values mean, thresholds by text size, and how to use both today.",
-  alternates: { canonical: "/apca-contrast" },
-  openGraph: {
-    title: "APCA vs WCAG 2 Contrast - What Changes and What to Use",
-    description:
-      "What APCA measures, why it can disagree with the 4.5:1 ratio, Lc thresholds by use, and a pragmatic policy for using both.",
-    url: `${SITE}/apca-contrast`,
-  },
-};
+  path: "/apca-contrast",
+  keywords: ["APCA contrast", "APCA vs WCAG", "Lc contrast value", "WCAG contrast ratio"],
+});
 
 const LC_TABLE: [string, string][] = [
   ["Lc 90", "Preferred for body text at small sizes (like 14px regular)."],
@@ -149,6 +144,7 @@ export default function ApcaContrastPage() {
             Download free for macOS &amp; Windows
           </Link>
         </section>
+        <ProductLinks heading="Move from contrast measurements to audit evidence" />
       </main>
       <Footer />
     </>

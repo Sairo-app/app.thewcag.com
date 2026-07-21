@@ -77,8 +77,8 @@ pnpm --filter @accessibility-build/desktop run pack
 8. Create and push an annotated tag that exactly matches `apps/desktop/package.json`:
 
 ```sh
-git tag -a v3.0.0 -m "TheWCAG v3.0.0"
-git push origin v3.0.0
+git tag -a v3.0.1 -m "TheWCAG v3.0.1"
+git push origin v3.0.1
 ```
 
 The workflow runs the repository quality gate, builds macOS and Windows in parallel, uploads the signed macOS and unsigned Windows artifacts, and creates one GitHub Release. Release artifacts are treated as immutable by policy: fixes ship under a new patch version.

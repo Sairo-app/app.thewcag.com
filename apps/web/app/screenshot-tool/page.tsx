@@ -2,21 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer, JsonLd } from "@/components/Footer";
+import { ProductLinks } from "@/components/ProductLinks";
+import { createPageMetadata } from "@/lib/seo";
 
-const SITE = process.env.NEXT_PUBLIC_APP_URL || "https://app.thewcag.com";
-
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: "Accessibility Screenshot Tool - Full How-To Guide",
   description:
     "A complete guide to TheWCAG's screenshot and annotation tool: capture any region, flag issues against WCAG success criteria, measure target sizes, probe contrast, and publish a shareable report.",
-  alternates: { canonical: "/screenshot-tool" },
-  openGraph: {
-    title: "Accessibility Screenshot Tool - Full How-To Guide",
-    description:
-      "Capture, annotate against WCAG criteria, measure targets, probe contrast, and share a report. Step by step.",
-    url: `${SITE}/screenshot-tool`,
-  },
-};
+  path: "/screenshot-tool",
+  keywords: ["accessibility screenshot tool", "WCAG annotation tool", "accessibility evidence capture", "annotated accessibility report"],
+});
 
 const STEPS: { title: string; body: string }[] = [
   {
@@ -177,6 +172,7 @@ export default function ScreenshotToolPage() {
           </Link>
           .
         </p>
+        <ProductLinks heading="Keep screenshot evidence connected to the audit" />
       </main>
       <Footer />
     </>

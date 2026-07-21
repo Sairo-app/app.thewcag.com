@@ -15,7 +15,6 @@ import {
 import type {
   Account,
   AppSettings,
-  AuditProject,
   PlatformInfo,
   UpdateState,
 } from "../../shared/desktop";
@@ -29,6 +28,14 @@ const DEFAULTS: AppSettings = {
     capture: "Alt+CommandOrControl+S",
     lens: "Alt+CommandOrControl+L",
   },
+  checklistShortcuts: {
+    pass: "p",
+    fail: "f",
+    notApplicable: "n",
+    next: "j",
+    previous: "k",
+    expand: "Enter",
+  },
   launchAtLogin: false,
   appearance: "light",
   reduceMotion: false,
@@ -37,12 +44,8 @@ const DEFAULTS: AppSettings = {
 
 export function SettingsView({
   platform,
-  audit,
-  onAuditChange,
 }: {
   platform: PlatformInfo;
-  audit: AuditProject;
-  onAuditChange: (patch: Partial<AuditProject>) => void;
 }) {
   const [settings, setSettings] = useState<AppSettings>(DEFAULTS);
   const [permission, setPermission] = useState<string>("unknown");
@@ -75,11 +78,12 @@ export function SettingsView({
         : "full";
       show("Settings saved");
     } catch (error) {
+      const persisted = await desktop
+        .invoke<AppSettings>("settings:get")
+        .catch(() => null);
+      if (persisted) setSettings(persisted);
       show(messageFromError(error), true);
     }
-  }
-  function patchAudit(patch: Partial<AuditProject>) {
-    onAuditChange(patch);
   }
   async function requestPermission() {
     try {
@@ -115,63 +119,9 @@ export function SettingsView({
     platform.platform === "macos"
       ? "macOS Keychain"
       : "Windows credential protection";
-
   return (
     <div className="settings-view">
       <Toast message={message} />
-      <section className="settings-section">
-        <div className="settings-intro">
-          <h2>Audit context</h2>
-          <p>This information travels with checklist and findings exports.</p>
-        </div>
-        <div className="settings-form grid-two">
-          <Field label="Project name">
-            <input
-              value={audit.project}
-              onChange={(event) => patchAudit({ project: event.target.value })}
-            />
-          </Field>
-          <Field label="Target URL or application">
-            <input
-              value={audit.target}
-              onChange={(event) => patchAudit({ target: event.target.value })}
-              placeholder="https://example.com or Product app"
-            />
-          </Field>
-          <Field label="Scope">
-            <textarea
-              value={audit.scope}
-              onChange={(event) => patchAudit({ scope: event.target.value })}
-              placeholder="Pages, flows, components, or release being audited"
-            />
-          </Field>
-          <div className="field-stack">
-            <Field label="Conformance target">
-              <select
-                value={audit.standard}
-                onChange={(event) =>
-                  patchAudit({
-                    standard: event.target.value as AuditProject["standard"],
-                  })
-                }
-              >
-                <option>WCAG 2.2 A</option>
-                <option>WCAG 2.2 AA</option>
-              </select>
-            </Field>
-            <Field label="Auditor">
-              <input
-                value={audit.auditor}
-                onChange={(event) =>
-                  patchAudit({ auditor: event.target.value })
-                }
-                placeholder="Name or team"
-              />
-            </Field>
-          </div>
-        </div>
-      </section>
-
       <section className="settings-section">
         <div className="settings-intro">
           <h2>Capture and startup</h2>
@@ -230,6 +180,47 @@ export function SettingsView({
               }
             />
           </label>
+        </div>
+      </section>
+
+      <section className="settings-section">
+        <div className="settings-intro">
+          <h2>Checklist keyboard</h2>
+          <p>
+            Decide and move through criteria without leaving the keyboard.
+            Shortcuts work only while a criterion row has focus.
+          </p>
+        </div>
+        <div className="shortcut-list checklist-shortcut-list">
+          {([
+            ["pass", "Mark pass"],
+            ["fail", "Mark fail"],
+            ["notApplicable", "Mark not applicable"],
+            ["next", "Next criterion"],
+            ["previous", "Previous criterion"],
+            ["expand", "Open audit record"],
+          ] as const).map(([key, label]) => (
+            <Field key={key} label={label}>
+              <div className="shortcut-input">
+                <Key size={15} />
+                <input
+                  maxLength={12}
+                  value={settings.checklistShortcuts[key]}
+                  aria-label={`${label} shortcut`}
+                  onChange={(event) =>
+                    setSettings({
+                      ...settings,
+                      checklistShortcuts: {
+                        ...settings.checklistShortcuts,
+                        [key]: event.target.value,
+                      },
+                    })
+                  }
+                  onBlur={() => void saveSettings(settings)}
+                />
+              </div>
+            </Field>
+          ))}
         </div>
       </section>
 

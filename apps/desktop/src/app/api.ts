@@ -14,6 +14,14 @@ const DEFAULT_SETTINGS: AppSettings = {
     capture: "Alt+CommandOrControl+S",
     lens: "Alt+CommandOrControl+L",
   },
+  checklistShortcuts: {
+    pass: "p",
+    fail: "f",
+    notApplicable: "n",
+    next: "j",
+    previous: "k",
+    expand: "Enter",
+  },
   launchAtLogin: false,
   appearance: "light",
   reduceMotion: false,
@@ -27,7 +35,7 @@ function previewPlatform(): PlatformInfo {
   return {
     platform: mac ? "macos" : "windows",
     arch: "preview",
-    version: "3.0.0-preview",
+    version: "3.0.1-preview",
     windowId: 0,
     view: (new URLSearchParams(location.search).get("view") as PlatformInfo["view"]) || "main",
     reduceMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
@@ -46,11 +54,23 @@ async function previewInvoke<T>(channel: InvokeChannel, payload?: unknown): Prom
   const value = (payload ?? {}) as Record<string, unknown>;
   switch (channel) {
     case "app:platform": return previewPlatform() as T;
-    case "settings:get": return JSON.parse(getLocal("settings") ?? JSON.stringify(DEFAULT_SETTINGS)) as T;
+    case "settings:get": {
+      const saved = JSON.parse(getLocal("settings") ?? "{}") as Partial<AppSettings>;
+      return {
+        ...DEFAULT_SETTINGS,
+        ...saved,
+        shortcuts: { ...DEFAULT_SETTINGS.shortcuts, ...saved.shortcuts },
+        checklistShortcuts: {
+          ...DEFAULT_SETTINGS.checklistShortcuts,
+          ...saved.checklistShortcuts,
+        },
+      } as T;
+    }
     case "settings:save": setLocal("settings", JSON.stringify(payload)); return payload as T;
     case "settings:reset": setLocal("settings", JSON.stringify(DEFAULT_SETTINGS)); return DEFAULT_SETTINGS as T;
     case "store:get": return getLocal(String(value.key)) as T;
     case "store:set": setLocal(String(value.key), String(value.json)); return undefined as T;
+    case "store:remove": try { localStorage.removeItem(`thewcag:${String(value.key)}`); } catch { /* preview storage is best effort */ } return undefined as T;
     case "store:add-findings": {
       const key = typeof value.auditId === "string" ? `findings-${value.auditId}` : "findings";
       const prior = JSON.parse(getLocal(key) ?? "[]") as unknown[];
@@ -60,6 +80,8 @@ async function previewInvoke<T>(channel: InvokeChannel, payload?: unknown): Prom
     }
     case "capture:list": return [] as T;
     case "capture:read-document": return null as T;
+    case "capture:read-data": return null as T;
+    case "dialog:open-text": return null as T;
     case "screen:permission":
     case "screen:request-permission": return "granted" as T;
     case "auth:account": return { signedIn: false } satisfies Account as T;

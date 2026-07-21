@@ -22,13 +22,15 @@ describe("capture identifiers", () => {
     const directory = await mkdtemp(join(tmpdir(), "thewcag-captures-"));
     try {
       const captures = new CaptureRepository(directory);
-      await captures.create(PNG, "Audit A", "aud-a1234567");
+      const auditA = await captures.create(PNG, "Audit A", "aud-a1234567");
       await captures.create(PNG, "Audit B", "aud-b1234567");
       await captures.create(PNG, "Legacy capture");
       expect(await captures.list("aud-a1234567")).toHaveLength(1);
       expect(await captures.assignUnscoped("aud-a1234567")).toBe(1);
       expect(await captures.list("aud-a1234567")).toHaveLength(2);
       expect((await captures.list("aud-b1234567"))[0].title).toBe("Audit B");
+      expect(await captures.readDataUrl(auditA.id, "raw")).toBe(PNG);
+      expect(await captures.readDataUrl(auditA.id, "thumbnail")).toBeNull();
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

@@ -24,11 +24,12 @@ The core audit workflow remains local-first. AI output is always a draft, WCAG m
 | On-screen contrast picker | Samples foreground and background pixels from any application or monitor, displays the WCAG 2.x ratio and AA/AAA verdicts, reports signed APCA Lc, and suggests nearby passing colors. |
 | Capture and annotation | Captures a region or full screen into a re-editable local document. Tools include issue badges, arrows, boxes, target measurement, contrast probes, focus-order markers, solid or pixel redaction, text, and non-destructive crop-to-new-capture. |
 | Color-vision lens | Shows the screen beneath a protected, always-on-top window with protanopia, deuteranopia, tritanopia, or achromatopsia simulation, adjustable severity, split view, zoom, low-acuity blur, low-contrast simulation, and PNG export. |
-| Audit workspace | Treats each project as an isolated audit with its own captures, findings, checklist, palette, reports, and activity history. The four-stage Inspect, Evidence, Review, and Share workflow keeps delivery state visible. |
-| Findings register | Combines contrast and annotated issues with WCAG criterion, severity, status, notes, search, Markdown export, and report preparation. |
-| WCAG checklist | Tracks all 55 WCAG 2.2 Level A and AA criteria by POUR principle with pass, fail, not applicable, notes, progress, filters, and contextual CSV or Markdown exports. |
+| Audit workspace | Treats each project as an isolated audit with its own evaluation goal, scope, structured representative sample, exclusions, browser and device matrix, assistive-technology coverage, captures, findings, checklist, conclusions, reports, and activity history. The five-stage Plan, Inspect, Evidence, Review, and Deliver workflow keeps the next required action and delivery state visible. Built-in and personal templates make approved matrices repeatable, while integrity-checked audit packages move the complete local record between computers. |
+| Guided testing | Provides reusable, step-by-step scripts for authentication, checkout, forms, media, downloadable documents, and design-system components. Each run records observations and planned, in-progress, blocked, or complete state alongside the representative sample. |
+| Findings register | Supports AI-assisted and manual findings with stable human-readable references, location, linked capture, before-and-after comparison, repeated-component occurrences, affected-user groups, severity rationale, WCAG mapping, remediation owner, ticket, target date, accepted-risk rationale, and retest records. Built-in and personal views, duplication, multi-select triage, undoable bulk owner/status/severity/date changes, sorting, editing, recovery, and selected-item Markdown export keep remediation queues manageable. |
+| WCAG checklist | Tracks the criteria applicable to the selected WCAG 2.2 Level A or AA target by POUR principle. Each criterion includes informative manual test prompts, a direct W3C Understanding reference, pass, fail, or reasoned not-applicable decisions, notes, progress, filters, failure-to-finding linkage, contextual CSV or Markdown exports, keyboard-first row navigation, configurable decision keys, and undo. |
 | Palette matrix | Accepts up to 16 hex colors, persists the palette, calculates every foreground/background pair, visualizes AA-normal and AA-large/UI thresholds, and copies the matrix as CSV. |
-| Evidence and reporting | Exports or copies annotated PNGs, merges annotation issues without overwriting later triage, and requires a report review, capture selection, privacy attestation, and authenticated account before publishing a shareable link. |
+| Evidence and reporting | Exports or copies annotated PNGs, merges annotation issues without overwriting later triage, and produces portable Markdown or printable HTML audit records with stable finding references, guided-run outcomes, repeated occurrences, and remediation comparisons. A guarded auditor conclusion distinguishes a focused evidence report from a complete audit. Delivery checks cover evaluation context, sample and guided-run completion, criterion decisions, N/A rationale, failure traceability, finding completeness, conclusion readiness, privacy attestation, and authentication before publishing a shareable link. |
 | Capture library and settings | Keeps up to 100 recent captures locally with editable source data and annotated thumbnails. Includes remappable global shortcuts, launch-at-login, update installation, screen-permission guidance, high-DPI capture, and a tray/menu-bar workflow. |
 
 Default global shortcuts are:
@@ -41,6 +42,8 @@ Default global shortcuts are:
 
 All three shortcuts can be changed in the application. The tray and native application menu also expose contrast inspection, region and full-screen capture, the vision lens, auditor tools, and application controls.
 
+Checklist decision keys are configured separately in Settings. Their defaults are `P` for pass, `F` for fail, `N` for not applicable, `J` and `K` to move between criterion rows, and `Enter` to open or close the focused criterion.
+
 ### Chrome evidence extension
 
 The Manifest V3 extension turns a browser observation into structured audit evidence without claiming automated conformance. The toolbar opens a compact popup for quick capture. The optional side panel is a separate, expanded workspace for reviewing evidence, controlling the approved payload, editing a generated draft, and saving the confirmed result.
@@ -49,9 +52,9 @@ The capture flow is:
 
 1. Open the toolbar popup on the page being audited.
 2. Choose **Select element** for one control, image, or text target, or **Select region** for a barrier spanning multiple elements.
-3. Mark the target on the webpage. The service worker finishes the screenshot crop and stores the evidence even after Chrome closes the popup.
+3. Mark the target on the webpage. The service worker creates a contextual screenshot with the selected control or region highlighted and stores the evidence even after Chrome closes the popup.
 4. Reopen the popup when the toolbar badge shows `1`, then choose **Review in workspace**.
-5. Inspect the marked crop, selector, semantic context, deterministic signals, and the complete bounded payload.
+5. Inspect the contextual marked screenshot, selector, semantic context, deterministic signals, and the complete bounded payload.
 6. Describe the observed behavior and optional task context. Choose whether the screenshot, element text, and sanitized page address may be included.
 7. Create a local structured draft or, when the paired desktop app is connected and signed in, generate an AI-assisted draft.
 8. Confirm the title, description, actual and expected results, user impact, affected users, severity, WCAG mappings, recommendation, example fix, and reproduction steps before saving into an audit.
@@ -107,7 +110,7 @@ The accessibility core is intentionally framework-independent and currently cons
 
 The desktop application uses one React bundle for multiple sandboxed Electron windows. `apps/desktop/src/main.tsx` selects the UI from the validated `view` query supplied by the main process:
 
-- `main`: staged audit workstation with Inspect, Evidence, Review, and Share plus palette, vision, account, and settings utilities.
+- `main`: staged audit workstation with Plan, Inspect, Evidence, Review, and Deliver plus palette, vision, account, and settings utilities.
 - `overlay`: one frozen full-screen inspection window per monitor.
 - `annotate`: re-editable screenshot editor with keyboard-accessible annotation selection and a handoff into report review.
 - `lens`: live color-vision and low-vision simulation.
@@ -143,7 +146,7 @@ accessibility-build-app/
 │   ├── a11y-core/               Pure TypeScript accessibility calculations
 │   └── audit-contracts/         Evidence, finding, WCAG, and native protocols
 ├── scripts/                     Desktop icon and Electron release validation
-├── docs/                        Release and site-integration operations
+├── docs/                        Product roadmap, release, and site-integration operations
 ├── .github/workflows/           Quality and signed release automation
 ├── docker-compose.yaml          Production Postgres and web stack
 ├── DESIGN.md                    Website visual system and accessibility rules
@@ -235,7 +238,7 @@ Then install the unpacked build:
 4. Copy the 32-character extension ID Chrome assigns.
 5. After every rebuild, click **Reload** on the extension card so Chrome replaces the popup, service worker, and side-panel bundle.
 
-The desktop native host intentionally accepts only that exact extension ID. For a production-shaped local bridge, package and launch the desktop app with the ID embedded:
+The desktop native host intentionally accepts only that exact extension ID. The extension talks directly to this local host; it does not send captured evidence to the website. For a production-shaped local bridge, package and launch the desktop app with the ID embedded:
 
 ```sh
 THEWCAG_EXTENSION_ID=<32-character-extension-id> \
@@ -245,6 +248,8 @@ THEWCAG_EXTENSION_ID=<32-character-extension-id> \
 Open the resulting unpacked TheWCAG application once so it registers the per-user native host, then choose **Connect desktop app** in the extension. The native messaging registration is written per user and is allowlisted to the configured extension origin. Local capture and export remain available if pairing is absent or the desktop app is offline.
 
 Release builds read the same value from the GitHub Actions repository variable `THEWCAG_EXTENSION_ID`. It must match the published Chrome Web Store extension ID before shipping the paired desktop release.
+
+The website enters the flow only when the desktop needs an authenticated service. Browser sign-in authorizes the device through a state-bound `thewcag://auth` link. The desktop keeps that credential in the operating system's encrypted storage and uses it for approved AI generation, optional report publishing, account checks, and downloads. The extension never receives the credential. See [docs/SITE-INTEGRATION.md](docs/SITE-INTEGRATION.md) for the complete trust boundary.
 
 #### Extension troubleshooting
 
@@ -450,6 +455,7 @@ Changes should preserve keyboard access, visible focus, semantic names and state
 - [DESIGN.md](DESIGN.md): Audit Lab visual language, responsive composition, interactive product-preview rules, and accessibility acceptance criteria.
 - [SKILL.md](SKILL.md): repository-specific implementation and verification workflow.
 - [CHANGELOG.md](CHANGELOG.md): shipped versions and unreleased changes.
+- [docs/AUDITOR-PRODUCT-ROADMAP.md](docs/AUDITOR-PRODUCT-ROADMAP.md): phased plan for a complete auditor workflow, integrations, collaboration, reporting, evidence, and enterprise controls.
 - [docs/RELEASING.md](docs/RELEASING.md): production signing and release operations.
 - [docs/SITE-INTEGRATION.md](docs/SITE-INTEGRATION.md): current desktop, website, authentication, publishing, and download integration.
 - [docs/AI-EXTENSION-IMPLEMENTATION.md](docs/AI-EXTENSION-IMPLEMENTATION.md): browser evidence architecture, contracts, privacy boundaries, phased delivery, and acceptance criteria.

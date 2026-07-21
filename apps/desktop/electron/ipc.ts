@@ -160,7 +160,7 @@ export function registerIpc(services: Services): void {
       typeof value.auditId === "string" ? stringField(value, "auditId", 48) : undefined,
     );
     services.windows.sendToMain("capture:saved", entry);
-    services.windows.openAnnotate(entry.id);
+    if (value.silent !== true) services.windows.openAnnotate(entry.id);
     return entry;
   });
 
@@ -173,6 +173,11 @@ export function registerIpc(services: Services): void {
     services.windows.openAnnotate(id);
   });
   register("capture:read-document", (_event, payload) => services.captures.readDocument(stringField(asObject(payload), "id", 100)));
+  register("capture:read-data", (_event, payload) => {
+    const value = asObject(payload);
+    const kind = value.kind === "thumbnail" ? "thumbnail" : "raw";
+    return services.captures.readDataUrl(stringField(value, "id", 100), kind);
+  });
   register("capture:save-document", async (_event, payload) => {
     const value = asObject(payload);
     await services.captures.saveDocument(stringField(value, "id", 100), stringField(value, "json", 8 * 1024 * 1024));
@@ -218,6 +223,9 @@ export function registerIpc(services: Services): void {
     const value = asObject(payload);
     await services.store.setRaw(stringField(value, "key", 64), stringField(value, "json", 10 * 1024 * 1024));
   });
+  register("store:remove", (_event, payload) =>
+    services.store.remove(stringField(asObject(payload), "key", 64)),
+  );
   register("store:add-findings", (_event, payload) => {
     const value = asObject(payload);
     return services.store.addFindings(value.items, typeof value.auditId === "string" ? stringField(value, "auditId", 48) : undefined);
@@ -225,7 +233,7 @@ export function registerIpc(services: Services): void {
   register("audit:activate", (_event, payload) => services.captureCoordinator.activateAudit(stringField(asObject(payload), "auditId", 48)));
   register("workspace:navigate", (event, payload) => {
     const tool = stringField(asObject(payload), "tool", 24);
-    const allowed: WorkspaceTool[] = ["inspect", "evidence", "review", "share", "vision", "palette", "settings", "capture", "checklist"];
+    const allowed: WorkspaceTool[] = ["plan", "inspect", "evidence", "review", "share", "vision", "palette", "settings", "capture", "checklist"];
     if (!allowed.includes(tool as WorkspaceTool)) throw new Error("Unsupported workspace destination");
     services.windows.navigate(tool as WorkspaceTool);
     if (viewFromUrl(event.sender.getURL()) !== "main") currentWindow(event).close();
@@ -258,12 +266,31 @@ export function registerIpc(services: Services): void {
   });
   register("dialog:save-text", async (event, payload) => {
     const value = asObject(payload);
-    const text = stringField(value, "text", 10 * 1024 * 1024);
     const name = stringField(value, "name", 140).replace(/[^a-zA-Z0-9._-]/g, "-");
+    const maximum = name.endsWith(".thewcag-audit.json")
+      ? 300 * 1024 * 1024
+      : 10 * 1024 * 1024;
+    const text = stringField(value, "text", maximum);
     const response = await dialog.showSaveDialog(currentWindow(event), { defaultPath: name });
     if (response.canceled || !response.filePath) return null;
     await import("node:fs/promises").then(({ writeFile }) => writeFile(response.filePath!, text, "utf8"));
     return response.filePath;
+  });
+  register("dialog:open-text", async (event, payload) => {
+    const value = asObject(payload);
+    const extension = typeof value.extension === "string"
+      ? value.extension.replace(/[^a-zA-Z0-9]/g, "").slice(0, 16)
+      : "json";
+    const response = await dialog.showOpenDialog(currentWindow(event), {
+      properties: ["openFile"],
+      filters: [{ name: "TheWCAG audit package", extensions: [extension || "json"] }],
+    });
+    if (response.canceled || !response.filePaths[0]) return null;
+    const { readFile, stat } = await import("node:fs/promises");
+    const file = response.filePaths[0];
+    const size = await stat(file);
+    if (size.size > 300 * 1024 * 1024) throw new Error("The audit package is too large");
+    return readFile(file, "utf8");
   });
   register("clipboard:write-text", (_event, payload) => clipboard.writeText(stringField(asObject(payload), "text", 2 * 1024 * 1024)));
   register("clipboard:write-image", (_event, payload) => clipboard.writeImage(nativeImage.createFromDataURL(stringField(asObject(payload), "pngDataUrl", 50 * 1024 * 1024))));

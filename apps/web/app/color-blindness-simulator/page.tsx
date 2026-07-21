@@ -2,21 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer, JsonLd } from "@/components/Footer";
+import { ProductLinks } from "@/components/ProductLinks";
+import { createPageMetadata } from "@/lib/seo";
 
-const SITE = process.env.NEXT_PUBLIC_APP_URL || "https://app.thewcag.com";
-
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: "Color Blindness Simulator for Your Whole Screen",
   description:
     "See any app through protanopia, deuteranopia, tritanopia, and low-acuity vision - live, across your whole screen. TheWCAG's color-blindness lens works in any macOS or Windows app.",
-  alternates: { canonical: "/color-blindness-simulator" },
-  openGraph: {
-    title: "Color Blindness Simulator for Your Whole Screen",
-    description:
-      "Live protanopia, deuteranopia, tritanopia and low-acuity simulation over any app on macOS and Windows.",
-    url: `${SITE}/color-blindness-simulator`,
-  },
-};
+  path: "/color-blindness-simulator",
+  keywords: ["color blindness simulator", "protanopia simulator", "deuteranopia simulator", "low vision simulator"],
+});
 
 const TYPES = [
   ["Deuteranopia", "Reduced sensitivity to green - the most common form (~6% of men)."],
@@ -108,6 +103,7 @@ export default function ColorBlindnessSimulatorPage() {
             ))}
           </dl>
         </section>
+        <ProductLinks heading="Record simulation findings in the complete audit" />
       </main>
       <Footer />
     </>

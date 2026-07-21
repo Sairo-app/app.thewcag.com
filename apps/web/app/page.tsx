@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Footer, JsonLd } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { AuditPlayground } from "@/components/HomeExperience";
+import { createPageMetadata, SITE_URL } from "@/lib/seo";
 import {
   AppleIcon,
   ArrowRightIcon,
@@ -16,33 +17,26 @@ import {
   WindowsIcon,
 } from "@/components/icons";
 
-const SITE = process.env.NEXT_PUBLIC_APP_URL || "https://app.thewcag.com";
-
-export const metadata: Metadata = {
-  title: "Audit what people see",
+export const metadata: Metadata = createPageMetadata({
+  title: "Accessibility Audit Software for Real Interface Evidence",
   description:
-    "TheWCAG is a local-first accessibility auditing workspace for macOS and Windows. Inspect any interface, capture evidence, track WCAG 2.2 findings, and publish clear review links.",
-  alternates: { canonical: "/" },
-  openGraph: {
-    title: "TheWCAG - Audit what people see",
-    description:
-      "A local-first desktop accessibility workspace for finding, documenting, and sharing barriers across any interface.",
-    url: SITE,
-  },
-};
+    "TheWCAG combines a macOS and Windows accessibility audit workstation, Chrome evidence capture, WCAG 2.2 planning, findings, retesting, and controlled reports.",
+  path: "/",
+  keywords: ["accessibility audit software", "WCAG audit tool", "accessibility testing app", "Chrome accessibility extension"],
+});
 
 const PRINCIPLES = [
   {
-    title: "Inspect the experience",
-    body: "Measure websites, native software, prototypes, documents, remote sessions, and temporary interface states exactly as they render.",
+    title: "Plan the evaluation",
+    body: "Define the goal, scope, representative sample, environments, assistive technologies, and methodology before decisions begin.",
   },
   {
-    title: "Document the barrier",
-    body: "Keep the screenshot, annotation, measurement, WCAG criterion, severity, status, and auditor note connected.",
+    title: "Inspect and document",
+    body: "Measure rendered interfaces, capture browser or desktop evidence, and keep every finding connected to its proof and WCAG decision.",
   },
   {
-    title: "Hand off the proof",
-    body: "Export the audit or publish a focused report that a client can open without creating an account.",
+    title: "Retest and deliver",
+    body: "Track remediation, compare before and after evidence, complete readiness checks, and export or publish only what you choose.",
   },
 ] as const;
 
@@ -67,9 +61,9 @@ const CAPABILITIES = [
   },
   {
     icon: ImageIcon,
-    title: "A connected findings register",
-    body: "Search and filter issues without separating the finding from its visual state or audit context.",
-    href: "/screenshot-tool",
+    title: "Browser evidence to audit",
+    body: "Mark a webpage control, capture contextual visual and semantic evidence, review an AI-assisted draft, and save it locally.",
+    href: "/chrome-accessibility-extension",
   },
   {
     icon: BookIcon,
@@ -79,26 +73,27 @@ const CAPABILITIES = [
   },
   {
     icon: PaletteIcon,
-    title: "Palette-wide checks",
-    body: "Compare up to sixteen colors and catch unsafe foreground and background pairings before release.",
-    href: "/color-contrast-checker",
+    title: "Audit planning and delivery",
+    body: "Define scope, run guided tests, verify checklist traceability, retest remediation, and produce a defensible audit record.",
+    href: "/accessibility-audit-software",
   },
 ] as const;
 
 const SHARED_FEATURES = [
   { title: "Global remappable shortcuts", body: "Open each audit tool from anywhere on the desktop." },
-  { title: "Light and dark appearance", body: "Follow the system while every control stays legible." },
+  { title: "Calibrated light interface", body: "Keep dense audit work readable without visual noise." },
   { title: "Keyboard-visible focus", body: "Move through the workspace with a clear focus indicator." },
   { title: "Reduced-motion support", body: "Keep context without unnecessary movement." },
   { title: "High-DPI capture", body: "Preserve sharp annotations on modern displays." },
-  { title: "Signed automatic updates", body: "Install verified releases without disrupting an audit." },
+  { title: "Integrity-checked updates", body: "Use signed and notarized macOS releases plus versioned update metadata." },
 ] as const;
 
 const WORKFLOW = [
-  ["Inspect", "Use a global shortcut over the interface you need to evaluate."],
-  ["Document", "Capture the exact state and connect the barrier to the standard."],
-  ["Organize", "Keep findings, checklist status, scope, and evidence together."],
-  ["Share", "Publish only what you choose, or export it in the format your team uses."],
+  ["Plan", "Define scope, representative samples, environments, assistive technologies, and the evaluation method."],
+  ["Inspect", "Use desktop instruments and guided scripts across the interface you need to evaluate."],
+  ["Evidence", "Capture the exact state and connect each barrier to its context and the standard."],
+  ["Review", "Triage findings, trace failed criteria, assign remediation, and record retest outcomes."],
+  ["Deliver", "Run readiness checks, export the audit record, or publish only the report you choose."],
 ] as const;
 
 export default function Home() {
@@ -112,10 +107,10 @@ export default function Home() {
           name: "TheWCAG",
           applicationCategory: "DeveloperApplication",
           operatingSystem: "macOS, Windows",
-          url: SITE,
+          url: SITE_URL,
           offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-          description:
-            "A local-first desktop accessibility workspace with contrast checking, vision simulation, annotated evidence, WCAG 2.2 audits, and shareable reports.",
+          description: metadata.description,
+          featureList: ["Audit planning", "Chrome evidence capture", "WCAG 2.2 checklist", "Annotated screenshots", "Findings and retesting", "Portable audit exports"],
         }}
       />
 
@@ -153,7 +148,7 @@ export default function Home() {
         <aside className="home-proof" aria-label="Product facts">
           <div className="home-shell home-proof__inner">
             <span>Local-first captures</span>
-            <span>Any rendered interface</span>
+            <span>Chrome evidence capture</span>
             <span>macOS and Windows</span>
             <span>WCAG 2.2 A and AA</span>
           </div>
@@ -185,7 +180,7 @@ export default function Home() {
           <div className="home-shell">
             <div className="section-heading section-heading--compact">
               <h2 id="tools-heading">One workspace for the full evidence trail.</h2>
-              <p>Each tool shares the same audit context, from the first inspection to the final handoff.</p>
+              <p>Desktop instruments, browser evidence, and audit records share one workflow from planning to delivery.</p>
             </div>
             <div className="capability-map">
               {CAPABILITIES.map((tool, index) => {
@@ -202,6 +197,22 @@ export default function Home() {
                   </Link>
                 );
               })}
+            </div>
+          </div>
+        </section>
+
+        <section className="home-connected" aria-labelledby="connected-heading">
+          <div className="home-shell">
+            <div className="section-heading section-heading--compact">
+              <h2 id="connected-heading">Three surfaces, one clear responsibility each.</h2>
+              <p>The browser captures the webpage, the desktop owns the audit, and the website handles services you explicitly request.</p>
+            </div>
+            <div className="home-connected__flow">
+              <Link href="/chrome-accessibility-extension"><strong>Chrome extension</strong><span>Select a control or region and review contextual evidence.</span></Link>
+              <span aria-hidden="true">→</span>
+              <Link href="/accessibility-audit-software"><strong>Desktop workstation</strong><span>Store the audit locally, confirm findings, manage remediation, and retest.</span></Link>
+              <span aria-hidden="true">→</span>
+              <Link href="/download"><strong>Website service</strong><span>Sign in, request AI drafting, publish chosen reports, and download releases.</span></Link>
             </div>
           </div>
         </section>
@@ -283,9 +294,9 @@ export default function Home() {
               <p>The web layer supports the workflow without turning every capture into cloud data.</p>
             </div>
             <div className="home-trust__details">
-              <article><h3>Device access</h3><p>Desktop sign-in uses your system browser and a secure app deep link. Raw device tokens are never stored in the database.</p></article>
+              <article><h3>Local bridge</h3><p>The Chrome extension talks directly to an allowlisted desktop native host. The website is not placed inside that local connection.</p></article>
+              <article><h3>Device access</h3><p>Desktop sign-in uses your system browser and a one-time state-bound app link. The account token is encrypted by the operating system and only its hash is stored by the service.</p></article>
               <article><h3>Published reports</h3><p>Unlisted links contain only the image, findings, and branding you choose. Viewers do not need an account.</p></article>
-              <article><h3>Account controls</h3><p>Passwordless sign-in, a private report library, deletion controls, and optional client-facing branding stay in your hands.</p></article>
             </div>
           </div>
         </section>

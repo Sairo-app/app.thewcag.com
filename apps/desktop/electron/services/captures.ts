@@ -124,6 +124,19 @@ export class CaptureRepository {
     return readFile(join(this.directory, `${id}.json`), "utf8").catch(() => null);
   }
 
+  async readDataUrl(id: string, kind: "raw" | "thumbnail"): Promise<string | null> {
+    assertCaptureId(id);
+    const path = this.resolveAsset(id, kind);
+    try {
+      const bytes = await readFile(path);
+      if (bytes.length < 8 || bytes.length > MAX_CAPTURE_BYTES) return null;
+      if (bytes.subarray(0, 8).toString("hex") !== "89504e470d0a1a0a") return null;
+      return `data:image/png;base64,${bytes.toString("base64")}`;
+    } catch {
+      return null;
+    }
+  }
+
   async saveDocument(id: string, json: string): Promise<void> {
     assertCaptureId(id);
     if (Buffer.byteLength(json, "utf8") > MAX_DOCUMENT_BYTES) throw new Error("Annotation document is too large");

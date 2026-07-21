@@ -371,7 +371,11 @@ export function App({ surface }: { surface: ExtensionSurface }) {
             </div>
             {evidence.image ? (
               <figure className="capture-preview popup-preview">
-                <img src={evidence.image.dataUrl} alt={`Marked evidence for ${targetLabel}`} />
+                <img src={evidence.image.dataUrl} alt={`Page context showing ${targetLabel} highlighted in orange as issue 1`} />
+                <figcaption>
+                  <span><ImageSquare size={14} /> Context screenshot</span>
+                  <strong><Crosshair size={14} /> {evidence.captureMode === "element" ? "Control highlighted" : "Region highlighted"}</strong>
+                </figcaption>
               </figure>
             ) : null}
             <div className="target-summary">
@@ -441,8 +445,11 @@ export function App({ surface }: { surface: ExtensionSurface }) {
 
             {evidence.image ? (
               <figure className="capture-preview">
-                <img src={evidence.image.dataUrl} alt={`Captured page region with ${targetLabel} outlined as issue 1`} />
-                <figcaption><ImageSquare size={15} /> {evidence.image.width} × {evidence.image.height} image</figcaption>
+                <img src={evidence.image.dataUrl} alt={`Page context showing ${targetLabel} highlighted in orange as issue 1`} />
+                <figcaption>
+                  <span><ImageSquare size={15} /> {evidence.image.width} × {evidence.image.height}</span>
+                  <strong><Crosshair size={14} /> {evidence.captureMode === "element" ? "Control highlighted" : "Region highlighted"}</strong>
+                </figcaption>
               </figure>
             ) : null}
 
@@ -510,7 +517,7 @@ export function App({ surface }: { surface: ExtensionSurface }) {
 
             <fieldset className="payload-options">
               <legend>Include in generation</legend>
-              <label><input type="checkbox" checked={includeScreenshot} onChange={(event) => setIncludeScreenshot(event.target.checked)} /><ImageSquare size={17} /><span><strong>Screenshot</strong><small>Exact marked crop</small></span></label>
+              <label><input type="checkbox" checked={includeScreenshot} onChange={(event) => setIncludeScreenshot(event.target.checked)} /><ImageSquare size={17} /><span><strong>Screenshot</strong><small>Context view with the selected target highlighted</small></span></label>
               <label><input type="checkbox" checked={includeElementText} onChange={(event) => setIncludeElementText(event.target.checked)} /><Code size={17} /><span><strong>Element text</strong><small>Name, labels, and DOM excerpt</small></span></label>
               <label><input type="checkbox" checked={includeUrl} onChange={(event) => setIncludeUrl(event.target.checked)} /><ArrowSquareOut size={17} /><span><strong>Page context</strong><small>Title and address, with query and fragment removed</small></span></label>
             </fieldset>

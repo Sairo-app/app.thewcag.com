@@ -28,6 +28,8 @@ describe("desktop storage validation", () => {
     ]);
     expect(result).toHaveLength(2);
     expect(result[0].status).toBe("fixed");
+    expect(result[0].reference).toBe("F-001");
+    expect(result[1].reference).toBe("F-002");
     expect(result[1].key).toBe("cap-2:1");
   });
 

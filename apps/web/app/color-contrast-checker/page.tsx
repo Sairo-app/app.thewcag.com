@@ -2,21 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer, JsonLd } from "@/components/Footer";
+import { ProductLinks } from "@/components/ProductLinks";
+import { createPageMetadata } from "@/lib/seo";
 
-const SITE = process.env.NEXT_PUBLIC_APP_URL || "https://app.thewcag.com";
-
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: "Color Contrast Checker for macOS & Windows",
   description:
     "Check WCAG color contrast anywhere on your screen - not just in the browser. TheWCAG samples any two pixels and shows the exact contrast ratio, AA/AAA pass or fail, and APCA score.",
-  alternates: { canonical: "/color-contrast-checker" },
-  openGraph: {
-    title: "Color Contrast Checker for macOS & Windows",
-    description:
-      "Sample any two pixels on screen and get the exact WCAG contrast ratio, AA/AAA verdict, and APCA Lc.",
-    url: `${SITE}/color-contrast-checker`,
-  },
-};
+  path: "/color-contrast-checker",
+  keywords: ["color contrast checker", "WCAG contrast checker", "screen color picker", "APCA contrast checker"],
+});
 
 const FAQ = [
   {
@@ -124,6 +119,7 @@ export default function ColorContrastCheckerPage() {
             ))}
           </dl>
         </section>
+        <ProductLinks heading="Turn contrast checks into traceable findings" />
       </main>
       <Footer />
     </>

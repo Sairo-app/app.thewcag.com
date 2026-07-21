@@ -1,15 +1,44 @@
 # Changelog
 
-## Unreleased
+## v3.0.1 - 2026-07-21
+
+**Professional auditor workflow**
+
+- Completed the auditor speed and repeatability phase with built-in web, regression, desktop, and document audit templates plus reusable personal templates.
+- Added guided authentication, checkout, forms, media, document, and component test runs with step observations and explicit progress or blocked states.
+- Added keyboard-first checklist rows, configurable decision and navigation keys, a visible shortcut reference, and undo for the last decision.
+- Added stable `F-001` style finding references, repeated-failure duplication, occurrence tracking, before-and-after evidence comparison, built-in and personal finding views, selected-item export, and undoable bulk owner, workflow status, severity, and target-date changes.
+- Added complete local audit package import and export with bounded schema validation, SHA-256 integrity verification, capture and annotation preservation, ID remapping, and rollback when an import fails.
+- Extended Markdown and printable HTML audit records with guided-run outcomes, stable references, repeat occurrences, duplication provenance, and remediation comparisons.
+- Added Plan as the first workflow stage, with evaluation goals, included and excluded scope, test environments, assistive-technology coverage, methodology, auditor ownership, readiness gaps, and a structured representative sample of pages, flows, components, documents, and application states.
+- Added criterion-level manual verification prompts and direct W3C Understanding references for every supported WCAG 2.2 Level A and AA success criterion, while keeping the prompts explicitly informative rather than normative.
+- Corrected checklist, workspace, review, and export totals so a Level A target never counts Level AA criteria.
+- Added manual finding authoring with evidence linkage, affected-user groups, severity rationale, remediation ownership, ticket and target-date tracking, accepted-risk rationale, status and severity filtering, and auditor-focused sorting.
+- Added failure-to-finding traceability, required rationale for not-applicable decisions at delivery, required retest records before a finding can be marked verified fixed, and required rationale before risk can be accepted.
+- Added portable Markdown and self-contained printable HTML audit exports covering the evaluation plan, structured sample, findings, remediation and retest records, evidence inventory, every applicable checklist decision, limitations, and the auditor's conclusion.
+- Added guarded audit conclusions and delivery readiness checks that clearly distinguish a focused evidence report from a complete audit and prevent unresolved, incomplete, or contradictory records from being mistaken for a conformance-ready evaluation.
+- Added a phased auditor product roadmap covering workflow speed, reusable templates, engineering integrations, collaboration, accessible reporting, advanced evidence, and enterprise trust controls.
 
 **AI-assisted browser evidence**
 
-- Added a privacy-first Manifest V3 Chrome extension with a toolbar quick-capture popup and a separate expanded evidence workspace, keyboard-accessible element and region selection, exact high-DPI marked crops, sanitized semantic and DOM context, deterministic checks, explicit payload consent, structured draft editing, and local Markdown export.
+- Added a privacy-first Manifest V3 Chrome extension with a toolbar quick-capture popup and a separate expanded evidence workspace, keyboard-accessible element and region selection, contextual high-DPI screenshots with clearly highlighted targets, sanitized semantic and DOM context, deterministic checks, explicit payload consent, structured draft editing, and local Markdown export.
 - Added versioned shared contracts for browser evidence, AI finding drafts, WCAG 2.2 mappings, audit summaries, and the extension-to-desktop native protocol with strict bounds and validation tests.
 - Added an allowlisted Electron native messaging host for macOS and Windows. It exposes audit summaries without credentials, sends authenticated generation requests from the desktop process, and saves confirmed `FindingV2` records plus local evidence and activity.
-- Expanded the Evidence workspace with collapsible structured findings, exact marked browser-evidence previews, affected-user groups, WCAG rationale and confidence, recommended fixes, example code, and manual confirmation tasks.
+- Expanded the Evidence workspace with collapsible structured findings, contextual highlighted browser-evidence previews, affected-user groups, WCAG rationale and confidence, recommended fixes, example code, and manual confirmation tasks.
 - Added a device-authenticated AI finding endpoint with explicit consent enforcement, per-account hourly and daily limits, strict structured output validation, WCAG allowlisting, privacy-safe metadata-only usage records, provider refusal handling, and a deterministic local fallback when AI is unavailable.
 - Added the complete architecture, privacy model, release setup, and acceptance plan in `docs/AI-EXTENSION-IMPLEMENTATION.md`, and extended `pnpm verify` to cover the contracts and extension.
+
+**Website and discoverability**
+
+- Added dedicated indexable product pages for the complete accessibility audit workstation and Chrome evidence extension, with accurate availability, privacy, system-boundary, and platform-signing information.
+- Updated the homepage, downloads, public guides, header, footer, sitemap, web manifest, social preview, canonical URLs, structured data, and cross-page product navigation to describe the current Plan, Inspect, Evidence, Review, and Deliver workflow.
+- Centralized route metadata so every public SEO page has consistent Open Graph, Twitter, canonical, keyword, and indexability settings.
+- Updated the public accessibility statement to cover the desktop app and Chrome extension and to avoid making an unsupported full-conformance claim.
+
+**Release**
+
+- Prepared desktop version 3.0.1 and extension version 0.2.0 for the tag-driven GitHub release workflow.
+- Documented the local Chrome Native Messaging connection and the separate authenticated website path for AI generation, report publishing, accounts, and downloads.
 
 ## v3.0.0 — 2026-07-21
 

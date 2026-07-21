@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JetBrains_Mono, Manrope, Source_Sans_3 } from "next/font/google";
+import { PRODUCT_DESCRIPTION, SITE_URL, SOCIAL_IMAGE } from "@/lib/seo";
 import "./globals.css";
 
 const sourceSans = Source_Sans_3({
@@ -22,42 +23,43 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
-const SITE = process.env.NEXT_PUBLIC_APP_URL || "https://app.thewcag.com";
-const DESCRIPTION =
-  "TheWCAG is a desktop app for macOS and Windows that checks WCAG color contrast anywhere on screen, simulates color blindness, and turns annotated screenshots into shareable accessibility reports.";
-
 export const metadata: Metadata = {
-  metadataBase: new URL(SITE),
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: "TheWCAG - Color contrast checker & accessibility screenshot tool",
-    template: "%s - TheWCAG",
+    default: "TheWCAG | Accessibility audit software and evidence capture",
+    template: "%s | TheWCAG",
   },
-  description: DESCRIPTION,
+  description: PRODUCT_DESCRIPTION,
   applicationName: "TheWCAG",
   keywords: [
-    "color contrast checker",
+    "accessibility audit software",
+    "WCAG audit tool",
+    "Chrome accessibility extension",
+    "accessibility evidence capture",
     "WCAG contrast checker",
-    "accessibility checker",
     "color blindness simulator",
     "WCAG 2.2",
-    "contrast ratio checker",
-    "APCA contrast",
-    "accessibility audit tool",
-    "screen color picker",
+    "accessibility findings management",
   ],
   authors: [{ name: "TheWCAG" }],
-  alternates: { canonical: "/" },
+  creator: "TheWCAG",
+  publisher: "TheWCAG",
+  category: "Accessibility software",
+  icons: { icon: "/icon.png", apple: "/apple-icon.png" },
   openGraph: {
     type: "website",
     siteName: "TheWCAG",
-    url: SITE,
-    title: "TheWCAG - Color contrast checker & accessibility screenshot tool",
-    description: DESCRIPTION,
+    locale: "en_US",
+    url: SITE_URL,
+    title: "TheWCAG | Accessibility audit software and evidence capture",
+    description: PRODUCT_DESCRIPTION,
+    images: [SOCIAL_IMAGE],
   },
   twitter: {
     card: "summary_large_image",
-    title: "TheWCAG - Color contrast checker for macOS & Windows",
-    description: DESCRIPTION,
+    title: "TheWCAG | Accessibility audit software",
+    description: PRODUCT_DESCRIPTION,
+    images: [SOCIAL_IMAGE.url],
   },
   robots: { index: true, follow: true },
 };

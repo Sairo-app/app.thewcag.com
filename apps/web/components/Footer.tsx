@@ -8,7 +8,6 @@ import {
   ContrastIcon,
   CropIcon,
   DownloadIcon,
-  EyeIcon,
   GitHubIcon,
   ImageIcon,
   LogInIcon,
@@ -20,11 +19,12 @@ const REPO = "https://github.com/Sairo-app/app.thewcag.com";
 
 const COLUMNS: { heading: string; links: { href: string; label: string; icon: ReactNode }[] }[] = [
   {
-    heading: "Desktop tools",
+    heading: "Product",
     links: [
+      { href: "/accessibility-audit-software", label: "Audit workstation", icon: <AccessibilityIcon size={15} /> },
+      { href: "/chrome-accessibility-extension", label: "Chrome extension", icon: <CropIcon size={15} /> },
       { href: "/screenshot-tool", label: "Screenshot evidence", icon: <CropIcon size={15} /> },
       { href: "/color-contrast-checker", label: "Contrast checker", icon: <ContrastIcon size={15} /> },
-      { href: "/color-blindness-simulator", label: "Vision simulator", icon: <EyeIcon size={15} /> },
       { href: "/download", label: "Download the app", icon: <DownloadIcon size={15} /> },
     ],
   },
@@ -70,7 +70,7 @@ export function Footer() {
               <span>TheWCAG</span>
             </Link>
             <p className="site-footer__description">
-              Inspect any rendered interface, document the accessibility barrier, and share the exact evidence when you choose.
+              Plan the audit, inspect rendered interfaces, capture browser and desktop evidence, confirm findings, retest fixes, and deliver only what you choose.
             </p>
             <div className="site-footer__platforms">
               <Link href="/download" className="site-footer__platform" aria-label="Download for macOS"><AppleIcon className="h-[15px] w-[15px]" />macOS</Link>

@@ -2,21 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer, JsonLd } from "@/components/Footer";
+import { ProductLinks } from "@/components/ProductLinks";
+import { createPageMetadata, SITE_URL } from "@/lib/seo";
 
-const SITE = process.env.NEXT_PUBLIC_APP_URL || "https://app.thewcag.com";
-
-export const metadata: Metadata = {
-  title: "WCAG 2.2 AA Checklist - Every Criterion in Plain English",
+export const metadata: Metadata = createPageMetadata({
+  title: "WCAG 2.2 AA Checklist - Practical Tests for Key Criteria",
   description:
-    "A practical WCAG 2.2 Level A and AA checklist, grouped by the POUR principles, with a plain-English test for each criterion and the fastest way to check it.",
-  alternates: { canonical: "/wcag-checklist" },
-  openGraph: {
-    title: "WCAG 2.2 AA Checklist - Every Criterion in Plain English",
-    description:
-      "The key WCAG 2.2 A/AA success criteria as a practical checklist, with a plain-English test for each.",
-    url: `${SITE}/wcag-checklist`,
-  },
-};
+    "A practical guide to frequently tested WCAG 2.2 Level A and AA criteria, plus the complete in-app checklist with prompts, notes, traceability, and exports.",
+  path: "/wcag-checklist",
+  keywords: ["WCAG 2.2 checklist", "WCAG AA checklist", "accessibility audit checklist", "WCAG success criteria"],
+});
 
 const GROUPS: { heading: string; intro: string; items: { sc: string; name: string; test: string }[] }[] = [
   {
@@ -74,23 +69,20 @@ export default function WcagChecklistPage() {
           description:
             "The key WCAG 2.2 Level A and AA success criteria as a practical checklist grouped by POUR, with a plain-English test for each.",
           author: { "@type": "Organization", name: "TheWCAG" },
-          url: `${SITE}/wcag-checklist`,
+          url: `${SITE_URL}/wcag-checklist`,
         }}
       />
       <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-16">
         <h1 className="text-3xl font-bold tracking-tight">WCAG 2.2 AA checklist</h1>
         <p className="mt-3 max-w-2xl text-muted">
-          The success criteria that catch the most real-world failures, grouped by the four POUR
-          principles, each with a plain-English test you can run today. It is not a substitute for
-          the full standard; it is the 80% that finds most issues. The three criteria marked
-          &ldquo;new in 2.2&rdquo; are where most previously-passing sites now fail.
+          This page highlights frequently tested criteria across the four POUR principles, each with a plain-language starting point. It is not the complete standard and does not replace normative WCAG guidance. The desktop app includes every WCAG 2.2 Level A and AA criterion applicable to your selected target, manual verification prompts, W3C references, notes, and finding traceability.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
             href="/download"
             className="inline-flex items-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
           >
-            Check contrast &amp; targets with the free app
+            Open the complete checklist in the app
           </Link>
           <Link
             href="/wcag-contrast"
@@ -121,12 +113,9 @@ export default function WcagChecklistPage() {
         ))}
 
         <section className="mt-14 rounded-xl border border-border bg-card p-6">
-          <h2 className="text-lg font-bold tracking-tight">Test the visual criteria in minutes</h2>
+          <h2 className="text-lg font-bold tracking-tight">Use the complete checklist inside the audit</h2>
           <p className="mt-2 text-sm text-muted">
-            TheWCAG&apos;s desktop app checks the visual half of this list anywhere on your screen:
-            exact contrast ratios (1.4.3, 1.4.11), 24×24 target measurement (2.5.8), and a
-            color-blindness lens, then turns findings into a shareable, criterion-referenced
-            report.
+            TheWCAG combines deterministic tools for contrast and target measurement with guided manual decisions for every supported Level A and AA criterion. Failed criteria link to findings, not-applicable decisions require rationale at delivery, and exports preserve the complete decision record.
           </p>
           <Link
             href="/download"
@@ -135,6 +124,7 @@ export default function WcagChecklistPage() {
             Download free for macOS &amp; Windows
           </Link>
         </section>
+        <ProductLinks heading="Use the checklist inside a complete audit record" />
       </main>
       <Footer />
     </>

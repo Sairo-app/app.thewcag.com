@@ -15,6 +15,7 @@ import {
   CaretDown,
   Check,
   CheckSquare,
+  ClipboardText,
   ClockCounterClockwise,
   Command,
   FileText,
@@ -30,14 +31,26 @@ import {
 } from "@phosphor-icons/react";
 import type {
   AuditActivity,
+  AuditSampleItem,
+  AuditTestRun,
+  CaptureEntry,
   Finding,
+  FindingSavedView,
   PlatformInfo,
+  PublishedReport,
   WorkspaceStage,
   WorkspaceTool,
   WorkspaceUtility,
 } from "../shared/desktop";
-import { desktop, getStored, listCaptures } from "./api";
+import { desktop, getStored, listCaptures, setStored } from "./api";
 import { auditStoreKey, useAuditWorkspace } from "./audits";
+import {
+  parseAuditPackage,
+  serializeAuditPackage,
+  type AuditPackagePayload,
+} from "./audit-package";
+import { normalizeFindingReferences } from "../shared/finding-references";
+import { auditPlanProgress } from "./audit-plan";
 import { messageFromError } from "./hooks";
 import {
   ConfirmDialog,
@@ -54,6 +67,8 @@ import { ShareView } from "./views/ShareView";
 import { PaletteView } from "./views/PaletteView";
 import { VisionView } from "./views/VisionView";
 import { SettingsView } from "./views/SettingsView";
+import { PlanView } from "./views/PlanView";
+import { WCAG_CRITERIA } from "./data/wcag";
 
 type Route = WorkspaceStage | WorkspaceUtility;
 const COMPACT_LAYOUT_QUERY = "(max-width: 1040px)";
@@ -68,10 +83,11 @@ const STAGES: {
   number: string;
   icon: IconType;
 }[] = [
-  { id: "inspect", label: "Inspect", number: "01", icon: Target },
-  { id: "evidence", label: "Evidence", number: "02", icon: SquaresFour },
-  { id: "review", label: "Review", number: "03", icon: CheckSquare },
-  { id: "share", label: "Share", number: "04", icon: FileText },
+  { id: "plan", label: "Plan", number: "01", icon: ClipboardText },
+  { id: "inspect", label: "Inspect", number: "02", icon: Target },
+  { id: "evidence", label: "Evidence", number: "03", icon: SquaresFour },
+  { id: "review", label: "Review", number: "04", icon: CheckSquare },
+  { id: "share", label: "Deliver", number: "05", icon: FileText },
 ];
 
 const UTILITIES: { id: WorkspaceUtility; label: string; icon: IconType }[] = [
@@ -81,6 +97,11 @@ const UTILITIES: { id: WorkspaceUtility; label: string; icon: IconType }[] = [
 ];
 
 const TITLES: Record<Route, { title: string; description: string }> = {
+  plan: {
+    title: "Plan the evaluation",
+    description:
+      "Define scope, methodology, test coverage, and the representative sample.",
+  },
   inspect: {
     title: "Inspect contrast",
     description:
@@ -96,9 +117,9 @@ const TITLES: Record<Route, { title: string; description: string }> = {
     description: "Work through WCAG 2.2 and resolve gaps before delivery.",
   },
   share: {
-    title: "Share the report",
+    title: "Deliver the report",
     description:
-      "Review the public payload, confirm privacy, and publish with intent.",
+      "Finalize the audit record, review public evidence, and publish with intent.",
   },
   vision: {
     title: "Vision lens",
@@ -110,9 +131,9 @@ const TITLES: Record<Route, { title: string; description: string }> = {
       "Test every text and background combination in a design system.",
   },
   settings: {
-    title: "Workspace settings",
+    title: "Application settings",
     description:
-      "Manage audit context, shortcuts, permissions, account, and updates.",
+      "Manage shortcuts, capture permissions, account, and updates.",
   },
 };
 
@@ -159,7 +180,8 @@ function Modal({
 }
 
 export function Workspace({ platform }: { platform: PlatformInfo }) {
-  const [active, setActive] = useState<Route>("inspect");
+  const [active, setActive] = useState<Route>("plan");
+  const [evidenceTab, setEvidenceTab] = useState<"captures" | "findings">("captures");
   const [compact, setCompact] = useState(() =>
     window.matchMedia(COMPACT_LAYOUT_QUERY).matches,
   );
@@ -175,6 +197,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     title?: string;
   } | null>(null);
   const [activity, setActivity] = useState<AuditActivity[]>([]);
+  const taskContentRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [commandIndex, setCommandIndex] = useState(0);
   const [newAuditName, setNewAuditName] = useState("");
@@ -204,6 +227,8 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     archiveAudit,
     audits,
     createAudit,
+    discardAudit,
+    importAudit,
     ready,
     recordActivity,
     selectAudit,
@@ -245,7 +270,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
         event.preventDefault();
         setCommandOpen((value) => !value);
       }
-      if ((event.metaKey || event.ctrlKey) && /^[1-4]$/.test(event.key)) {
+      if ((event.metaKey || event.ctrlKey) && /^[1-5]$/.test(event.key)) {
         event.preventDefault();
         setActive(STAGES[Number(event.key) - 1].id);
       }
@@ -265,12 +290,16 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
       getStored<unknown[]>(auditStoreKey(activeAudit.id, "reports"), []),
       getStored<AuditActivity[]>(auditStoreKey(activeAudit.id, "activity"), []),
     ]).then(([captures, findings, checklist, reports, nextActivity]) => {
+      const applicableCriteria = WCAG_CRITERIA.filter(
+        (criterion) => activeAudit.standard === "WCAG 2.2 AA" || criterion.level === "A",
+      );
       setStats({
         captures: captures.length,
         findings: findings.length,
-        reviewed: Object.values(checklist).filter(
-          (entry) => entry.result && entry.result !== "untested",
-        ).length,
+        reviewed: applicableCriteria.filter((criterion) => {
+          const entry = checklist[criterion.sc];
+          return entry?.result && entry.result !== "untested";
+        }).length,
         reports: reports.length,
       });
       setActivity(nextActivity);
@@ -300,11 +329,22 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     setCommandIndex(0);
   }, [query]);
   useEffect(() => {
+    taskContentRef.current?.scrollTo({ top: 0 });
+  }, [active, activeId]);
+  useEffect(() => {
     setCommandIndex((index) => Math.min(index, Math.max(0, commands.length - 1)));
   }, [commands.length]);
 
   function navigate(route: Route) {
+    if (route === "evidence") setEvidenceTab("captures");
     setActive(route);
+    setCommandOpen(false);
+    setQuery("");
+  }
+
+  function openFindings() {
+    setEvidenceTab("findings");
+    setActive("evidence");
     setCommandOpen(false);
     setQuery("");
   }
@@ -313,8 +353,187 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     const audit = createAudit(newAuditName);
     setNewAuditName("");
     setSwitcherOpen(false);
-    setActive("inspect");
+    setActive("plan");
     setNotice({ text: `${audit.project} created`, error: false });
+  }
+
+  async function exportAuditPackage() {
+    if (!activeAudit) return;
+    const [
+      captures,
+      sampleItems,
+      testRuns,
+      findings,
+      findingViews,
+      checklist,
+      history,
+      palette,
+      savedActivity,
+      reports,
+    ] = await Promise.all([
+      listCaptures(activeAudit.id),
+      getStored<AuditSampleItem[]>(auditStoreKey(activeAudit.id, "sampleItems"), []),
+      getStored<AuditTestRun[]>(auditStoreKey(activeAudit.id, "testRuns"), []),
+      getStored<Finding[]>(auditStoreKey(activeAudit.id, "findings"), []),
+      getStored<FindingSavedView[]>(auditStoreKey(activeAudit.id, "findingViews"), []),
+      getStored<Record<string, unknown>>(auditStoreKey(activeAudit.id, "checklist"), {}),
+      getStored<unknown[]>(auditStoreKey(activeAudit.id, "history"), []),
+      getStored<string[]>(auditStoreKey(activeAudit.id, "palette"), []),
+      getStored<AuditActivity[]>(auditStoreKey(activeAudit.id, "activity"), []),
+      getStored<PublishedReport[]>(auditStoreKey(activeAudit.id, "reports"), []),
+    ]);
+    const packagedCaptures: AuditPackagePayload["captures"] = [];
+    for (const capture of captures) {
+      const [rawPngDataUrl, thumbnailPngDataUrl, document] = await Promise.all([
+        desktop.invoke<string | null>("capture:read-data", { id: capture.id, kind: "raw" }),
+        desktop.invoke<string | null>("capture:read-data", { id: capture.id, kind: "thumbnail" }),
+        desktop.invoke<string | null>("capture:read-document", { id: capture.id }),
+      ]);
+      if (!rawPngDataUrl) throw new Error(`The source image for ${capture.title} could not be read.`);
+      packagedCaptures.push({
+        id: capture.id,
+        title: capture.title,
+        rawPngDataUrl,
+        thumbnailPngDataUrl: thumbnailPngDataUrl || undefined,
+        document: document || undefined,
+      });
+    }
+    const text = await serializeAuditPackage({
+      exportedAt: new Date().toISOString(),
+      audit: activeAudit,
+      sections: {
+        sampleItems,
+        testRuns,
+        findings: normalizeFindingReferences(findings).findings,
+        findingViews,
+        checklist,
+        history,
+        palette,
+        activity: savedActivity,
+        reports,
+      },
+      captures: packagedCaptures,
+    });
+    const slug = activeAudit.project.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "audit";
+    const path = await desktop.invoke<string | null>("dialog:save-text", {
+      name: `${slug}.thewcag-audit.json`,
+      text,
+    });
+    if (!path) return;
+    await recordActivity({
+      kind: "exported",
+      title: "Complete audit package exported",
+      detail: `${captures.length} captures and ${findings.length} findings`,
+    });
+    setNotice({ text: "Integrity-checked audit package exported", error: false });
+  }
+
+  async function importAuditPackage() {
+    const text = await desktop.invoke<string | null>("dialog:open-text", {
+      extension: "json",
+    });
+    if (!text) return;
+    const payload = await parseAuditPackage(text);
+    const imported = importAudit(payload.audit);
+    const createdCaptureIds: string[] = [];
+    const sections = [
+      "findings",
+      "checklist",
+      "history",
+      "palette",
+      "sampleItems",
+      "testRuns",
+      "findingViews",
+      "activity",
+      "reports",
+    ] as const;
+    try {
+      const captureMap = new Map<string, string>();
+      for (const capture of payload.captures) {
+        const entry = await desktop.invoke<CaptureEntry>("capture:create", {
+          pngDataUrl: capture.rawPngDataUrl,
+          title: capture.title,
+          auditId: imported.id,
+          silent: true,
+        });
+        createdCaptureIds.push(entry.id);
+        captureMap.set(capture.id, entry.id);
+        if (capture.document) {
+          await desktop.invoke("capture:save-document", {
+            id: entry.id,
+            json: capture.document,
+          });
+        }
+        if (capture.thumbnailPngDataUrl) {
+          await desktop.invoke("capture:save-thumbnail", {
+            id: entry.id,
+            pngDataUrl: capture.thumbnailPngDataUrl,
+          });
+        }
+      }
+      const remapCapture = (id: string | undefined) =>
+        id ? captureMap.get(id) : undefined;
+      const findings = normalizeFindingReferences(payload.sections.findings).findings.map(
+        (finding) => ({
+          ...finding,
+          captureId: remapCapture(finding.captureId),
+          beforeCaptureId: remapCapture(finding.beforeCaptureId),
+          afterCaptureId: remapCapture(finding.afterCaptureId),
+          occurrences: finding.occurrences?.map((occurrence) => ({
+            ...occurrence,
+            captureId: remapCapture(occurrence.captureId),
+          })),
+        }),
+      );
+      const importedActivity: AuditActivity[] = [
+        {
+          id: crypto.randomUUID(),
+          auditId: imported.id,
+          kind: "created" as const,
+          title: "Audit package imported",
+          detail: `Integrity verified. Exported ${payload.exportedAt}.`,
+          createdAt: Date.now(),
+        },
+        ...payload.sections.activity.map((entry) => ({
+          ...entry,
+          id: crypto.randomUUID(),
+          auditId: imported.id,
+        })),
+      ].slice(0, 120);
+      await Promise.all([
+        setStored(auditStoreKey(imported.id, "sampleItems"), payload.sections.sampleItems),
+        setStored(auditStoreKey(imported.id, "testRuns"), payload.sections.testRuns),
+        setStored(auditStoreKey(imported.id, "findings"), findings),
+        setStored(auditStoreKey(imported.id, "findingViews"), payload.sections.findingViews),
+        setStored(auditStoreKey(imported.id, "checklist"), payload.sections.checklist),
+        setStored(auditStoreKey(imported.id, "history"), payload.sections.history),
+        setStored(auditStoreKey(imported.id, "palette"), payload.sections.palette),
+        setStored(auditStoreKey(imported.id, "activity"), importedActivity),
+        setStored(
+          auditStoreKey(imported.id, "reports"),
+          payload.sections.reports.map((report) => ({
+            ...report,
+            id: crypto.randomUUID(),
+            auditId: imported.id,
+            captureId: remapCapture(report.captureId) || "",
+          })),
+        ),
+      ]);
+      setActive("plan");
+      setNotice({
+        text: `${imported.project} imported with verified integrity`,
+        error: false,
+      });
+    } catch (error) {
+      await Promise.all([
+        ...createdCaptureIds.map((id) => desktop.invoke("capture:delete", { id })),
+        ...sections.map((section) =>
+          desktop.invoke("store:remove", { key: auditStoreKey(imported.id, section) }),
+        ),
+      ]).catch(() => undefined);
+      discardAudit(imported.id);
+      throw error;
+    }
   }
 
   function onCommandKey(event: ReactKeyboardEvent<HTMLInputElement>) {
@@ -348,8 +567,19 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
       </div>
     );
 
+  const plan = auditPlanProgress(activeAudit);
+
   const body =
-    active === "inspect" ? (
+    active === "plan" ? (
+      <PlanView
+        audit={activeAudit}
+        onAuditChange={updateAudit}
+        recordActivity={recordActivity}
+        onNavigate={navigate}
+        onExportPackage={exportAuditPackage}
+        onImportPackage={importAuditPackage}
+      />
+    ) : active === "inspect" ? (
       <InspectView
         auditId={activeAudit.id}
         onNavigate={navigate}
@@ -358,14 +588,20 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     ) : active === "evidence" ? (
       <EvidenceView
         auditId={activeAudit.id}
+        initialTab={evidenceTab}
         onNavigate={navigate}
         recordActivity={recordActivity}
       />
     ) : active === "review" ? (
-      <ReviewView audit={activeAudit} recordActivity={recordActivity} />
+      <ReviewView
+        audit={activeAudit}
+        recordActivity={recordActivity}
+        onOpenFindings={openFindings}
+      />
     ) : active === "share" ? (
       <ShareView
         audit={activeAudit}
+        onAuditChange={updateAudit}
         recordActivity={recordActivity}
         onNavigate={navigate}
       />
@@ -374,15 +610,12 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     ) : active === "vision" ? (
       <VisionView />
     ) : (
-      <SettingsView
-        platform={platform}
-        audit={activeAudit}
-        onAuditChange={updateAudit}
-      />
+      <SettingsView platform={platform} />
     );
 
   const stageIndex = STAGES.findIndex((stage) => stage.id === active);
   const stageStats = [
+    `${plan.complete}/${plan.total} ready`,
     "Ready",
     `${stats.captures} captures`,
     `${stats.reviewed} reviewed`,
@@ -403,8 +636,8 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
       <aside className="stage-rail" aria-label="Audit workflow">
         <button
           className="rail-brand"
-          aria-label="Go to Inspect"
-          onClick={() => navigate("inspect")}
+          aria-label="Go to Plan"
+          onClick={() => navigate("plan")}
         >
           <img src="/logo.png" alt="TheWCAG" draggable={false} />
         </button>
@@ -505,7 +738,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
               <div>
                 {stageIndex >= 0 ? (
                   <span className="stage-indicator">
-                    Stage {stageIndex + 1} of 4
+                    Stage {stageIndex + 1} of {STAGES.length}
                   </span>
                 ) : (
                   <span className="stage-indicator">Utility</span>
@@ -513,7 +746,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
                 <h1>{title.title}</h1>
                 <p>{title.description}</p>
               </div>
-              {stageIndex >= 0 && stageIndex < 3 ? (
+              {stageIndex >= 0 && stageIndex < STAGES.length - 1 ? (
                 <button
                   className="next-stage"
                   onClick={() => navigate(STAGES[stageIndex + 1].id)}
@@ -522,7 +755,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
                 </button>
               ) : null}
             </div>
-            <div className="task-content">{body}</div>
+            <div ref={taskContentRef} className="task-content">{body}</div>
           </section>
           {compact && inspector ? (
             <button
@@ -603,10 +836,22 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
                 </p>
                 <button
                   className="text-action"
-                  onClick={() => navigate("settings")}
+                  onClick={() => navigate("plan")}
                 >
                   Edit audit context
                 </button>
+              </div>
+              <div className="inspector-section inspector-plan">
+                <div className="inspector-plan-heading">
+                  <span className="inspector-label">Evaluation plan</span>
+                  <strong>{plan.complete}/{plan.total}</strong>
+                </div>
+                <progress value={plan.complete} max={plan.total}>{plan.percent}%</progress>
+                <p className="inspector-copy">
+                  {plan.missing.length
+                    ? `Still needed: ${plan.missing.slice(0, 3).join(", ")}${plan.missing.length > 3 ? ` and ${plan.missing.length - 3} more` : ""}.`
+                    : "Scope, sample, environment, and ownership are documented."}
+                </p>
               </div>
               <div className="inspector-callout">
                 <Check size={18} weight="bold" />

@@ -15,8 +15,8 @@ import {
 } from "@/components/icons";
 
 const MOBILE_NAV = [
-  ["/#purpose", "Why it works", <BookIcon key="purpose" size={16} />],
-  ["/#tools", "Desktop tools", <ContrastIcon key="toolkit" size={16} />],
+  ["/accessibility-audit-software", "Audit software", <BookIcon key="software" size={16} />],
+  ["/chrome-accessibility-extension", "Chrome extension", <ContrastIcon key="extension" size={16} />],
   ["/#platforms", "Mac and Windows", <CropIcon key="platforms" size={16} />],
   ["/wcag-contrast", "Guides", <EyeIcon key="resources" size={16} />],
 ] as const;

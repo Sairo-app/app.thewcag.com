@@ -37,19 +37,61 @@ export function calculateCropGeometry(
   viewport: CapturedSelection["page"]["viewport"],
   sourceWidth: number,
   sourceHeight: number,
-  paddingCss = 28,
+  paddingCss = 64,
   maxOutputDimension = 2_400,
 ): CropGeometry {
   const viewportWidth = Math.max(1, viewport.width);
   const viewportHeight = Math.max(1, viewport.height);
   const scaleX = sourceWidth / viewportWidth;
   const scaleY = sourceHeight / viewportHeight;
-  const targetX = bounds.x - viewport.offsetLeft;
-  const targetY = bounds.y - viewport.offsetTop;
-  const cssX = Math.max(0, targetX - paddingCss);
-  const cssY = Math.max(0, targetY - paddingCss);
-  const cssRight = Math.min(viewportWidth, targetX + bounds.width + paddingCss);
-  const cssBottom = Math.min(viewportHeight, targetY + bounds.height + paddingCss);
+  const rawTargetX = bounds.x - viewport.offsetLeft;
+  const rawTargetY = bounds.y - viewport.offsetTop;
+  const targetX = Math.max(0, Math.min(viewportWidth - 1, rawTargetX));
+  const targetY = Math.max(0, Math.min(viewportHeight - 1, rawTargetY));
+  const targetRight = Math.max(
+    targetX + 1,
+    Math.min(viewportWidth, rawTargetX + bounds.width),
+  );
+  const targetBottom = Math.max(
+    targetY + 1,
+    Math.min(viewportHeight, rawTargetY + bounds.height),
+  );
+  const targetWidth = Math.max(1, targetRight - targetX);
+  const targetHeight = Math.max(1, targetBottom - targetY);
+
+  // Keep enough surrounding interface to explain where the issue occurs. A
+  // tiny control should never become an element-only screenshot, while a
+  // deliberately selected large region should still fit without distortion.
+  const contextWidth = Math.min(
+    viewportWidth,
+    Math.max(
+      targetWidth + paddingCss * 2,
+      Math.min(960, viewportWidth * 0.78),
+    ),
+  );
+  const contextHeight = Math.min(
+    viewportHeight,
+    Math.max(
+      targetHeight + paddingCss * 2,
+      Math.min(640, viewportHeight * 0.72),
+    ),
+  );
+  const cssX = Math.max(
+    0,
+    Math.min(
+      viewportWidth - contextWidth,
+      targetX + targetWidth / 2 - contextWidth / 2,
+    ),
+  );
+  const cssY = Math.max(
+    0,
+    Math.min(
+      viewportHeight - contextHeight,
+      targetY + targetHeight / 2 - contextHeight / 2,
+    ),
+  );
+  const cssRight = cssX + contextWidth;
+  const cssBottom = cssY + contextHeight;
   const source: EvidenceRect = {
     x: Math.max(0, Math.floor(cssX * scaleX)),
     y: Math.max(0, Math.floor(cssY * scaleY)),
@@ -65,8 +107,8 @@ export function calculateCropGeometry(
   const marker = {
     x: Math.max(0, (targetX * scaleX - source.x) * outputScale),
     y: Math.max(0, (targetY * scaleY - source.y) * outputScale),
-    width: Math.max(1, bounds.width * scaleX * outputScale),
-    height: Math.max(1, bounds.height * scaleY * outputScale),
+    width: Math.max(1, targetWidth * scaleX * outputScale),
+    height: Math.max(1, targetHeight * scaleY * outputScale),
   };
   marker.width = Math.min(marker.width, outputWidth - marker.x);
   marker.height = Math.min(marker.height, outputHeight - marker.y);
@@ -162,34 +204,93 @@ export async function createMarkedCrop(
     geometry.outputHeight,
   );
 
-  const line = Math.max(3, Math.min(7, geometry.outputWidth / 180));
-  const radius = Math.max(7, line * 2.2);
+  const line = Math.max(4, Math.min(10, geometry.outputWidth / 140));
+  const markerX = Math.max(0, geometry.marker.x);
+  const markerY = Math.max(0, geometry.marker.y);
+  const markerWidth = Math.max(1, geometry.marker.width);
+  const markerHeight = Math.max(1, geometry.marker.height);
   context.save();
+
+  // A light outside veil preserves the page context while keeping attention
+  // on the exact control or region the auditor selected.
+  context.fillStyle = "rgba(31, 41, 51, 0.1)";
+  context.fillRect(0, 0, geometry.outputWidth, markerY);
+  context.fillRect(
+    0,
+    markerY + markerHeight,
+    geometry.outputWidth,
+    Math.max(0, geometry.outputHeight - markerY - markerHeight),
+  );
+  context.fillRect(0, markerY, markerX, markerHeight);
+  context.fillRect(
+    markerX + markerWidth,
+    markerY,
+    Math.max(0, geometry.outputWidth - markerX - markerWidth),
+    markerHeight,
+  );
+
+  context.beginPath();
+  context.roundRect(
+    markerX + line / 2,
+    markerY + line / 2,
+    Math.max(1, markerWidth - line),
+    Math.max(1, markerHeight - line),
+    Math.min(12, Math.max(4, line * 1.6)),
+  );
+  context.strokeStyle = "rgba(255, 255, 255, 0.96)";
+  context.lineWidth = line + 5;
+  context.stroke();
+
   context.strokeStyle = "#D9480F";
-  context.fillStyle = "rgba(217, 72, 15, 0.1)";
+  context.fillStyle = "rgba(217, 72, 15, 0.08)";
   context.lineWidth = line;
   context.beginPath();
   context.roundRect(
-    geometry.marker.x + line / 2,
-    geometry.marker.y + line / 2,
-    Math.max(1, geometry.marker.width - line),
-    Math.max(1, geometry.marker.height - line),
-    Math.min(10, radius),
+    markerX + line / 2,
+    markerY + line / 2,
+    Math.max(1, markerWidth - line),
+    Math.max(1, markerHeight - line),
+    Math.min(12, Math.max(4, line * 1.6)),
   );
   context.fill();
   context.stroke();
 
-  const badgeX = Math.max(radius + 2, geometry.marker.x + 2);
-  const badgeY = Math.max(radius + 2, geometry.marker.y + 2);
+  const labelText = selection.target.kind === "region"
+    ? "1  Selected region"
+    : `1  Selected ${selection.target.role || selection.target.tagName || "control"}`;
+  const labelFontSize = Math.max(
+    20,
+    Math.min(48, geometry.outputWidth / 38),
+  );
+  const labelHeight = Math.round(labelFontSize + 20);
+  context.font = `700 ${labelFontSize}px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif`;
+  const labelWidth = Math.min(
+    geometry.outputWidth - 8,
+    Math.ceil(context.measureText(labelText).width + 28),
+  );
+  const labelX = Math.max(
+    4,
+    Math.min(geometry.outputWidth - labelWidth - 4, markerX),
+  );
+  const labelY = markerY >= labelHeight + 12
+    ? markerY - labelHeight - 8
+    : Math.min(
+        geometry.outputHeight - labelHeight - 4,
+        markerY + markerHeight + 8,
+      );
   context.fillStyle = "#D9480F";
   context.beginPath();
-  context.arc(badgeX, badgeY, radius, 0, Math.PI * 2);
+  context.roundRect(labelX, Math.max(4, labelY), labelWidth, labelHeight, 8);
   context.fill();
   context.fillStyle = "#FFFFFF";
-  context.font = `700 ${Math.max(11, radius)}px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif`;
-  context.textAlign = "center";
+  context.textAlign = "left";
   context.textBaseline = "middle";
-  context.fillText("1", badgeX, badgeY + 0.5);
+  context.fillText(
+    labelText,
+    labelX + 14,
+    Math.max(4, labelY) + labelHeight / 2 + 0.5,
+    labelWidth - 28,
+  );
   context.restore();
   sourceImage.close?.();
 

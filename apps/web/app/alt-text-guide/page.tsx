@@ -2,21 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer, JsonLd } from "@/components/Footer";
+import { ProductLinks } from "@/components/ProductLinks";
+import { createPageMetadata } from "@/lib/seo";
 
-const SITE = process.env.NEXT_PUBLIC_APP_URL || "https://app.thewcag.com";
-
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: "How to Write Alt Text - Rules, Examples, and Edge Cases",
   description:
     "A practical alt-text guide for WCAG 1.1.1: when to describe, when to leave alt empty, and how to handle charts, icons, logos, and screenshots with before/after examples.",
-  alternates: { canonical: "/alt-text-guide" },
-  openGraph: {
-    title: "How to Write Alt Text - Rules, Examples, and Edge Cases",
-    description:
-      "When to describe, when alt should be empty, and how to handle charts, icons, logos, and screenshots.",
-    url: `${SITE}/alt-text-guide`,
-  },
-};
+  path: "/alt-text-guide",
+  keywords: ["how to write alt text", "WCAG 1.1.1", "alt text examples", "accessible images"],
+});
 
 const RULES: { title: string; body: string }[] = [
   {
@@ -175,6 +170,7 @@ export default function AltTextGuidePage() {
             Download free for macOS &amp; Windows
           </Link>
         </section>
+        <ProductLinks heading="Connect content review to the full audit" />
       </main>
       <Footer />
     </>

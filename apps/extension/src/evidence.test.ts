@@ -25,15 +25,43 @@ function target(patch: Partial<EvidenceTargetV1> = {}): EvidenceTargetV1 {
 }
 
 describe("evidence capture", () => {
-  it("maps CSS pixels to a high-DPI screenshot and clamps padding", () => {
+  it("keeps a high-DPI contextual frame around a small target", () => {
     const crop = calculateCropGeometry(
       { x: 10, y: 20, width: 100, height: 40 },
       { width: 1280, height: 720, devicePixelRatio: 2, visualScale: 1, offsetLeft: 0, offsetTop: 0 },
       2560,
       1440,
     );
-    expect(crop.source).toEqual({ x: 0, y: 0, width: 276, height: 176 });
+    expect(crop.source).toEqual({ x: 0, y: 0, width: 1920, height: 1037 });
     expect(crop.marker).toEqual({ x: 20, y: 40, width: 200, height: 80 });
+    expect(crop.outputWidth).toBeGreaterThan(crop.marker.width * 5);
+    expect(crop.outputHeight).toBeGreaterThan(crop.marker.height * 5);
+  });
+
+  it("centers a target when enough context exists on every side", () => {
+    const crop = calculateCropGeometry(
+      { x: 600, y: 340, width: 80, height: 40 },
+      { width: 1280, height: 720, devicePixelRatio: 2, visualScale: 1, offsetLeft: 0, offsetTop: 0 },
+      2560,
+      1440,
+    );
+    expect(crop.source.x).toBe(320);
+    expect(crop.source.y).toBe(201);
+    expect(crop.marker.x).toBe(880);
+    expect(crop.marker.y).toBe(479);
+  });
+
+  it("keeps an offscreen target marker inside the captured image", () => {
+    const crop = calculateCropGeometry(
+      { x: 1_400, y: 800, width: 80, height: 40 },
+      { width: 1280, height: 720, devicePixelRatio: 2, visualScale: 1, offsetLeft: 0, offsetTop: 0 },
+      2560,
+      1440,
+    );
+    expect(crop.marker.x).toBeGreaterThanOrEqual(0);
+    expect(crop.marker.y).toBeGreaterThanOrEqual(0);
+    expect(crop.marker.x + crop.marker.width).toBeLessThanOrEqual(crop.outputWidth);
+    expect(crop.marker.y + crop.marker.height).toBeLessThanOrEqual(crop.outputHeight);
   });
 
   it("detects a missing interactive name", () => {

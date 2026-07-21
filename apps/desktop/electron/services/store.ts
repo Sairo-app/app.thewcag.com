@@ -6,6 +6,7 @@ import {
   type AiFindingDraftV1,
 } from "@accessibility-build/audit-contracts";
 import type { Finding } from "../../src/shared/desktop";
+import { normalizeFindingReferences } from "../../src/shared/finding-references";
 
 const KEY = /^[a-zA-Z0-9_-]{1,64}$/;
 const MAX_JSON_BYTES = 10 * 1024 * 1024;
@@ -15,9 +16,10 @@ export function assertStoreKey(key: string): void {
 }
 
 export function mergeFindings(existing: Finding[], incoming: unknown): Finding[] {
-  if (!Array.isArray(incoming)) return existing;
-  const seen = new Set(existing.map((finding) => finding.key).filter(Boolean));
-  const next = [...existing];
+  if (!Array.isArray(incoming)) return normalizeFindingReferences(existing).findings;
+  const normalized = normalizeFindingReferences(existing).findings;
+  const seen = new Set(normalized.map((finding) => finding.key).filter(Boolean));
+  const next = [...normalized];
   for (const value of incoming) {
     if (!value || typeof value !== "object") continue;
     const finding = value as Partial<Finding>;
@@ -30,7 +32,7 @@ export function mergeFindings(existing: Finding[], incoming: unknown): Finding[]
       severity: ["blocker", "major", "minor"].includes(finding.severity ?? "")
         ? finding.severity as Finding["severity"]
         : "major",
-      status: ["open", "fixed", "accepted"].includes(finding.status ?? "")
+      status: ["open", "retest", "fixed", "accepted"].includes(finding.status ?? "")
         ? finding.status as Finding["status"]
         : "open",
       note: typeof finding.note === "string" ? finding.note.slice(0, 5_000) : "",
@@ -99,7 +101,7 @@ export function mergeFindings(existing: Finding[], incoming: unknown): Finding[]
     }
     next.push(base);
   }
-  return next;
+  return normalizeFindingReferences(next).findings;
 }
 
 export class JsonStore {
