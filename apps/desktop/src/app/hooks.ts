@@ -27,13 +27,43 @@ export function useStoredState<T>(key: string, initial: T) {
   return [value, update, ready] as const;
 }
 export function useTransientMessage(timeout = 3000) {
-  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
+  const [message, setMessage] = useState<{
+    text: string;
+    error: boolean;
+    title?: string;
+  } | null>(null);
   const timer = useRef<number | null>(null);
-  function show(text: string, error = false) {
+  function clear() {
     if (timer.current) window.clearTimeout(timer.current);
-    setMessage({ text, error });
+    timer.current = null;
+    setMessage(null);
+  }
+  function show(text: string, error = false, title?: string) {
+    if (timer.current) window.clearTimeout(timer.current);
+    setMessage({ text, error, title });
     timer.current = window.setTimeout(() => setMessage(null), timeout);
   }
-  useEffect(() => () => { if (timer.current) window.clearTimeout(timer.current); }, []);
-  return [message, show] as const;
+  useEffect(() => () => {
+    if (timer.current) window.clearTimeout(timer.current);
+  }, []);
+  return [message, show, clear] as const;
+}
+
+export function messageFromError(
+  error: unknown,
+  fallback = "The action could not be completed. Try again.",
+): string {
+  const raw = error instanceof Error ? error.message : String(error ?? "");
+  const message = raw.replace(/^Error:\s*/i, "").trim();
+  if (!message) return fallback;
+  if (/failed to fetch|network request failed/i.test(message)) {
+    return "TheWCAG could not reach the service. Check your connection and try again.";
+  }
+  if (/tainted canvas|toDataURL|securityerror/i.test(message)) {
+    return "The capture could not be prepared. Close and reopen it, then try again.";
+  }
+  if (/failed to execute|htmlcanvaselement|ipc|stack trace/i.test(message)) {
+    return fallback;
+  }
+  return message;
 }

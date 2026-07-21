@@ -21,7 +21,7 @@ import type {
 } from "../../shared/desktop";
 import { desktop } from "../api";
 import { Button, Field, StatusBadge, Toast } from "../components";
-import { useTransientMessage } from "../hooks";
+import { messageFromError, useTransientMessage } from "../hooks";
 
 const DEFAULTS: AppSettings = {
   shortcuts: {
@@ -54,7 +54,7 @@ export function SettingsView({
       desktop.invoke<AppSettings>("settings:get").then(setSettings),
       desktop.invoke<string>("screen:permission").then(setPermission),
       desktop.invoke<Account>("auth:account").then(setAccount),
-    ]).catch((error) => show(String(error), true));
+    ]).catch((error) => show(messageFromError(error), true));
     const stopUpdate = desktop.on<UpdateState>("update:state", setUpdate);
     const stopAccount = desktop.on(
       "account:changed",
@@ -75,7 +75,7 @@ export function SettingsView({
         : "full";
       show("Settings saved");
     } catch (error) {
-      show(String(error), true);
+      show(messageFromError(error), true);
     }
   }
   function patchAudit(patch: Partial<AuditProject>) {
@@ -87,7 +87,7 @@ export function SettingsView({
       setPermission(result);
       if (result !== "granted") await desktop.invoke("screen:open-settings");
     } catch (error) {
-      show(String(error), true);
+      show(messageFromError(error), true);
     }
   }
   async function signIn() {
@@ -95,16 +95,26 @@ export function SettingsView({
       await desktop.invoke("auth:sign-in");
       show("Complete sign in in your browser");
     } catch (error) {
-      show(String(error), true);
+      show(messageFromError(error), true);
     }
   }
   async function checkUpdate() {
     try {
       setUpdate(await desktop.invoke("update:check"));
     } catch (error) {
-      show(String(error), true);
+      show(messageFromError(error), true);
     }
   }
+  const permissionLabel =
+    permission === "granted"
+      ? "Allowed"
+      : permission === "denied"
+        ? "Not allowed"
+        : "Not checked";
+  const secureStorageName =
+    platform.platform === "macos"
+      ? "macOS Keychain"
+      : "Windows credential protection";
 
   return (
     <div className="settings-view">
@@ -289,7 +299,7 @@ export function SettingsView({
             </p>
           </div>
           <StatusBadge tone={permission === "granted" ? "success" : "warning"}>
-            {permission}
+            {permissionLabel}
           </StatusBadge>
           {permission !== "granted" ? (
             <Button
@@ -314,7 +324,9 @@ export function SettingsView({
             </div>
             <div>
               <strong>
-                {account.signedIn ? account.email : "Not signed in"}
+                {account.signedIn
+                  ? account.email || "Connected account"
+                  : "Not signed in"}
               </strong>
               <p>
                 {account.signedIn
@@ -384,9 +396,8 @@ export function SettingsView({
         <div>
           <strong>Private by default</strong>
           <p>
-            Captures, annotations, checklists, and tokens are stored in the
-            operating system application-data directory. Authentication tokens
-            are encrypted with the OS secure-storage service.
+            Captures, annotations, and checklists stay in the app data folder.
+            If you sign in, the connection token is encrypted with {secureStorageName}.
           </p>
         </div>
       </section>

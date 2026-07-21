@@ -124,9 +124,18 @@ export class AuthService {
   }
 
   private async readToken(): Promise<string | null> {
+    let encrypted: Buffer;
+    try {
+      // Check for a saved session before touching safeStorage. On macOS,
+      // querying safeStorage can involve Keychain, which should never happen
+      // on a fresh install or while the user is signed out.
+      encrypted = await readFile(this.tokenPath);
+    } catch {
+      return null;
+    }
     try {
       if (!safeStorage.isEncryptionAvailable()) return null;
-      return safeStorage.decryptString(await readFile(this.tokenPath));
+      return safeStorage.decryptString(encrypted);
     } catch {
       return null;
     }

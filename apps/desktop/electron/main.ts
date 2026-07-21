@@ -23,9 +23,10 @@ import { migrateLegacyDesktopData } from "./migration";
 
 protocol.registerSchemesAsPrivileged([{
   scheme: "thewcag-asset",
-  privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: false },
+  privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
 }]);
 
+app.name = "TheWCAG";
 app.setName("TheWCAG");
 app.setAppUserModelId("com.thewcag.app");
 app.commandLine.appendSwitch("force-color-profile", "srgb");
@@ -106,13 +107,26 @@ async function start(): Promise<void> {
   services = { auth, windows, settings, captureCoordinator };
   registerIpc({ auth, captureCoordinator, captures, capture: screenCapture, settings, store, updates, windows });
 
-  protocol.handle("thewcag-asset", (request) => {
+  protocol.handle("thewcag-asset", async (request) => {
+    if (request.method !== "GET") {
+      return new Response("Method not allowed", { status: 405 });
+    }
     const url = new URL(request.url);
     if (url.hostname !== "capture") return new Response("Not found", { status: 404 });
     const id = decodeURIComponent(url.pathname.replace(/^\//, ""));
     const kind = url.searchParams.get("kind") === "thumbnail" ? "thumbnail" : "raw";
     try {
-      return net.fetch(pathToFileURL(captures.resolveAsset(id, kind)).toString());
+      const response = await net.fetch(pathToFileURL(captures.resolveAsset(id, kind)).toString());
+      if (!response.ok) return new Response("Not found", { status: 404 });
+      return new Response(response.body, {
+        status: response.status,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Cache-Control": "private, no-store",
+          "Content-Type": response.headers.get("content-type") || "image/png",
+          "Cross-Origin-Resource-Policy": "cross-origin",
+        },
+      });
     } catch {
       return new Response("Not found", { status: 404 });
     }

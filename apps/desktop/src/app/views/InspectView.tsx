@@ -23,7 +23,11 @@ import type { OverlayResult, WorkspaceStage } from "../../shared/desktop";
 import { desktop } from "../api";
 import { auditStoreKey, type RecordAuditActivity } from "../audits";
 import { Button, Segmented, StatusBadge, Toast } from "../components";
-import { useStoredState, useTransientMessage } from "../hooks";
+import {
+  messageFromError,
+  useStoredState,
+  useTransientMessage,
+} from "../hooks";
 
 type TextMode = "normal" | "large" | "ui";
 interface Pair {
@@ -90,7 +94,7 @@ export function InspectView({
       await desktop.invoke("capture:begin", { mode: modeName, auditId });
     } catch (error) {
       setPending(false);
-      show(String(error), true);
+      show(messageFromError(error), true);
     }
   }
 

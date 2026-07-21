@@ -38,7 +38,13 @@ import type {
 } from "../shared/desktop";
 import { desktop, getStored, listCaptures } from "./api";
 import { auditStoreKey, useAuditWorkspace } from "./audits";
-import { IconButton, StatusBadge, Toast } from "./components";
+import { messageFromError } from "./hooks";
+import {
+  ConfirmDialog,
+  IconButton,
+  StatusBadge,
+  Toast,
+} from "./components";
 import { InspectView } from "./views/InspectView";
 import { PanelResizer } from "./ResizablePanel";
 import { usePersistedPanelSize } from "./usePersistedPanelSize";
@@ -50,6 +56,7 @@ import { VisionView } from "./views/VisionView";
 import { SettingsView } from "./views/SettingsView";
 
 type Route = WorkspaceStage | WorkspaceUtility;
+const COMPACT_LAYOUT_QUERY = "(max-width: 1040px)";
 type IconType = ComponentType<{
   size?: number;
   weight?: "bold" | "regular" | "duotone";
@@ -153,17 +160,25 @@ function Modal({
 
 export function Workspace({ platform }: { platform: PlatformInfo }) {
   const [active, setActive] = useState<Route>("inspect");
-  const [inspector, setInspector] = useState(true);
+  const [compact, setCompact] = useState(() =>
+    window.matchMedia(COMPACT_LAYOUT_QUERY).matches,
+  );
+  const [inspector, setInspector] = useState(
+    () => !window.matchMedia(COMPACT_LAYOUT_QUERY).matches,
+  );
   const [commandOpen, setCommandOpen] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
-  const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(
-    null,
-  );
+  const [notice, setNotice] = useState<{
+    text: string;
+    error: boolean;
+    title?: string;
+  } | null>(null);
   const [activity, setActivity] = useState<AuditActivity[]>([]);
   const [query, setQuery] = useState("");
   const [commandIndex, setCommandIndex] = useState(0);
   const [newAuditName, setNewAuditName] = useState("");
+  const [archiveConfirm, setArchiveConfirm] = useState(false);
   const [stats, setStats] = useState({
     captures: 0,
     findings: 0,
@@ -214,7 +229,12 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
   useEffect(
     () =>
       desktop.on<{ text: string; error?: boolean }>("notification", (value) => {
-        setNotice({ text: value.text, error: Boolean(value.error) });
+        const error = Boolean(value.error);
+        setNotice({
+          text: error ? messageFromError(new Error(value.text)) : value.text,
+          error,
+          title: error ? "Action not completed" : undefined,
+        });
         window.setTimeout(() => setNotice(null), 5000);
       }),
     [],
@@ -257,8 +277,31 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     });
   }, [active, activeId, activityOpen, activeAudit]);
   useEffect(() => {
+    const media = window.matchMedia(COMPACT_LAYOUT_QUERY);
+    const onChange = () => {
+      setCompact(media.matches);
+      if (media.matches) setInspector(false);
+    };
+    onChange();
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+  useEffect(() => {
+    if (!compact || !inspector) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setInspector(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [compact, inspector]);
+  useEffect(() => {
     setCommandIndex(0);
   }, [query]);
+  useEffect(() => {
+    setCommandIndex((index) => Math.min(index, Math.max(0, commands.length - 1)));
+  }, [commands.length]);
 
   function navigate(route: Route) {
     setActive(route);
@@ -282,6 +325,14 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     if (event.key === "ArrowUp") {
       event.preventDefault();
       setCommandIndex((index) => Math.max(0, index - 1));
+    }
+    if (event.key === "Home" && commands.length) {
+      event.preventDefault();
+      setCommandIndex(0);
+    }
+    if (event.key === "End" && commands.length) {
+      event.preventDefault();
+      setCommandIndex(commands.length - 1);
     }
     if (event.key === "Enter" && commands[commandIndex]) {
       event.preventDefault();
@@ -365,6 +416,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
               className="stage-link"
               data-active={active === id}
               aria-current={active === id ? "page" : undefined}
+              title={`${label}, ${stageStats[Number(number) - 1]}`}
               onClick={() => navigate(id)}
             >
               <span className="stage-number">{number}</span>
@@ -382,6 +434,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
               className="utility-link"
               data-active={active === id}
               aria-current={active === id ? "page" : undefined}
+              title={label}
               onClick={() => navigate(id)}
             >
               <Icon size={18} weight={active === id ? "duotone" : "regular"} />
@@ -418,6 +471,8 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
           </button>
           <button
             className="command-trigger"
+            aria-label="Search tools and commands"
+            title="Search tools and commands"
             onClick={() => setCommandOpen(true)}
           >
             <MagnifyingGlass size={17} />
@@ -428,6 +483,9 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
             <StatusBadge tone="success">Stored locally</StatusBadge>
             <IconButton
               label={inspector ? "Hide audit panel" : "Show audit panel"}
+              className="inspector-toggle"
+              ariaExpanded={inspector}
+              ariaControls="audit-context-panel"
               onClick={() => setInspector((value) => !value)}
             >
               <SidebarSimple size={18} weight="bold" />
@@ -466,6 +524,14 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
             </div>
             <div className="task-content">{body}</div>
           </section>
+          {compact && inspector ? (
+            <button
+              type="button"
+              className="inspector-scrim"
+              aria-label="Close audit status panel"
+              onClick={() => setInspector(false)}
+            />
+          ) : null}
           {inspector ? (
             <PanelResizer
               className="context-resizer"
@@ -481,8 +547,10 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
           ) : null}
           {inspector ? (
             <aside
+              id="audit-context-panel"
               className="context-inspector"
               aria-label="Current audit context"
+              data-compact={compact}
             >
               <div className="inspector-heading">
                 <span>Audit status</span>
@@ -618,6 +686,15 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
             onKeyDown={onCommandKey}
             placeholder="Jump to a stage or utility"
             aria-label="Search commands"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="true"
+            aria-controls="command-results"
+            aria-activedescendant={
+              commands[commandIndex]
+                ? `command-${commands[commandIndex].id}`
+                : undefined
+            }
           />
           <button
             aria-label="Close command palette"
@@ -629,10 +706,13 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
         <p className="command-group-label">
           {commands.length ? "Destinations" : "No matching commands"}
         </p>
-        <div className="command-results">
+        <div id="command-results" className="command-results" role="listbox">
           {commands.map(({ id, label, icon: Icon }, index) => (
             <button
               key={id}
+              id={`command-${id}`}
+              role="option"
+              aria-selected={index === commandIndex}
               data-selected={index === commandIndex}
               onMouseEnter={() => setCommandIndex(index)}
               onClick={() => navigate(id)}
@@ -722,10 +802,8 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
           <button
             disabled={audits.filter((audit) => !audit.archivedAt).length < 2}
             onClick={() => {
-              if (confirm(`Archive “${activeAudit.project}”?`)) {
-                archiveAudit(activeAudit.id);
-                setSwitcherOpen(false);
-              }
+              setSwitcherOpen(false);
+              setArchiveConfirm(true);
             }}
           >
             <Archive size={16} />
@@ -733,6 +811,17 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
           </button>
         </div>
       </Modal>
+      <ConfirmDialog
+        open={archiveConfirm}
+        title={`Archive ${activeAudit.project}?`}
+        description="The audit will leave the active workspace list. Its local evidence and findings are preserved."
+        confirmLabel="Archive audit"
+        onCancel={() => setArchiveConfirm(false)}
+        onConfirm={() => {
+          archiveAudit(activeAudit.id);
+          setArchiveConfirm(false);
+        }}
+      />
     </div>
   );
 }

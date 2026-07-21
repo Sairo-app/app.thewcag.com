@@ -19,6 +19,7 @@ export function PaletteView({ auditId }: { auditId: string }) {
   );
   const [draft, setDraft] = useState("");
   const [failuresOnly, setFailuresOnly] = useState(false);
+  const [clearedColors, setClearedColors] = useState<string[] | null>(null);
   const [message, show] = useTransientMessage();
   const matrix = useMemo(
     () =>
@@ -37,6 +38,7 @@ export function PaletteView({ auditId }: { auditId: string }) {
       return;
     }
     setColors((current) => [...new Set([...current, ...next])].slice(0, 16));
+    setClearedColors(null);
     setDraft("");
   }
   async function copyCsv() {
@@ -113,10 +115,32 @@ export function PaletteView({ auditId }: { auditId: string }) {
         >
           Copy CSV
         </Button>
-        <Button variant="quiet" icon={Trash} onClick={() => setColors([])}>
+        <Button
+          variant="quiet"
+          icon={Trash}
+          disabled={!colors.length}
+          onClick={() => {
+            setClearedColors(colors);
+            setColors([]);
+          }}
+        >
           Clear
         </Button>
       </div>
+      {clearedColors ? (
+        <div className="undo-strip" role="status">
+          <span>Palette cleared.</span>
+          <button
+            type="button"
+            onClick={() => {
+              setColors(clearedColors);
+              setClearedColors(null);
+            }}
+          >
+            Undo
+          </button>
+        </div>
+      ) : null}
       {colors.length < 2 ? (
         <EmptyState
           icon={Palette}

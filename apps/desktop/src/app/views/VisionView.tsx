@@ -10,7 +10,7 @@ import {
 } from "@phosphor-icons/react";
 import { desktop } from "../api";
 import { Button, StatusBadge, Toast } from "../components";
-import { useTransientMessage } from "../hooks";
+import { messageFromError, useTransientMessage } from "../hooks";
 
 const MODES = ["Original", "Protanopia", "Deuteranopia", "Tritanopia"];
 
@@ -24,7 +24,7 @@ export function VisionView() {
       setOpen(next);
       show(next ? "Vision lens opened" : "Vision lens closed");
     } catch (error) {
-      show(String(error), true);
+      show(messageFromError(error), true);
     }
   }
 

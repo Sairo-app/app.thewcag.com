@@ -21,7 +21,7 @@ import type {
 import { desktop, getStored, listCaptures, setStored } from "../api";
 import { auditStoreKey, type RecordAuditActivity } from "../audits";
 import { Button, EmptyState, Field, StatusBadge, Toast } from "../components";
-import { useTransientMessage } from "../hooks";
+import { messageFromError, useTransientMessage } from "../hooks";
 import { ISSUE_TYPES, parseDoc } from "../../lib/annotate/model";
 import { renderDoc } from "../../lib/annotate/render";
 
@@ -30,6 +30,7 @@ async function renderCapture(entry: CaptureEntry): Promise<string> {
     desktop.invoke<string | null>("capture:read-document", { id: entry.id }),
     new Promise<HTMLImageElement>((resolve, reject) => {
       const next = new Image();
+      next.crossOrigin = "anonymous";
       next.onload = () => resolve(next);
       next.onerror = () =>
         reject(new Error("The selected capture could not be loaded"));
@@ -90,7 +91,7 @@ export function ShareView({
         setAccount(nextAccount);
         setCaptureId((current) => current || nextCaptures[0]?.id || "");
       })
-      .catch((error) => show(String(error), true));
+      .catch((error) => show(messageFromError(error), true));
     return desktop.on(
       "account:changed",
       () => void desktop.invoke<Account>("auth:account").then(setAccount),
@@ -122,7 +123,7 @@ export function ShareView({
       await desktop.invoke("auth:sign-in");
       show("Complete sign in in your browser");
     } catch (error) {
-      show(String(error), true);
+      show(messageFromError(error), true);
     }
   }
 
@@ -170,7 +171,7 @@ export function ShareView({
       setPublishedUrl(url);
       show("Report published. Link copied to clipboard.");
     } catch (error) {
-      show(String(error), true);
+      show(messageFromError(error), true);
     } finally {
       setPublishing(false);
     }

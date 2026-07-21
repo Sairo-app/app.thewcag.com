@@ -21,12 +21,13 @@ import { desktop, getStored, listCaptures, setStored } from "../api";
 import { auditStoreKey, type RecordAuditActivity } from "../audits";
 import {
   Button,
+  ConfirmDialog,
   EmptyState,
   Segmented,
   StatusBadge,
   Toast,
 } from "../components";
-import { useTransientMessage } from "../hooks";
+import { messageFromError, useTransientMessage } from "../hooks";
 
 type Tab = "captures" | "findings";
 
@@ -53,6 +54,9 @@ export function EvidenceView({
   const [findings, setFindings] = useState<Finding[]>([]);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [captureToDelete, setCaptureToDelete] =
+    useState<CaptureEntry | null>(null);
   const [message, show] = useTransientMessage(5000);
   const deletedRef = useRef<{ item: Finding; index: number } | null>(null);
   const findingsKey = auditStoreKey(auditId, "findings");
@@ -67,7 +71,7 @@ export function EvidenceView({
   }
 
   useEffect(() => {
-    void refresh().catch((error) => show(String(error), true));
+    void refresh().catch((error) => show(messageFromError(error), true));
     return desktop.on("capture:saved", () => void refresh());
   }, [auditId]);
   useEffect(
@@ -91,20 +95,24 @@ export function EvidenceView({
         });
       show(full ? "Full screen captured" : "Drag to select an area");
     } catch (error) {
-      show(String(error), true);
+      show(messageFromError(error), true);
     } finally {
       setBusy(false);
     }
   }
 
-  async function removeCapture(entry: CaptureEntry) {
-    if (!confirm(`Delete “${entry.title}” and its annotations?`)) return;
+  async function confirmCaptureDelete() {
+    if (!captureToDelete) return;
+    setDeleteBusy(true);
     try {
-      await desktop.invoke("capture:delete", { id: entry.id });
+      await desktop.invoke("capture:delete", { id: captureToDelete.id });
       await refresh();
+      setCaptureToDelete(null);
       show("Capture deleted");
     } catch (error) {
-      show(String(error), true);
+      show(messageFromError(error), true);
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -408,7 +416,7 @@ export function EvidenceView({
                     </button>
                     <button
                       aria-label={`Delete ${entry.title}`}
-                      onClick={() => void removeCapture(entry)}
+                      onClick={() => setCaptureToDelete(entry)}
                     >
                       <Trash size={17} />
                     </button>
@@ -438,6 +446,15 @@ export function EvidenceView({
           )}
         </section>
       )}
+      <ConfirmDialog
+        open={Boolean(captureToDelete)}
+        title={`Delete ${captureToDelete?.title || "capture"}?`}
+        description="This permanently removes the capture and its annotations from the current audit."
+        confirmLabel="Delete capture"
+        busy={deleteBusy}
+        onCancel={() => setCaptureToDelete(null)}
+        onConfirm={() => void confirmCaptureDelete()}
+      />
     </div>
   );
 }

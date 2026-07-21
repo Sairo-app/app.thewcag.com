@@ -1,4 +1,4 @@
-import { Menu, Tray, app, nativeImage } from "electron";
+import { Menu, Tray, app, nativeImage, shell } from "electron";
 import { join } from "node:path";
 import type { CaptureCoordinator } from "./services/capture-coordinator";
 import type { WindowManager } from "./windows";
@@ -21,6 +21,12 @@ export function installApplicationMenu(actions: NativeActions): void {
       submenu: [
         { role: "about" as const },
         { type: "separator" as const },
+        {
+          label: "Settings…",
+          accelerator: "CommandOrControl+,",
+          click: () => actions.windows.navigate("settings"),
+        },
+        { type: "separator" as const },
         { role: "services" as const },
         { type: "separator" as const },
         { role: "hide" as const },
@@ -29,12 +35,28 @@ export function installApplicationMenu(actions: NativeActions): void {
         { type: "separator" as const },
         { role: "quit" as const },
       ],
-    }] : []),
+    }] : [{
+      label: "File",
+      submenu: [
+        {
+          label: "Settings",
+          accelerator: "CommandOrControl+,",
+          click: () => actions.windows.navigate("settings"),
+        },
+        { type: "separator" as const },
+        { role: "quit" as const },
+      ],
+    }]),
     {
       label: "Audit",
       submenu: [
-        { label: "Inspect contrast", click: () => run(() => actions.captures.begin("pair")) },
-        { label: "Capture area", click: () => run(() => actions.captures.begin("capture")) },
+        { label: "Inspect", accelerator: "CommandOrControl+1", click: () => actions.windows.navigate("inspect") },
+        { label: "Evidence", accelerator: "CommandOrControl+2", click: () => actions.windows.navigate("evidence") },
+        { label: "Review", accelerator: "CommandOrControl+3", click: () => actions.windows.navigate("checklist") },
+        { label: "Share", accelerator: "CommandOrControl+4", click: () => actions.windows.navigate("share") },
+        { type: "separator" },
+        { label: "Sample contrast from screen", click: () => run(() => actions.captures.begin("pair")) },
+        { label: "Capture region", click: () => run(() => actions.captures.begin("capture")) },
         { label: "Capture full screen", click: () => run(() => actions.captures.fullscreen()) },
         { type: "separator" },
         { label: "Toggle vision lens", click: () => actions.windows.toggleLens() },
@@ -43,6 +65,15 @@ export function installApplicationMenu(actions: NativeActions): void {
     { label: "Edit", submenu: [{ role: "undo" }, { role: "redo" }, { type: "separator" }, { role: "cut" }, { role: "copy" }, { role: "paste" }, { role: "selectAll" }] },
     { label: "View", submenu: [{ role: "reload" }, { role: "toggleDevTools", visible: !app.isPackaged }, { type: "separator" }, { role: "resetZoom" }, { role: "zoomIn" }, { role: "zoomOut" }, { type: "separator" }, { role: "togglefullscreen" }] },
     { label: "Window", submenu: [{ role: "minimize" }, { role: "zoom" }, ...(isMac ? [{ role: "front" as const }] : [{ role: "close" as const }])] },
+    {
+      role: "help",
+      submenu: [
+        { label: "TheWCAG website", click: () => run(() => shell.openExternal("https://app.thewcag.com")) },
+        { label: "Download TheWCAG", click: () => run(() => shell.openExternal("https://app.thewcag.com/download")) },
+        { type: "separator" },
+        { label: "Accessibility statement", click: () => run(() => shell.openExternal("https://app.thewcag.com/accessibility-statement")) },
+      ],
+    },
   ]));
 }
 

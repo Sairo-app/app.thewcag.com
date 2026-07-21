@@ -32,7 +32,7 @@ import {
 import type { CaptureEntry, Finding, Point } from "../shared/desktop";
 import { desktop, listCaptures } from "./api";
 import { Button, Field, StatusBadge, Toast } from "./components";
-import { useTransientMessage } from "./hooks";
+import { messageFromError, useTransientMessage } from "./hooks";
 import { PanelResizer } from "./ResizablePanel";
 import { usePersistedPanelSize } from "./usePersistedPanelSize";
 import { hitTest } from "../lib/annotate/geometry";
@@ -95,9 +95,13 @@ export function AnnotateView() {
   const [redo, setRedo] = useState<AnnotationDoc[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState<"copy" | "export" | null>(null);
+  const [retryAction, setRetryAction] = useState<
+    "copy" | "export" | "save" | null
+  >(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const baseRef = useRef<HTMLCanvasElement | null>(null);
-  const [message, show] = useTransientMessage();
+  const [message, show, clearMessage] = useTransientMessage(6000);
   const toolsSize = usePersistedPanelSize(
     "layout-annotation-tools-width-v1",
     82,
@@ -122,6 +126,7 @@ export function AnnotateView() {
         setCapture(entry);
         setDoc(parseDoc(raw || "") || emptyDoc());
         const next = new Image();
+        next.crossOrigin = "anonymous";
         next.onload = () => {
           const base = document.createElement("canvas");
           base.width = next.naturalWidth;
@@ -133,9 +138,17 @@ export function AnnotateView() {
           setImage(next);
           setLoaded(true);
         };
+        next.onerror = () =>
+          show(
+            "The capture image could not be opened. Close this window and try the capture again.",
+            true,
+            "Capture unavailable",
+          );
         next.src = entry.assetUrl;
       })
-      .catch((error) => show(String(error), true));
+      .catch((error) =>
+        show(messageFromError(error), true, "Capture unavailable"),
+      );
   }, [id]);
 
   useEffect(() => {
@@ -466,27 +479,64 @@ export function AnnotateView() {
         draw(false);
       }
       if (notify) show("Capture saved");
+      setRetryAction(null);
     } catch (error) {
-      show(String(error), true);
+      setRetryAction("save");
+      show(
+        messageFromError(
+          error,
+          "Your annotations could not be saved. Your current work is still open.",
+        ),
+        true,
+        "Save incomplete",
+      );
     } finally {
       setSaving(false);
     }
   }
   async function exportPng(copy = false) {
-    const canvas = draw(true);
-    if (!canvas) return;
-    const pngDataUrl = canvas.toDataURL("image/png");
-    if (copy) {
-      await desktop.invoke("clipboard:write-image", { pngDataUrl });
-      show("Annotated capture copied");
-    } else {
-      const path = await desktop.invoke<string | null>("dialog:save-image", {
-        name: `${capture?.title || "annotated-capture"}.png`,
-        pngDataUrl,
-      });
-      if (path) show("Annotated PNG exported");
+    if (exporting) return;
+    setExporting(copy ? "copy" : "export");
+    try {
+      const canvas = draw(true);
+      if (!canvas) throw new Error("The capture is not ready yet");
+      const pngDataUrl = canvas.toDataURL("image/png");
+      if (copy) {
+        await desktop.invoke("clipboard:write-image", { pngDataUrl });
+        show("Annotated capture copied");
+      } else {
+        const path = await desktop.invoke<string | null>("dialog:save-image", {
+          name: `${capture?.title || "annotated-capture"}.png`,
+          pngDataUrl,
+        });
+        if (path) show("Annotated PNG exported");
+      }
+      setRetryAction(null);
+    } catch (error) {
+      setRetryAction(copy ? "copy" : "export");
+      show(
+        messageFromError(
+          error,
+          copy
+            ? "The annotated capture could not be copied. Try again."
+            : "The annotated capture could not be exported. Try again.",
+        ),
+        true,
+        copy ? "Copy failed" : "Export failed",
+      );
+    } finally {
+      draw(false);
+      setExporting(null);
     }
-    draw(false);
+  }
+  function retryLastAction() {
+    const action = retryAction;
+    setRetryAction(null);
+    clearMessage();
+    if (action === "save") void save();
+    if (action === "copy" || action === "export") {
+      void exportPng(action === "copy");
+    }
   }
   async function addFindings() {
     const badges = doc.shapes.filter((shape) => shape.kind === "badge");
@@ -524,7 +574,15 @@ export function AnnotateView() {
   );
   return (
     <div className="annotate-window">
-      <Toast message={message} />
+      <Toast
+        message={message}
+        actionLabel={retryAction ? "Try again" : undefined}
+        onAction={retryAction ? retryLastAction : undefined}
+        onClose={() => {
+          setRetryAction(null);
+          clearMessage();
+        }}
+      />
       <header className="annotate-titlebar">
         <div className="annotate-drag">
           <button
@@ -551,19 +609,30 @@ export function AnnotateView() {
           </button>
         </div>
         <div className="annotate-actions">
-          <span>{saving ? "Saving" : "Saved locally"}</span>
-          <Button icon={Clipboard} onClick={() => void exportPng(true)}>
-            Copy
+          <span data-saving={saving}>
+            {saving ? "Saving changes" : "All changes saved"}
+          </span>
+          <Button
+            icon={Clipboard}
+            disabled={saving || Boolean(exporting)}
+            onClick={() => void exportPng(true)}
+          >
+            {exporting === "copy" ? "Copying" : "Copy"}
           </Button>
-          <Button icon={DownloadSimple} onClick={() => void exportPng(false)}>
-            Export
+          <Button
+            icon={DownloadSimple}
+            disabled={saving || Boolean(exporting)}
+            onClick={() => void exportPng(false)}
+          >
+            {exporting === "export" ? "Exporting" : "Export"}
           </Button>
           <Button
             variant="primary"
             icon={FloppyDisk}
+            disabled={saving || Boolean(exporting)}
             onClick={() => void save()}
           >
-            Save
+            {saving ? "Saving" : "Save"}
           </Button>
         </div>
       </header>
