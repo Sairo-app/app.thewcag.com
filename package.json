@@ -1,7 +1,7 @@
 {
   "name": "accessibility-build-app",
   "private": true,
-  "version": "3.0.1",
+  "version": "3.0.2",
   "scripts": {
     "dev": "pnpm --filter @accessibility-build/desktop dev",
     "build": "pnpm --filter @accessibility-build/desktop build",
@@ -9,7 +9,7 @@
     "build:web": "pnpm --filter @thewcag/web build",
     "typecheck": "pnpm --filter @accessibility-build/audit-contracts typecheck && pnpm --filter @accessibility-build/extension typecheck && pnpm --filter @accessibility-build/desktop typecheck && pnpm --filter @thewcag/web typecheck",
     "test": "pnpm --filter @accessibility-build/audit-contracts test && pnpm --filter @accessibility-build/extension test && pnpm --filter @accessibility-build/a11y-core test && pnpm --filter @accessibility-build/desktop test && pnpm --filter @thewcag/web test && node --test scripts/*.test.mjs",
-    "verify": "pnpm test && pnpm typecheck && pnpm build:extension && pnpm --filter @accessibility-build/desktop build:vite && pnpm build:web"
+    "verify": "pnpm test && pnpm typecheck && pnpm build:extension && pnpm --filter @accessibility-build/desktop build:vite && node scripts/validate-desktop-bundle.mjs && pnpm build:web"
   },
   "packageManager": "pnpm@9.15.4"
 }

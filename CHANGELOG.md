@@ -1,5 +1,14 @@
 # Changelog
 
+## v3.0.2 - 2026-07-22
+
+**Desktop startup hotfix**
+
+- Bundled the TypeScript workspace contracts into Electron's production main process instead of loading raw source from packaged `node_modules`, fixing `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING` at startup.
+- Removed raw internal workspace packages from the application archive and added a release guard that rejects external workspace imports in the built main or preload bundles.
+- Fixed the existing-window path so a second launch, Dock activation, or authentication callback focuses the running application without recursive window creation.
+- Added regression coverage for the single-instance focus path and verified the corrected packaged macOS application through first-launch and second-launch smoke tests.
+
 ## v3.0.1 - 2026-07-21
 
 **Professional auditor workflow**

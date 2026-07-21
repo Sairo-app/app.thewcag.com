@@ -421,8 +421,8 @@ Production desktop releases are tag-driven. Before tagging:
 5. Create and push the exact `v<desktop-version>` tag.
 
 ```sh
-git tag -a v3.0.1 -m "TheWCAG v3.0.1"
-git push origin v3.0.1
+git tag -a v3.0.2 -m "TheWCAG v3.0.2"
+git push origin v3.0.2
 ```
 
 The release workflow first rejects a tag that does not exactly match the desktop package version and refuses to publish unless all mandatory Apple signing and notarization credentials plus the valid repository variable `THEWCAG_EXTENSION_ID` are present. It then:

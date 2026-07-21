@@ -23,7 +23,6 @@ export class WindowManager {
 
   createMain(): BrowserWindow {
     if (this.main && !this.main.isDestroyed()) {
-      this.showMain();
       return this.main;
     }
     const isMac = process.platform === "darwin";

@@ -1,7 +1,7 @@
 {
   "name": "@accessibility-build/desktop",
   "productName": "TheWCAG",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "A production accessibility audit workstation for macOS and Windows.",
   "author": "TheWCAG",
   "homepage": "https://app.thewcag.com",
@@ -24,14 +24,14 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@accessibility-build/a11y-core": "workspace:*",
-    "@accessibility-build/audit-contracts": "workspace:*",
     "@phosphor-icons/react": "^2.1.10",
     "electron-updater": "^6.8.9",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@accessibility-build/a11y-core": "workspace:*",
+    "@accessibility-build/audit-contracts": "workspace:*",
     "@tailwindcss/vite": "^4.1.0",
     "@types/node": "^24.3.0",
     "@types/react": "^19.0.0",

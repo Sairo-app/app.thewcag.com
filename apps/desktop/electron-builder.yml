@@ -10,6 +10,9 @@ directories:
 files:
   - out/**/*
   - package.json
+  # Workspace libraries are compiled into the Vite bundles. Do not ship their
+  # raw TypeScript sources as runtime node_modules.
+  - "!node_modules/@accessibility-build/**/*"
 
 extraResources:
   - from: public/logo.png

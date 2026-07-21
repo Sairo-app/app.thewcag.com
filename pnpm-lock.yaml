@@ -10,12 +10,6 @@ importers:
 
   apps/desktop:
     dependencies:
-      '@accessibility-build/a11y-core':
-        specifier: workspace:*
-        version: link:../../packages/a11y-core
-      '@accessibility-build/audit-contracts':
-        specifier: workspace:*
-        version: link:../../packages/audit-contracts
       '@phosphor-icons/react':
         specifier: ^2.1.10
         version: 2.1.10(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -29,6 +23,12 @@ importers:
         specifier: ^19.0.0
         version: 19.2.7(react@19.2.7)
     devDependencies:
+      '@accessibility-build/a11y-core':
+        specifier: workspace:*
+        version: link:../../packages/a11y-core
+      '@accessibility-build/audit-contracts':
+        specifier: workspace:*
+        version: link:../../packages/audit-contracts
       '@tailwindcss/vite':
         specifier: ^4.1.0
         version: 4.3.2(vite@6.4.3(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0))
