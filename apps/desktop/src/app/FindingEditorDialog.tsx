@@ -495,7 +495,7 @@ export function FindingEditorDialog({
               rows={3}
               value={value.retestNote}
               onChange={(event) => patch("retestNote", event.target.value)}
-              placeholder="Retested in build 3.0.2 with NVDA and Chrome."
+              placeholder="Retested in build 3.0.3 with NVDA and Chrome."
             />
           </Field>
           <Field

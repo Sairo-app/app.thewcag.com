@@ -1,5 +1,24 @@
 # Changelog
 
+## v3.0.3 - 2026-07-22
+
+**Auditor-controlled AI providers**
+
+- Added production integrations for OpenAI, Anthropic Claude, and OpenRouter with provider-specific model selection, connection verification, bounded responses, timeout handling, and clear error recovery.
+- Added a dedicated desktop settings interface for saving, testing, activating, replacing, and removing provider credentials without exposing complete API keys back to the renderer.
+- Kept AI evidence sharing explicit and consent-based, with editable drafts, local fallback behavior, and provider provenance attached to generated findings.
+
+**Desktop experience**
+
+- Completed the responsive workspace pass across compact and resizable sidebars, settings, capture, evidence, review, delivery, and narrow-window layouts.
+- Improved provider setup, validation feedback, empty states, keyboard focus, text wrapping, overflow containment, and destructive-action safeguards.
+
+**Website**
+
+- Rebuilt the homepage hero around the complete Capture, AI Draft, Review, and Deliver workflow with a compact keyboard-operable product preview.
+- Updated the product story for the desktop application, Chrome evidence extension, user-selected AI providers, WCAG review, and controlled report publishing.
+- Recalibrated orange action surfaces to use cream foreground text with WCAG AA contrast and added automated color-token regression tests.
+
 ## v3.0.2 - 2026-07-22
 
 **Desktop startup hotfix**

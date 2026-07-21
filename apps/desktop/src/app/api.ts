@@ -50,7 +50,7 @@ function previewPlatform(): PlatformInfo {
   return {
     platform: mac ? "macos" : "windows",
     arch: "preview",
-    version: "3.0.2-preview",
+    version: "3.0.3-preview",
     windowId: 0,
     view: (new URLSearchParams(location.search).get("view") as PlatformInfo["view"]) || "main",
     reduceMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
