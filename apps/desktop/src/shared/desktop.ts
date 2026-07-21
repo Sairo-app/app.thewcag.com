@@ -1,3 +1,10 @@
+import type {
+  AffectedUser,
+  DraftConfidence,
+  FieldConfidenceV1,
+  WcagMappingV1,
+} from "@accessibility-build/audit-contracts";
+
 export type AppView = "main" | "overlay" | "annotate" | "lens";
 export type WorkspaceStage = "inspect" | "evidence" | "review" | "share";
 export type WorkspaceUtility = "vision" | "palette" | "settings";
@@ -111,6 +118,31 @@ export interface Finding {
   note: string;
   captureId?: string;
   createdAt: number;
+  schemaVersion?: 2;
+  description?: string;
+  actualResult?: string;
+  expectedResult?: string;
+  userImpact?: string;
+  affectedUsers?: AffectedUser[];
+  severityRationale?: string;
+  wcagMappings?: WcagMappingV1[];
+  recommendation?: string;
+  exampleFix?: string;
+  reproductionSteps?: string[];
+  evidenceId?: string;
+  source?: "manual" | "local" | "ai";
+  confidence?: DraftConfidence;
+  fieldConfidence?: FieldConfidenceV1[];
+  assumptions?: string[];
+  manualChecks?: string[];
+  provenance?: {
+    model: string;
+    modelVersion: string;
+    promptVersion: string;
+    knowledgeVersion: string;
+    generatedAt: number;
+  };
+  modifiedAt?: number;
 }
 
 export interface ShortcutSettings {

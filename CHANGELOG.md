@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+**AI-assisted browser evidence**
+
+- Added a privacy-first Manifest V3 Chrome extension with a toolbar quick-capture popup and a separate expanded evidence workspace, keyboard-accessible element and region selection, exact high-DPI marked crops, sanitized semantic and DOM context, deterministic checks, explicit payload consent, structured draft editing, and local Markdown export.
+- Added versioned shared contracts for browser evidence, AI finding drafts, WCAG 2.2 mappings, audit summaries, and the extension-to-desktop native protocol with strict bounds and validation tests.
+- Added an allowlisted Electron native messaging host for macOS and Windows. It exposes audit summaries without credentials, sends authenticated generation requests from the desktop process, and saves confirmed `FindingV2` records plus local evidence and activity.
+- Expanded the Evidence workspace with collapsible structured findings, exact marked browser-evidence previews, affected-user groups, WCAG rationale and confidence, recommended fixes, example code, and manual confirmation tasks.
+- Added a device-authenticated AI finding endpoint with explicit consent enforcement, per-account hourly and daily limits, strict structured output validation, WCAG allowlisting, privacy-safe metadata-only usage records, provider refusal handling, and a deterministic local fallback when AI is unavailable.
+- Added the complete architecture, privacy model, release setup, and acceptance plan in `docs/AI-EXTENSION-IMPLEMENTATION.md`, and extended `pnpm verify` to cover the contracts and extension.
+
 ## v3.0.0 — 2026-07-21
 
 **Desktop**

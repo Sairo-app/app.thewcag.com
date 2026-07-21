@@ -21,7 +21,10 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     signedIn: true,
     email: user?.email ?? "",
-    features: { publishReports: true },
+    features: {
+      publishReports: true,
+      aiFindingDrafts: Boolean(process.env.OPENAI_API_KEY),
+    },
     storage: { usedBytes, quotaBytes: STORAGE_QUOTA_BYTES },
   });
 }

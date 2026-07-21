@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@accessibility-build/a11y-core": "workspace:*",
+    "@accessibility-build/audit-contracts": "workspace:*",
     "@phosphor-icons/react": "^2.1.10",
     "electron-updater": "^6.8.9",
     "react": "^19.0.0",

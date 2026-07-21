@@ -10,7 +10,9 @@
 #   NEXT_PUBLIC_APP_URL, AUTH_EMAIL_FROM
 # You MUST provide these in Coolify (external credentials - can't be generated):
 #   AUTH_RESEND_KEY, R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
-#   R2_BUCKET, R2_PUBLIC_URL
+#   R2_BUCKET, R2_PUBLIC_URL. AI finding drafts additionally require
+#   OPENAI_API_KEY and AI_SAFETY_SALT; without them the local draft remains
+#   available and the AI endpoint stays disabled.
 #
 # Coolify setup: Build Pack: Docker Compose; Compose file: this file;
 # point app.thewcag.com at the `web` service, port 3100.
@@ -56,6 +58,11 @@ services:
       R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
       R2_BUCKET: ${R2_BUCKET}
       R2_PUBLIC_URL: ${R2_PUBLIC_URL}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_FINDING_MODEL: ${OPENAI_FINDING_MODEL:-gpt-5.6-terra}
+      AI_SAFETY_SALT: ${AI_SAFETY_SALT:-}
+      AI_GENERATIONS_PER_HOUR: ${AI_GENERATIONS_PER_HOUR:-30}
+      AI_GENERATIONS_PER_DAY: ${AI_GENERATIONS_PER_DAY:-200}
     expose:
       - "3100"
     ports:

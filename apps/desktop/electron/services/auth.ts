@@ -3,6 +3,11 @@ import { hostname } from "node:os";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { safeStorage, shell } from "electron";
+import {
+  parseAiFindingDraft,
+  parseEvidencePacket,
+  type AiFindingDraftV1,
+} from "@accessibility-build/audit-contracts";
 import type { Account } from "../../src/shared/desktop";
 import type { JsonStore } from "./store";
 
@@ -116,6 +121,35 @@ export class AuthService {
     if (!response.ok) throw new Error(body.message || body.error || `Publishing failed with status ${response.status}`);
     if (!body.url || new URL(body.url).protocol !== "https:") throw new Error("The publishing service returned an invalid URL");
     return body.url;
+  }
+
+  async generateFinding(rawEvidence: unknown): Promise<AiFindingDraftV1> {
+    const token = await this.readToken();
+    if (!token) throw new Error("Sign in to TheWCAG before using AI authoring");
+    const evidence = parseEvidencePacket(rawEvidence);
+    if (!evidence.consent?.approvedAt) throw new Error("Review and approve the evidence before AI authoring");
+    const response = await fetch(new URL("/api/device/ai/findings", this.site), {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ evidence }),
+      signal: AbortSignal.timeout(55_000),
+    });
+    if (response.status === 401) {
+      await this.signOut();
+      throw new Error("Your session expired. Sign in again to use AI authoring");
+    }
+    const body = await response.json().catch(() => ({})) as {
+      draft?: unknown;
+      message?: string;
+      error?: string;
+      retryAfterSeconds?: number;
+    };
+    if (!response.ok) {
+      if (response.status === 429) throw new Error(body.message || "AI authoring limit reached. Try again later");
+      if (response.status === 503) throw new Error(body.message || "AI authoring is not configured yet");
+      throw new Error(body.message || body.error || `AI authoring failed with status ${response.status}`);
+    }
+    return parseAiFindingDraft(body.draft);
   }
 
   private async saveToken(token: string): Promise<void> {

@@ -21,6 +21,7 @@ jobs:
       APPLE_ID: ${{ secrets.APPLE_ID }}
       APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      THEWCAG_EXTENSION_ID: ${{ vars.THEWCAG_EXTENSION_ID }}
     steps:
       - uses: actions/checkout@v7
       - name: Require release tag to match desktop version
@@ -34,6 +35,13 @@ jobs:
           done
           if [ "${#missing[@]}" -gt 0 ]; then
             echo "Production release blocked. Missing Apple signing secrets: ${missing[*]}"
+            exit 1
+          fi
+      - name: Require the paired Chrome extension ID
+        shell: bash
+        run: |
+          if [[ ! "$THEWCAG_EXTENSION_ID" =~ ^[a-p]{32}$ ]]; then
+            echo "Production release blocked. Set the repository variable THEWCAG_EXTENSION_ID to the published 32-character Chrome extension ID."
             exit 1
           fi
 
@@ -69,6 +77,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          THEWCAG_EXTENSION_ID: ${{ vars.THEWCAG_EXTENSION_ID }}
         run: pnpm build && pnpm exec electron-builder --mac --universal --publish never
       - name: Upload macOS installers and updater metadata
         uses: actions/upload-artifact@v7
@@ -96,6 +105,7 @@ jobs:
         working-directory: apps/desktop
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          THEWCAG_EXTENSION_ID: ${{ vars.THEWCAG_EXTENSION_ID }}
         run: pnpm build && pnpm exec electron-builder --win --x64 --publish never
       - name: Upload Windows installer and updater metadata
         uses: actions/upload-artifact@v7

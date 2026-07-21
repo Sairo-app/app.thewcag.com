@@ -42,6 +42,14 @@ required by the release workflow.
 
 Never commit certificates, passwords, exported keychain files, or signing environment files.
 
+### Chrome extension pairing
+
+Create the repository variable `THEWCAG_EXTENSION_ID` with the exact
+32-character ID of the published Chrome Web Store extension. The ID contains
+only the letters `a` through `p`. Release preflight rejects a missing or invalid
+value, and the pack hook embeds it into both desktop platforms so the native
+messaging host can allowlist only that extension origin.
+
 ## Prepare and publish
 
 1. Update `package.json` and `apps/desktop/package.json` to the same next semantic version.
@@ -62,8 +70,11 @@ pnpm --filter @accessibility-build/desktop run pack
 ```
 
 5. Smoke-test the unpacked app on the current platform: launch, screen permission, contrast pair, region and full-screen capture, annotation save/reopen, lens, checklist persistence, sign-in, report publishing, and update check.
-6. Commit and push the release preparation.
-7. Create and push an annotated tag that exactly matches `apps/desktop/package.json`:
+6. Load the release-candidate extension, connect it to the packaged desktop app,
+   select an element and a region, inspect payload omission, generate both local
+   and AI-assisted drafts, save into an audit, and reopen the marked evidence.
+7. Commit and push the release preparation.
+8. Create and push an annotated tag that exactly matches `apps/desktop/package.json`:
 
 ```sh
 git tag -a v3.0.0 -m "TheWCAG v3.0.0"
@@ -81,6 +92,9 @@ The workflow runs the repository quality gate, builds macOS and Windows in paral
 5. Test the website download redirect for both platforms.
 6. Launch the prior production version and verify automatic update discovery, download, restart, and version change.
 7. Repeat the core capture, annotation, lens, auth, and publishing smoke tests on both platforms.
+8. On both platforms, confirm Chrome connects only through the published
+   extension ID and that uninstalling or disabling the extension leaves the
+   desktop app fully usable.
 
 Do not replace artifacts under an existing tag. Publish a patch version when a shipped artifact needs correction so updater metadata stays immutable and monotonic.
 
@@ -108,6 +122,7 @@ CSC_KEY_PASSWORD="certificate-password" \
 APPLE_ID="developer@example.com" \
 APPLE_APP_SPECIFIC_PASSWORD="app-specific-password" \
 APPLE_TEAM_ID="TEAMID1234" \
+THEWCAG_EXTENSION_ID="abcdefghijklmnopabcdefghijklmnop" \
 pnpm --filter @accessibility-build/desktop dist:mac
 ```
 
@@ -117,6 +132,8 @@ For Windows, run `dist:win` on a Windows host. No signing environment variables 
 
 - App identity remains `com.thewcag.app`; changing it affects permissions, protocol registration, secure storage, and update continuity.
 - The custom `thewcag://` protocol must remain registered for browser-mediated desktop sign-in.
+- The native messaging manifest must name `com.thewcag.app` and allow only the
+  configured Chrome extension origin; wildcard origins are forbidden.
 - macOS hardened runtime and the committed entitlements must remain enabled.
 - Windows update manifests must retain their SHA-512 integrity values and come from the canonical GitHub Release.
 - `latest-mac.yml`, `latest.yml`, installer files, and blockmaps must come from the same build and version.

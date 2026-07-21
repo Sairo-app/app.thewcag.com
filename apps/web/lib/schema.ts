@@ -99,8 +99,30 @@ export const reports = pgTable(
   (t) => ({ userIdx: index("report_user_idx").on(t.userId) }),
 );
 
+// AI usage metadata deliberately excludes evidence, screenshots, prompts, and
+// generated finding content. It exists only for abuse protection, quota
+// enforcement, and operational health.
+export const aiGenerations = pgTable(
+  "ai_generation",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    deviceId: text("device_id").references(() => desktopDevices.id, { onDelete: "set null" }),
+    requestId: text("request_id").notNull().unique(),
+    provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    status: text("status").notNull(),
+    inputBytes: integer("input_bytes").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    userCreatedIdx: index("ai_generation_user_created_idx").on(t.userId, t.createdAt),
+  }),
+);
+
 // silence unused import if boolean not referenced elsewhere
 void boolean;
 
 export type Report = typeof reports.$inferSelect;
 export type DesktopDevice = typeof desktopDevices.$inferSelect;
+export type AiGeneration = typeof aiGenerations.$inferSelect;

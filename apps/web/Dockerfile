@@ -19,6 +19,7 @@ FROM base AS build
 COPY pnpm-workspace.yaml package.json ./
 COPY apps/web/package.json apps/web/
 COPY packages/a11y-core/package.json packages/a11y-core/
+COPY packages/audit-contracts/package.json packages/audit-contracts/
 RUN pnpm install --filter @thewcag/web... --frozen-lockfile=false
 COPY packages ./packages
 COPY apps/web ./apps/web

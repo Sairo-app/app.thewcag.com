@@ -1,6 +1,10 @@
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
+import {
+  parseAiFindingDraft,
+  type AiFindingDraftV1,
+} from "@accessibility-build/audit-contracts";
 import type { Finding } from "../../src/shared/desktop";
 
 const KEY = /^[a-zA-Z0-9_-]{1,64}$/;
@@ -19,7 +23,7 @@ export function mergeFindings(existing: Finding[], incoming: unknown): Finding[]
     const finding = value as Partial<Finding>;
     if (!finding.key || seen.has(finding.key) || typeof finding.title !== "string") continue;
     seen.add(finding.key);
-    next.push({
+    const base: Finding = {
       key: finding.key,
       title: finding.title.trim().slice(0, 240),
       wcag: typeof finding.wcag === "string" ? finding.wcag.slice(0, 20) : "",
@@ -32,7 +36,68 @@ export function mergeFindings(existing: Finding[], incoming: unknown): Finding[]
       note: typeof finding.note === "string" ? finding.note.slice(0, 5_000) : "",
       captureId: typeof finding.captureId === "string" ? finding.captureId : undefined,
       createdAt: typeof finding.createdAt === "number" ? finding.createdAt : Date.now(),
-    });
+    };
+    if (finding.schemaVersion === 2) {
+      try {
+        const draft = parseAiFindingDraft({
+          schemaVersion: 1,
+          title: base.title,
+          description: finding.description,
+          actualResult: finding.actualResult,
+          expectedResult: finding.expectedResult,
+          userImpact: finding.userImpact,
+          affectedUsers: finding.affectedUsers,
+          severity: base.severity,
+          severityRationale: finding.severityRationale,
+          wcag: finding.wcagMappings,
+          recommendation: finding.recommendation,
+          exampleFix: finding.exampleFix ?? "",
+          reproductionSteps: finding.reproductionSteps,
+          confidence: finding.confidence,
+          fieldConfidence: finding.fieldConfidence,
+          assumptions: finding.assumptions,
+          manualChecks: finding.manualChecks,
+          provenance: {
+            source: finding.source === "ai" ? "ai" : "local",
+            model: finding.provenance?.model ?? "",
+            modelVersion: finding.provenance?.modelVersion ?? "",
+            promptVersion: finding.provenance?.promptVersion ?? "",
+            knowledgeVersion: finding.provenance?.knowledgeVersion ?? "",
+            generatedAt: finding.provenance?.generatedAt ?? base.createdAt,
+          },
+        } satisfies Partial<AiFindingDraftV1> & Record<string, unknown>);
+        Object.assign(base, {
+          schemaVersion: 2,
+          description: draft.description,
+          actualResult: draft.actualResult,
+          expectedResult: draft.expectedResult,
+          userImpact: draft.userImpact,
+          affectedUsers: draft.affectedUsers,
+          severityRationale: draft.severityRationale,
+          wcagMappings: draft.wcag,
+          recommendation: draft.recommendation,
+          exampleFix: draft.exampleFix,
+          reproductionSteps: draft.reproductionSteps,
+          evidenceId: typeof finding.evidenceId === "string" ? finding.evidenceId.slice(0, 64) : undefined,
+          source: finding.source === "ai" ? "ai" : finding.source === "local" ? "local" : "manual",
+          confidence: draft.confidence,
+          fieldConfidence: draft.fieldConfidence,
+          assumptions: draft.assumptions,
+          manualChecks: draft.manualChecks,
+          provenance: {
+            model: draft.provenance.model,
+            modelVersion: draft.provenance.modelVersion,
+            promptVersion: draft.provenance.promptVersion,
+            knowledgeVersion: draft.provenance.knowledgeVersion,
+            generatedAt: draft.provenance.generatedAt,
+          },
+          modifiedAt: typeof finding.modifiedAt === "number" ? finding.modifiedAt : Date.now(),
+        } satisfies Partial<Finding>);
+      } catch {
+        // Keep the bounded legacy fields rather than rejecting the full audit.
+      }
+    }
+    next.push(base);
   }
   return next;
 }

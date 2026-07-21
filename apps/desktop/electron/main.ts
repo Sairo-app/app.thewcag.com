@@ -20,7 +20,14 @@ import { WindowManager } from "./windows";
 import { createTray, installApplicationMenu } from "./menu";
 import { registerIpc } from "./ipc";
 import { migrateLegacyDesktopData } from "./migration";
+import { nativeOriginFromArgs, runNativeHost } from "./native-host";
+import { registerNativeMessagingHost } from "./native-host-registration";
 
+const nativeOrigin = nativeOriginFromArgs(process.argv);
+
+if (nativeOrigin) {
+  void runNativeHost(nativeOrigin);
+} else {
 protocol.registerSchemesAsPrivileged([{
   scheme: "thewcag-asset",
   privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
@@ -73,6 +80,12 @@ app.on("second-instance", (_event, argv) => {
 async function start(): Promise<void> {
   await app.whenReady();
   nativeTheme.themeSource = "light";
+  await registerNativeMessagingHost({
+    platform: process.platform,
+    resourcesPath: process.resourcesPath,
+    executablePath: process.execPath,
+    homePath: app.getPath("home"),
+  }).catch((error) => logFatal(error));
   if (process.defaultApp && process.argv[1]) {
     app.setAsDefaultProtocolClient("thewcag", process.execPath, [process.argv[1]]);
   } else {
@@ -171,3 +184,4 @@ void start().catch(async (error) => {
 });
 
 void tray;
+}

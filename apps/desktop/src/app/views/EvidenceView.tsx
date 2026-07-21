@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera,
+  CaretDown,
   FileArrowDown,
   FrameCorners,
   Image,
@@ -8,9 +9,14 @@ import {
   NotePencil,
   Plus,
   ShareNetwork,
+  Sparkle,
   Trash,
   WarningCircle,
 } from "@phosphor-icons/react";
+import {
+  parseEvidencePacket,
+  type EvidencePacketV1,
+} from "@accessibility-build/audit-contracts";
 import type {
   CaptureEntry,
   Finding,
@@ -57,6 +63,10 @@ export function EvidenceView({
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [captureToDelete, setCaptureToDelete] =
     useState<CaptureEntry | null>(null);
+  const [expandedFinding, setExpandedFinding] = useState<string | null>(null);
+  const [findingEvidence, setFindingEvidence] = useState<
+    Record<string, EvidencePacketV1 | null>
+  >({});
   const [message, show] = useTransientMessage(5000);
   const deletedRef = useRef<{ item: Finding; index: number } | null>(null);
   const findingsKey = auditStoreKey(auditId, "findings");
@@ -145,25 +155,56 @@ export function EvidenceView({
     show("Finding restored");
   }
 
+  async function toggleFinding(item: Finding) {
+    if (expandedFinding === item.key) {
+      setExpandedFinding(null);
+      return;
+    }
+    setExpandedFinding(item.key);
+    if (!item.evidenceId || Object.hasOwn(findingEvidence, item.key)) return;
+    try {
+      const stored = await getStored<unknown | null>(
+        `evidence-${item.evidenceId}`,
+        null,
+      );
+      setFindingEvidence((current) => ({
+        ...current,
+        [item.key]: stored ? parseEvidencePacket(stored) : null,
+      }));
+    } catch {
+      setFindingEvidence((current) => ({ ...current, [item.key]: null }));
+    }
+  }
+
   async function exportMarkdown() {
+    const findingSections = findings.map((item, index) => {
+      const section = [
+        `## ${index + 1}. ${item.title}`,
+        "",
+        `- WCAG: ${item.wcag}`,
+        `- Severity: ${item.severity}`,
+        `- Status: ${item.status}`,
+        item.note ? `- Note: ${item.note}` : "",
+      ];
+      const addSection = (heading: string, value?: string) => {
+        if (!value) return;
+        section.push("", `### ${heading}`, "", value);
+      };
+      addSection("Actual result", item.actualResult);
+      addSection("Expected result", item.expectedResult);
+      addSection("User impact", item.userImpact);
+      addSection("Suggested resolution", item.recommendation);
+      if (item.exampleFix) {
+        section.push("", "### Example fix", "", `\`\`\`html\n${item.exampleFix}\n\`\`\``);
+      }
+      return section.filter(Boolean).join("\n");
+    });
     const lines = [
       "# Accessibility findings",
       "",
       `Exported ${new Date().toLocaleDateString()}`,
       "",
-      ...findings.map((item, index) =>
-        [
-          `## ${index + 1}. ${item.title}`,
-          "",
-          `- WCAG: ${item.wcag}`,
-          `- Severity: ${item.severity}`,
-          `- Status: ${item.status}`,
-          item.note ? `- Note: ${item.note}` : "",
-          "",
-        ]
-          .filter(Boolean)
-          .join("\n"),
-      ),
+      ...findingSections,
     ];
     const path = await desktop.invoke<string | null>("dialog:save-text", {
       name: "accessibility-findings.md",
@@ -189,7 +230,7 @@ export function EvidenceView({
   const filteredFindings = useMemo(
     () =>
       findings.filter((item) =>
-        `${item.title} ${item.wcag} ${item.note}`
+        `${item.title} ${item.wcag} ${item.note} ${item.actualResult ?? ""} ${item.userImpact ?? ""} ${item.recommendation ?? ""}`
           .toLowerCase()
           .includes(query.toLowerCase()),
       ),
@@ -315,7 +356,8 @@ export function EvidenceView({
                 <span />
               </div>
               {filteredFindings.map((item) => (
-                <article key={item.key} className="finding-row">
+                <Fragment key={item.key}>
+                <article className={`finding-row ${expandedFinding === item.key ? "finding-row-expanded" : ""}`}>
                   <div>
                     <span
                       className={`severity-marker severity-${item.severity}`}
@@ -323,6 +365,18 @@ export function EvidenceView({
                     <span>
                       <strong>{item.title}</strong>
                       <small>{item.note || "No implementation note"}</small>
+                      {item.schemaVersion === 2 ? (
+                        <button
+                          className="finding-toggle"
+                          aria-expanded={expandedFinding === item.key}
+                          aria-controls={`finding-detail-${item.key}`}
+                          onClick={() => void toggleFinding(item)}
+                        >
+                          <Sparkle size={13} weight="fill" />
+                          {item.source === "ai" ? "AI-assisted evidence" : "Browser evidence"}
+                          <CaretDown size={13} className={expandedFinding === item.key ? "rotated" : ""} />
+                        </button>
+                      ) : null}
                     </span>
                   </div>
                   <code>{item.wcag}</code>
@@ -358,6 +412,59 @@ export function EvidenceView({
                     <Trash size={16} />
                   </button>
                 </article>
+                {item.schemaVersion === 2 && expandedFinding === item.key ? (
+                  <section className="finding-detail" id={`finding-detail-${item.key}`} aria-label={`Details for ${item.title}`}>
+                    <div className="finding-detail-meta">
+                      <span>{item.source === "ai" ? "AI-assisted draft, auditor confirmed" : "Structured browser evidence"}</span>
+                      {item.confidence ? <span className={`finding-confidence finding-confidence-${item.confidence}`}>{item.confidence} confidence</span> : null}
+                    </div>
+                    {findingEvidence[item.key]?.image ? (
+                      <figure className="finding-evidence-preview">
+                        <img
+                          src={findingEvidence[item.key]?.image?.dataUrl}
+                          alt={`Marked browser evidence for ${item.title}`}
+                        />
+                        <figcaption>
+                          <strong>Exact selected region</strong>
+                          <span>
+                            {findingEvidence[item.key]?.target.selector ||
+                              "Selected visual region"}
+                          </span>
+                        </figcaption>
+                      </figure>
+                    ) : null}
+                    <div className="finding-detail-grid">
+                      <div><span>Actual result</span><p>{item.actualResult}</p></div>
+                      <div><span>Expected result</span><p>{item.expectedResult}</p></div>
+                    </div>
+                    <div className="finding-detail-block"><span>User impact</span><p>{item.userImpact}</p></div>
+                    {item.affectedUsers?.length ? (
+                      <div className="finding-user-tags" aria-label="Affected users">
+                        {item.affectedUsers.map((user) => <span key={user}>{user.replaceAll("-", " ")}</span>)}
+                      </div>
+                    ) : null}
+                    {item.wcagMappings?.length ? (
+                      <div className="finding-wcag-list">
+                        {item.wcagMappings.map((mapping) => (
+                          <div key={mapping.criterion}>
+                            <strong>{mapping.criterion} {mapping.name}</strong>
+                            <span>Level {mapping.level} · {mapping.confidence} confidence</span>
+                            <p>{mapping.rationale}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                    <div className="finding-detail-block"><span>Suggested resolution</span><p>{item.recommendation}</p></div>
+                    {item.exampleFix ? <pre><code>{item.exampleFix}</code></pre> : null}
+                    {item.manualChecks?.length ? (
+                      <div className="finding-manual-checks">
+                        <strong>Manual confirmation</strong>
+                        {item.manualChecks.map((check) => <p key={check}>{check}</p>)}
+                      </div>
+                    ) : null}
+                  </section>
+                ) : null}
+                </Fragment>
               ))}
             </>
           ) : (

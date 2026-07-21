@@ -10,6 +10,7 @@ const nextConfig = {
   // (server ends up at standalone/apps/web/server.js; see Dockerfile).
   output: 'standalone',
   outputFileTracingRoot: path.join(__dirname, '../../'),
+  transpilePackages: ['@accessibility-build/audit-contracts'],
   reactStrictMode: true,
   poweredByHeader: false,
   // Keep lint out of the constrained image build, but never publish a bundle
