@@ -269,6 +269,24 @@ export interface Account {
   plan?: string;
 }
 
+export type AiProviderId = "thewcag" | "openai" | "anthropic" | "openrouter";
+export type ApiKeyProviderId = Exclude<AiProviderId, "thewcag">;
+
+export interface AiProviderStatus {
+  id: AiProviderId;
+  configured: boolean;
+  active: boolean;
+  model: string;
+  keyHint?: string;
+  verifiedAt?: number;
+}
+
+export interface AiConfiguration {
+  activeProvider: AiProviderId;
+  secureStorageAvailable: boolean;
+  providers: AiProviderStatus[];
+}
+
 export interface UpdateState {
   status: "idle" | "checking" | "available" | "downloading" | "ready" | "current" | "error";
   version?: string;
@@ -330,6 +348,11 @@ export type InvokeChannel =
   | "auth:sign-in"
   | "auth:sign-out"
   | "auth:account"
+  | "ai:configuration"
+  | "ai:save-provider"
+  | "ai:test-provider"
+  | "ai:remove-provider"
+  | "ai:set-active"
   | "report:publish"
   | "dialog:save-image"
   | "dialog:save-text"

@@ -56,14 +56,14 @@ The capture flow is:
 4. Reopen the popup when the toolbar badge shows `1`, then choose **Review in workspace**.
 5. Inspect the contextual marked screenshot, selector, semantic context, deterministic signals, and the complete bounded payload.
 6. Describe the observed behavior and optional task context. Choose whether the screenshot, element text, and sanitized page address may be included.
-7. Create a local structured draft or, when the paired desktop app is connected and signed in, generate an AI-assisted draft.
+7. Create a local structured draft or, when the paired desktop app is connected, generate an AI-assisted draft with TheWCAG, OpenAI, Claude, or OpenRouter.
 8. Confirm the title, description, actual and expected results, user impact, affected users, severity, WCAG mappings, recommendation, example fix, and reproduction steps before saving into an audit.
 
 | Mode | Available behavior |
 |---|---|
 | Extension only | Element and region capture, marked high-DPI crop, deterministic checks, local persistence, local structured draft, Markdown export, and copy |
 | Extension plus desktop | Lists local audits, saves confirmed findings and evidence into the selected audit, and keeps the device credential outside Chrome |
-| Extension plus signed-in desktop and configured AI | Sends only the user-approved payload through the authenticated desktop process and returns a schema-validated, editable finding draft |
+| Extension plus desktop and configured AI | Sends only the user-approved payload through the selected provider and returns a schema-validated, editable finding draft |
 
 The extension requests temporary `activeTab` access only after a toolbar action. It does not request permanent access to every website. Regular `http` and `https` pages, including localhost, are supported. Chrome-owned pages such as `chrome://settings`, DevTools, the Chrome Web Store, and other protected browser surfaces cannot be inspected by extensions.
 
@@ -124,6 +124,7 @@ Native services live in `apps/desktop/electron/`; the renderer sees only the all
 - Browser evidence is sanitized and retained locally until the auditor explicitly approves generation. The extension can omit its screenshot, element text, or sanitized page address from the approved payload.
 - Form values and passwords are not extracted as semantic fields. The selected screenshot may still contain visible page content, which is why users can inspect and omit it before generation. Cookies, browser storage, authentication headers, network bodies, clipboard contents, browser history, executable page code, URL credentials, query parameters, and fragments are not collected.
 - The desktop device token is stored in macOS Keychain or Windows Credential Manager. Only its SHA-256 hash is stored in Postgres.
+- User-supplied OpenAI, Anthropic, and OpenRouter keys are encrypted by the operating system credential service. Keys remain in the Electron main process, are never returned to the renderer or extension, and are sent only to their selected provider.
 - AI usage records contain operational metadata only. Evidence images, DOM excerpts, observations, and generated content are not written to the web database.
 - Published PNGs and brand logos live in Cloudflare R2. Postgres stores identity, sessions, device records, report metadata, issues, sizes, branding, and view counts.
 - A published image is limited to 4 MB, a report to 100 issue rows, and each user to 1 GiB of stored report images.
@@ -249,7 +250,7 @@ Open the resulting unpacked TheWCAG application once so it registers the per-use
 
 Release builds read the same value from the GitHub Actions repository variable `THEWCAG_EXTENSION_ID`. It must match the published Chrome Web Store extension ID before shipping the paired desktop release.
 
-The website enters the flow only when the desktop needs an authenticated service. Browser sign-in authorizes the device through a state-bound `thewcag://auth` link. The desktop keeps that credential in the operating system's encrypted storage and uses it for approved AI generation, optional report publishing, account checks, and downloads. The extension never receives the credential. See [docs/SITE-INTEGRATION.md](docs/SITE-INTEGRATION.md) for the complete trust boundary.
+The website enters the flow only when the desktop needs a TheWCAG authenticated service. Browser sign-in authorizes the device through a state-bound `thewcag://auth` link. The desktop keeps that credential in the operating system's encrypted storage and uses it for managed AI generation, optional report publishing, and account checks. Bring-your-own-key requests go directly from the desktop main process to OpenAI, Anthropic, or OpenRouter, so they do not require website sign-in. The extension never receives any credential. See [docs/SITE-INTEGRATION.md](docs/SITE-INTEGRATION.md) for the complete trust boundary.
 
 #### Extension troubleshooting
 
@@ -261,7 +262,7 @@ The website enters the flow only when the desktop needs an authenticated service
 | Localhost is reported as unavailable | Reload the latest unpacked build. `http://localhost` and `https://localhost` are treated as regular websites. |
 | The popup closes while selecting | This is expected. Complete the selection, wait for the badge and page confirmation, then reopen the popup to review the stored evidence. |
 | The desktop connector is not found | Rebuild the desktop app with the exact Chrome extension ID, launch it once to register the host, and reconnect from the extension. |
-| AI generation is unavailable | Confirm the desktop app is connected and signed in, then check `OPENAI_API_KEY`, the AI limits, and the web service. A local structured draft remains available. |
+| AI generation is unavailable | Open desktop **Settings → AI authoring**. For TheWCAG, confirm the app is signed in. For OpenAI, Claude, or OpenRouter, save and verify the key, model, and active provider. A local structured draft remains available. |
 
 ### Website without full infrastructure
 
@@ -440,9 +441,10 @@ The application checks the latest GitHub Release manifest and offers an in-app u
 - Desktop renderers use context isolation, Chromium sandboxing, no Node integration, a strict CSP, denied web permissions, blocked navigation and popups, trusted-sender checks, and explicit IPC allowlists.
 - The website removes the framework header and sends content-type, referrer, permissions, and HSTS headers.
 - Device tokens are random 256-bit values, hashed at rest, revocable, and stored in the native credential vault.
+- Bring-your-own AI keys are encrypted with macOS Keychain or Windows credential protection, used only in the Electron main process, and exposed to the renderer only as a four-character hint.
 - The Chrome native host is registered only for the configured extension ID, validates versioned bounded JSON, and keeps bearer credentials inside the desktop process.
 - The Chrome extension uses a popup for capture initiation, temporary `activeTab` access instead of `<all_urls>`, local evidence persistence, bounded extraction, and an optional side panel for detailed review.
-- AI authoring requires explicit payload consent, uses strict structured output validation, and records operational usage without storing evidence or finding content in Postgres.
+- AI authoring requires explicit field-level payload consent and strict local contract validation. Managed requests record operational usage without storing evidence or finding content in Postgres; direct provider requests bypass TheWCAG servers.
 - Public reports use unguessable slugs and are marked `noindex`; possession of the link grants viewing access.
 - Production database migration failures stop server startup instead of leaving a partially functioning service.
 - The web root includes a skip link, semantic landmarks, responsive navigation, and page-level metadata.

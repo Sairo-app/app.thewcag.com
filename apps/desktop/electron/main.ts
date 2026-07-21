@@ -10,6 +10,7 @@ import {
   type Tray,
 } from "electron";
 import { AuthService } from "./services/auth";
+import { AiAuthoringService } from "./services/ai-authoring";
 import { CaptureCoordinator } from "./services/capture-coordinator";
 import { CaptureRepository } from "./services/captures";
 import { ScreenCaptureService } from "./services/screen-capture";
@@ -105,6 +106,7 @@ async function start(): Promise<void> {
   const screenCapture = new ScreenCaptureService();
   const captureCoordinator = new CaptureCoordinator(screenCapture, captures, windows);
   const auth = new AuthService(userData, store);
+  const ai = new AiAuthoringService(userData, auth);
   const notifyError = (error: unknown) => windows.broadcast("notification", { text: error instanceof Error ? error.message : String(error), error: true });
   const settings = new SettingsService(store, {
     inspect: () => void captureCoordinator.begin("pair").catch(notifyError),
@@ -118,7 +120,7 @@ async function start(): Promise<void> {
   const updates = new UpdateService((state) => windows.broadcast("update:state", state));
 
   services = { auth, windows, settings, captureCoordinator };
-  registerIpc({ auth, captureCoordinator, captures, capture: screenCapture, settings, store, updates, windows });
+  registerIpc({ ai, auth, captureCoordinator, captures, capture: screenCapture, settings, store, updates, windows });
 
   protocol.handle("thewcag-asset", async (request) => {
     if (request.method !== "GET") {

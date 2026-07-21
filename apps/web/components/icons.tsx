@@ -101,6 +101,22 @@ export const CropIcon = (p: { size?: number }) => (
   </Icon>
 );
 
+export const SparklesIcon = (p: { size?: number }) => (
+  <Icon {...p}>
+    <path d="m12 3-1.15 3.1a3 3 0 0 1-1.75 1.75L6 9l3.1 1.15a3 3 0 0 1 1.75 1.75L12 15l1.15-3.1a3 3 0 0 1 1.75-1.75L18 9l-3.1-1.15a3 3 0 0 1-1.75-1.75L12 3Z" />
+    <path d="m5 15-.65 1.75a2 2 0 0 1-1.1 1.1L1.5 18.5l1.75.65a2 2 0 0 1 1.1 1.1L5 22l.65-1.75a2 2 0 0 1 1.1-1.1l1.75-.65-1.75-.65a2 2 0 0 1-1.1-1.1L5 15Z" />
+    <path d="m19 14-.55 1.45a2 2 0 0 1-.9.9L16 17l1.55.65a2 2 0 0 1 .9.9L19 20l.55-1.45a2 2 0 0 1 .9-.9L22 17l-1.55-.65a2 2 0 0 1-.9-.9L19 14Z" />
+  </Icon>
+);
+
+export const FileCheckIcon = (p: { size?: number }) => (
+  <Icon {...p}>
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+    <path d="M14 2v6h6" />
+    <path d="m9 15 2 2 4-4" />
+  </Icon>
+);
+
 export const BookIcon = (p: { size?: number }) => (
   <Icon {...p}>
     <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />

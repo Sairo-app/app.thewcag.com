@@ -139,19 +139,32 @@ function systemInstructions(): string {
 }
 
 function evidenceText(evidence: EvidencePacketV1): string {
+  const includeElementText = evidence.consent?.includeElementText === true;
+  const includeUrl = evidence.consent?.includeUrl === true;
   return JSON.stringify({
     observation: evidence.observation,
     taskContext: evidence.taskContext,
     page: {
       title: evidence.page.title,
-      url: evidence.page.url,
+      url: includeUrl ? evidence.page.url : "Withheld by auditor",
       locale: evidence.page.locale,
       viewport: evidence.page.viewport,
     },
-    target: evidence.target,
+    target: includeElementText ? evidence.target : {
+      kind: evidence.target.kind,
+      tagName: evidence.target.tagName,
+      role: evidence.target.role,
+      selector: evidence.target.selector,
+      structuralPath: evidence.target.structuralPath,
+      bounds: evidence.target.bounds,
+      marker: evidence.target.marker,
+      states: evidence.target.states,
+      attributeNames: Object.keys(evidence.target.attributes),
+      styles: evidence.target.styles,
+      elementText: "Withheld by auditor",
+    },
     deterministicChecks: evidence.checks,
     omissions: evidence.omissions,
-    consent: evidence.consent,
   });
 }
 

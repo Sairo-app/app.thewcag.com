@@ -1,5 +1,8 @@
 import type {
   Account,
+  AiConfiguration,
+  AiProviderId,
+  ApiKeyProviderId,
   AppSettings,
   CaptureEntry,
   DesktopEvent,
@@ -7,6 +10,18 @@ import type {
   PlatformInfo,
   UpdateState,
 } from "../shared/desktop";
+
+const AI_DEFAULT_MODELS: Record<AiProviderId, string> = {
+  thewcag: "Managed automatically",
+  openai: "gpt-5.6",
+  anthropic: "claude-sonnet-4-6",
+  openrouter: "anthropic/claude-sonnet-4.6",
+};
+
+interface PreviewAiState {
+  activeProvider: AiProviderId;
+  providers: Partial<Record<ApiKeyProviderId, { model: string; verifiedAt?: number }>>;
+}
 
 const DEFAULT_SETTINGS: AppSettings = {
   shortcuts: {
@@ -50,6 +65,38 @@ function setLocal(key: string, json: string): void {
   try { localStorage.setItem(`thewcag:${key}`, json); } catch { /* preview storage is best effort */ }
 }
 
+function previewAiState(): PreviewAiState {
+  try {
+    const saved = JSON.parse(getLocal("ai-provider-settings") ?? "{}") as Partial<PreviewAiState>;
+    return {
+      activeProvider: ["thewcag", "openai", "anthropic", "openrouter"].includes(saved.activeProvider ?? "")
+        ? saved.activeProvider as AiProviderId
+        : "thewcag",
+      providers: saved.providers ?? {},
+    };
+  } catch {
+    return { activeProvider: "thewcag", providers: {} };
+  }
+}
+
+function previewAiConfiguration(state = previewAiState()): AiConfiguration {
+  return {
+    activeProvider: state.activeProvider,
+    secureStorageAvailable: true,
+    providers: (["thewcag", "openai", "anthropic", "openrouter"] as const).map((id) => {
+      const saved = id === "thewcag" ? undefined : state.providers[id];
+      return {
+        id,
+        configured: id === "thewcag" || Boolean(saved),
+        active: id === state.activeProvider,
+        model: saved?.model ?? AI_DEFAULT_MODELS[id],
+        keyHint: saved ? "••••demo" : undefined,
+        verifiedAt: saved?.verifiedAt,
+      };
+    }),
+  };
+}
+
 async function previewInvoke<T>(channel: InvokeChannel, payload?: unknown): Promise<T> {
   const value = (payload ?? {}) as Record<string, unknown>;
   switch (channel) {
@@ -85,6 +132,42 @@ async function previewInvoke<T>(channel: InvokeChannel, payload?: unknown): Prom
     case "screen:permission":
     case "screen:request-permission": return "granted" as T;
     case "auth:account": return { signedIn: false } satisfies Account as T;
+    case "ai:configuration": return previewAiConfiguration() as T;
+    case "ai:save-provider": {
+      const provider = String(value.provider) as ApiKeyProviderId;
+      if (!["openai", "anthropic", "openrouter"].includes(provider)) throw new Error("Choose a supported AI provider");
+      const state = previewAiState();
+      if (!String(value.apiKey ?? "").trim() && !state.providers[provider]) throw new Error("Enter an API key before saving");
+      const model = String(value.model ?? "").trim();
+      if (!model) throw new Error("Enter a model name");
+      state.providers[provider] = { model };
+      setLocal("ai-provider-settings", JSON.stringify(state));
+      return previewAiConfiguration(state) as T;
+    }
+    case "ai:test-provider": {
+      const provider = String(value.provider) as ApiKeyProviderId;
+      const state = previewAiState();
+      if (!state.providers[provider]) throw new Error("Save this provider before testing it");
+      state.providers[provider] = { ...state.providers[provider], verifiedAt: Date.now() };
+      setLocal("ai-provider-settings", JSON.stringify(state));
+      return previewAiConfiguration(state) as T;
+    }
+    case "ai:remove-provider": {
+      const provider = String(value.provider) as ApiKeyProviderId;
+      const state = previewAiState();
+      delete state.providers[provider];
+      if (state.activeProvider === provider) state.activeProvider = "thewcag";
+      setLocal("ai-provider-settings", JSON.stringify(state));
+      return previewAiConfiguration(state) as T;
+    }
+    case "ai:set-active": {
+      const provider = String(value.provider) as AiProviderId;
+      const state = previewAiState();
+      if (provider !== "thewcag" && !state.providers[provider]) throw new Error("Save this provider before using it for authoring");
+      state.activeProvider = provider;
+      setLocal("ai-provider-settings", JSON.stringify(state));
+      return previewAiConfiguration(state) as T;
+    }
     case "report:publish": return `https://app.thewcag.com/s/preview-${Date.now().toString(36)}` as T;
     case "update:check": return { status: "current", message: "Preview build" } satisfies UpdateState as T;
     case "clipboard:write-text": await navigator.clipboard?.writeText(String(value.text ?? "")); return undefined as T;

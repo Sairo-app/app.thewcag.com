@@ -95,6 +95,23 @@ describe("AI finding provider", () => {
     expect(withImage.input[0].content).toContainEqual(expect.objectContaining({ type: "input_image" }));
   });
 
+  it("omits the page address and element text when the auditor withholds them", () => {
+    const withheld = evidence(false);
+    withheld.page.url = "https://private.example/customer/42";
+    withheld.target.accessibleName = "Private customer action";
+    withheld.target.domExcerpt = "<button>Private customer action</button>";
+    withheld.consent = {
+      ...withheld.consent!,
+      includeUrl: false,
+      includeElementText: false,
+    };
+    const request = buildOpenAiFindingRequest(withheld, "safe-id");
+    const serialized = JSON.stringify(request);
+    expect(serialized).not.toContain("private.example");
+    expect(serialized).not.toContain("Private customer action");
+    expect(serialized).toContain("Withheld by auditor");
+  });
+
   it("normalizes model WCAG names and levels against the versioned catalog", async () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify({
       output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(providerFinding) }] }],

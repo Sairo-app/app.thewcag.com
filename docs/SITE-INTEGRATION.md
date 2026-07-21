@@ -6,7 +6,8 @@ TheWCAG ships one product across three deliberately separated surfaces:
   and semantic evidence capture, payload review, and draft editing.
 - The Electron app owns local screen capture, contrast inspection, annotation,
   audit state, browser-evidence persistence, the native extension bridge, the
-  vision lens, native shortcuts, encrypted device credentials, and offline work.
+  vision lens, native shortcuts, encrypted device and AI-provider credentials,
+  provider selection, and offline work.
 - The Next.js service owns browser authentication, device authorization,
   authorized AI generation, report publishing, account administration, public
   report links, and the platform download redirect.
@@ -30,15 +31,17 @@ with the service over HTTPS only when a connected feature is requested.
    account bearer token to Chrome.
 
 If the desktop app is unavailable, the extension still captures evidence and can
-create a local structured draft. Audit persistence and authenticated AI drafting
-require the desktop connection.
+create a local structured draft. Audit persistence and all provider-backed AI
+drafting require the desktop connection.
 
 ### Desktop to website
 
 The desktop contacts `app.thewcag.com` over HTTPS for device authorization,
-entitlement checks, AI generation, report publishing, and release downloads. The
+entitlement checks, managed AI generation, report publishing, and release
+downloads. When OpenAI, Claude, or OpenRouter is active, the Electron main process
+contacts that provider directly and the website is not in the request path. The
 website is not involved in local extension capture, native messaging, audit
-storage, or offline exports.
+storage, bring-your-own-key requests, or offline exports.
 
 ## Authentication
 
@@ -52,7 +55,8 @@ storage, or offline exports.
    account and administrative surfaces.
 
 Renderer code never receives native credential-vault access. The allowlisted
-preload bridge exposes only the account operations required by the UI.
+preload bridge exposes only account operations and redacted provider status. A
+saved AI key can be replaced, verified, selected, or removed, but never read back.
 
 ## Report publishing
 
@@ -69,16 +73,23 @@ objects.
 ## AI-assisted finding drafts
 
 The extension first shows the exact screenshot, element text, and sanitized page
-address that could be sent. The auditor can withhold any section and must approve
-the payload explicitly. The extension sends the bounded evidence packet to the
-desktop native host. The desktop adds its encrypted device credential and posts
-the request to `POST /api/device/ai/findings`.
+address that could be sent. The auditor can withhold each section independently
+and must approve the payload explicitly. The extension sends the bounded evidence
+packet to the desktop native host, which uses the provider selected in Settings:
 
-The service validates consent, account limits, input bounds, the WCAG reference
-set, and the provider's structured response. It records operational usage only,
-not screenshots, DOM excerpts, observations, or generated finding content. The
-draft returns through the desktop to the extension for human review. Nothing is
-saved as a finding until the auditor confirms it.
+- **TheWCAG managed** adds the encrypted device credential and posts to
+  `POST /api/device/ai/findings`. The service enforces account limits and records
+  operational usage only, not evidence or generated content.
+- **OpenAI** calls the Responses API directly with the user's encrypted key.
+- **Claude** calls Anthropic's Messages API directly with the user's encrypted key.
+- **OpenRouter** calls its chat-completions API directly with the user's encrypted key.
+
+All paths use a constrained JSON schema, replace model-supplied WCAG names and
+levels with the versioned local catalog, and validate the complete draft against
+the shared audit contract. Withheld screenshots, element text, and page addresses
+are omitted before the request is built. The editable draft returns through the
+desktop to the extension for human review. Nothing is saved as a finding until the
+auditor confirms it.
 
 ## Downloads and updates
 
@@ -118,6 +129,8 @@ download route keeps the website independent of application bundle size.
 - The native host accepts only the configured extension ID and never returns the
   desktop bearer token.
 - Device tokens never enter localStorage, renderer logs, or report payloads.
+- AI-provider keys never enter localStorage, the extension, report payloads, or
+  renderer-facing configuration. At rest they are an encrypted, mode-`0600` file.
 - Browser navigation and popups are blocked in Electron; external HTTPS links use
   the system browser.
 - Renderers use the Chromium sandbox, context isolation, no Node integration, and

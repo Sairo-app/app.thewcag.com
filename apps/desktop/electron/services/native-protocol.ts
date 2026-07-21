@@ -8,12 +8,12 @@ import {
   type NativeResponseV1,
 } from "@accessibility-build/audit-contracts";
 import type { AuditActivity, AuditProject, Finding } from "../../src/shared/desktop";
-import type { AuthService } from "./auth";
+import type { AiAuthoringService } from "./ai-authoring";
 import type { JsonStore } from "./store";
 
 interface NativeProtocolServices {
   store: Pick<JsonStore, "get" | "set" | "addFindings" | "remove">;
-  auth: Pick<AuthService, "generateFinding">;
+  ai: Pick<AiAuthoringService, "generateFinding">;
   appVersion: string;
 }
 
@@ -176,7 +176,7 @@ export async function handleNativeRequest(
 
   if (request.type === "finding:generate") {
     try {
-      const draft = await services.auth.generateFinding(request.evidence);
+      const draft = await services.ai.generateFinding(request.evidence);
       return {
         protocolVersion: NATIVE_PROTOCOL_VERSION,
         requestId: request.requestId,

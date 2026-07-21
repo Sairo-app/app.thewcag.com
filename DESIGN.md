@@ -19,7 +19,9 @@ Design dials:
 - Body: `oklch(0.41 0.025 255)`
 - Muted: `oklch(0.49 0.022 255)`
 - Line: `oklch(0.865 0.014 250)`
-- Orange: `oklch(0.66 0.19 39)`
+- Orange action surface: `oklch(0.52 0.18 42)`
+- Orange hover surface: `oklch(0.47 0.17 40)`
+- Cream on orange: `oklch(0.98 0.014 85)`
 - Accessible orange text: `oklch(0.47 0.17 38)`
 - Success: `oklch(0.46 0.12 160)`
 - Danger: `oklch(0.48 0.18 27)`
@@ -60,7 +62,7 @@ A solid, quiet navigation rail with the wordmark on the left, four primary links
 
 ### Buttons
 
-- Primary: orange fill with dark ink text.
+- Primary: deep orange fill with cream text. The pairing must remain at or above 4.5:1 contrast in normal and hover states.
 - Secondary: transparent or white surface with a visible neutral border.
 - Dark: ink fill with off-white text, used sparingly.
 - Press feedback scales to 0.98 for 120ms.

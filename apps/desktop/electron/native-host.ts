@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { NATIVE_PROTOCOL_VERSION, type NativeResponseV1 } from "@accessibility-build/audit-contracts";
 import { AuthService } from "./services/auth";
+import { AiAuthoringService } from "./services/ai-authoring";
 import { JsonStore } from "./services/store";
 import { handleNativeRequest } from "./services/native-protocol";
 import { configuredExtensionId } from "./native-host-registration";
@@ -74,7 +75,8 @@ export async function runNativeHost(origin: string): Promise<void> {
     const store = new JsonStore(userData);
     await store.initialize();
     const auth = new AuthService(userData, store);
-    const response = await handleNativeRequest(raw, { store, auth, appVersion: app.getVersion() });
+    const ai = new AiAuthoringService(userData, auth);
+    const response = await handleNativeRequest(raw, { store, ai, appVersion: app.getVersion() });
     await writeNativeMessage(response);
     app.exit(response.ok ? 0 : 1);
   } catch (error) {

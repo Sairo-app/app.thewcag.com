@@ -109,7 +109,7 @@ describe("native extension protocol", () => {
       type: "audits:list",
     }, {
       store: { get, set: vi.fn(), addFindings: vi.fn(), remove: vi.fn() },
-      auth: { generateFinding: vi.fn() },
+      ai: { generateFinding: vi.fn() },
       appVersion: "3.0.0",
     });
     expect(response).toEqual(expect.objectContaining({ ok: true, type: "audits:list" }));
@@ -120,7 +120,7 @@ describe("native extension protocol", () => {
     const generateFinding = vi.fn();
     const response = await handleNativeRequest({ type: "finding:generate" }, {
       store: { get: vi.fn(), set: vi.fn(), addFindings: vi.fn(), remove: vi.fn() },
-      auth: { generateFinding },
+      ai: { generateFinding },
       appVersion: "3.0.0",
     });
     expect(response).toEqual(expect.objectContaining({ ok: false, code: "version-mismatch" }));
@@ -154,7 +154,7 @@ describe("native extension protocol", () => {
       draft: draft(),
     }, {
       store: { get, set, addFindings, remove: vi.fn() },
-      auth: { generateFinding: vi.fn() },
+      ai: { generateFinding: vi.fn() },
       appVersion: "3.0.0",
     });
     expect(response).toEqual(expect.objectContaining({

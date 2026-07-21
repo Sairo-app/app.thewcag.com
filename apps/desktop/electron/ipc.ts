@@ -12,6 +12,7 @@ import type {
 } from "../src/shared/desktop";
 import { assertTrustedSender, safeExternalUrl } from "./security";
 import type { AuthService } from "./services/auth";
+import type { AiAuthoringService } from "./services/ai-authoring";
 import type { CaptureCoordinator } from "./services/capture-coordinator";
 import type { CaptureRepository } from "./services/captures";
 import type { ScreenCaptureService } from "./services/screen-capture";
@@ -21,6 +22,7 @@ import type { UpdateService } from "./services/updater";
 import type { WindowManager } from "./windows";
 
 interface Services {
+  ai: AiAuthoringService;
   auth: AuthService;
   captureCoordinator: CaptureCoordinator;
   captures: CaptureRepository;
@@ -249,6 +251,11 @@ export function registerIpc(services: Services): void {
     services.windows.broadcast("account:changed", null);
   });
   register("auth:account", () => services.auth.getAccount());
+  register("ai:configuration", () => services.ai.configuration());
+  register("ai:save-provider", (_event, payload) => services.ai.saveProvider(payload));
+  register("ai:test-provider", (_event, payload) => services.ai.testProvider(payload));
+  register("ai:remove-provider", (_event, payload) => services.ai.removeProvider(payload));
+  register("ai:set-active", (_event, payload) => services.ai.setActive(payload));
   register("report:publish", (_event, payload) => services.auth.publish(payload));
 
   register("dialog:save-image", async (event, payload) => {

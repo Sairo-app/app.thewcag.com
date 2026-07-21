@@ -120,37 +120,37 @@ export default function Home() {
             <div className="home-hero__intro">
               <div className="home-hero__copy">
                 <h1 id="home-heading">
-                  <span>Find the barrier.</span>
-                  <span>Keep the proof.</span>
+                  <span>Capture.</span>
+                  <span>Review.</span>
+                  <span>Deliver.</span>
                 </h1>
-              </div>
-              <div className="home-hero__support">
                 <p>
-                  Inspect any rendered interface, capture the exact failure, and turn it into clear WCAG evidence from one local desktop workspace.
+                  Capture browser and desktop evidence, draft complete findings with your preferred AI provider, review every WCAG decision, and deliver a report from one local-first workspace.
                 </p>
                 <div className="home-actions">
                   <Link href="/download" className="button button--primary">
-                    Download free <ArrowRightIcon size={16} />
+                    Download desktop app <ArrowRightIcon size={16} />
                   </Link>
                   <Link href="#workflow" className="button button--secondary">
-                    See the workflow
+                    Explore the workflow
                   </Link>
                 </div>
+                <p className="home-hero__product-line">macOS and Windows + Chrome extension + bring your own AI key</p>
               </div>
-            </div>
 
-            <div className="home-hero__stage">
-              <AuditPlayground />
+              <div className="home-hero__stage">
+                <AuditPlayground />
+              </div>
             </div>
           </div>
         </section>
 
         <aside className="home-proof" aria-label="Product facts">
           <div className="home-shell home-proof__inner">
-            <span>Local-first captures</span>
-            <span>Chrome evidence capture</span>
-            <span>macOS and Windows</span>
-            <span>WCAG 2.2 A and AA</span>
+            <span>Context-rich capture</span>
+            <span>AI-assisted finding drafts</span>
+            <span>WCAG 2.2 audit workspace</span>
+            <span>Export and controlled publishing</span>
           </div>
         </aside>
 

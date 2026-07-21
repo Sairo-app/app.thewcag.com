@@ -1,138 +1,202 @@
 "use client";
 
 import { useId, useState } from "react";
-import { CheckIcon, ImageIcon } from "@/components/icons";
+import {
+  BookIcon,
+  CheckIcon,
+  CropIcon,
+  FileCheckIcon,
+  ImageIcon,
+  SparklesIcon,
+} from "@/components/icons";
 
-const MODES = ["Contrast", "Evidence", "Vision"] as const;
-type Mode = (typeof MODES)[number];
+const MODES = [
+  { id: "Capture", label: "Capture", icon: CropIcon },
+  { id: "Draft", label: "AI draft", icon: SparklesIcon },
+  { id: "Review", label: "Review", icon: BookIcon },
+  { id: "Deliver", label: "Deliver", icon: FileCheckIcon },
+] as const;
 
-function ContrastPanel() {
+type Mode = (typeof MODES)[number]["id"];
+
+function CapturePanel() {
   return (
-    <div className="audit-playground__contrast">
-      <div className="audit-playground__swatches" aria-hidden="true">
-        <div className="audit-playground__swatch audit-playground__swatch--dark">
-          <b>Aa</b><span>#24261F</span>
+    <div className="hero-workspace__capture">
+      <div className="hero-workspace__browser" aria-hidden="true">
+        <div className="hero-workspace__address">
+          <span>checkout.example</span>
+          <strong>/ payment</strong>
         </div>
-        <div className="audit-playground__swatch audit-playground__swatch--light">
-          <b>Aa</b><span>#F5F1E8</span>
+        <div className="hero-workspace__page">
+          <span className="hero-workspace__page-label">Payment details</span>
+          <strong>Complete your order</strong>
+          <span className="hero-workspace__field-label">Cardholder name</span>
+          <span className="hero-workspace__field">Alex Morgan</span>
+          <span className="hero-workspace__target-label">button</span>
+          <span className="hero-workspace__target">Continue to payment</span>
         </div>
       </div>
-      <div className="audit-playground__result">
+
+      <div className="hero-workspace__inspector">
+        <span className="hero-workspace__section-label"><ImageIcon size={13} /> Browser evidence</span>
+        <strong>Continue to payment</strong>
+        <dl>
+          <div><dt>Role</dt><dd>button</dd></div>
+          <div><dt>Name</dt><dd>Continue to payment</dd></div>
+          <div><dt>State</dt><dd>Focused</dd></div>
+        </dl>
+        <span className="hero-workspace__confirmed"><CheckIcon size={13} /> Visual and semantic context attached</span>
+      </div>
+    </div>
+  );
+}
+
+function DraftPanel() {
+  return (
+    <div className="hero-workspace__document">
+      <div className="hero-workspace__document-head">
         <div>
-          <span className="audit-playground__label">Contrast ratio</span>
-          <strong>12.78<small>:1</small></strong>
+          <span className="hero-workspace__section-label"><SparklesIcon size={13} /> Finding draft</span>
+          <strong>Visible focus is obscured by the sticky footer</strong>
         </div>
-        <div className="audit-playground__badges" aria-label="Passes WCAG AA and AAA">
-          <span><CheckIcon size={12} /> AA pass</span>
-          <span><CheckIcon size={12} /> AAA pass</span>
+        <span className="hero-workspace__provider">Your AI provider</span>
+      </div>
+      <div className="hero-workspace__document-grid">
+        <div>
+          <span>Actual result</span>
+          <p>The payment button receives focus, but its indicator is partially hidden by the persistent footer.</p>
+        </div>
+        <div>
+          <span>Expected result</span>
+          <p>The complete focus indicator remains visible while the control has keyboard focus.</p>
+        </div>
+        <div>
+          <span>Suggested resolution</span>
+          <p>Reserve space for the focused control or move the sticky footer so it cannot overlap the indicator.</p>
+        </div>
+        <div>
+          <span>WCAG mapping</span>
+          <p><strong>2.4.11</strong> Focus Not Obscured (Minimum)</p>
         </div>
       </div>
-      <p className="audit-playground__hint">Sampled from the real screen, not reconstructed from CSS.</p>
+      <p className="hero-workspace__note">Every field stays editable before it becomes part of the audit.</p>
     </div>
   );
 }
 
-function EvidencePanel() {
+function ReviewPanel() {
   return (
-    <div className="audit-playground__evidence">
-      <div className="audit-playground__capture" aria-hidden="true">
-        <div className="audit-playground__capture-bar"><ImageIcon size={13} /><span>checkout / payment</span></div>
-        <div className="audit-playground__capture-body">
-          <span className="audit-playground__mock-title" />
-          <span className="audit-playground__mock-line" />
-          <span className="audit-playground__mock-line audit-playground__mock-line--short" />
-          <span className="audit-playground__annotation">1</span>
-          <span className="audit-playground__focus-outline" />
-          <span className="audit-playground__mock-button">Continue</span>
-        </div>
+    <div className="hero-workspace__review">
+      <div className="hero-workspace__review-main">
+        <span className="hero-workspace__section-label"><BookIcon size={13} /> Auditor review</span>
+        <strong>Confirm the decision, not just the wording.</strong>
+        <ul>
+          <li><CheckIcon size={14} /><span><b>Evidence</b> Screenshot and browser semantics are attached.</span></li>
+          <li><CheckIcon size={14} /><span><b>Traceability</b> WCAG 2.4.11 is mapped to the finding.</span></li>
+          <li><CheckIcon size={14} /><span><b>Affected users</b> Keyboard and switch control users.</span></li>
+          <li><CheckIcon size={14} /><span><b>Retest path</b> Reproduction steps are ready.</span></li>
+        </ul>
       </div>
-      <div className="audit-playground__finding">
-        <span className="audit-playground__label">Finding 01</span>
-        <strong>Focus indicator is obscured</strong>
-        <p>WCAG 2.4.11, Focus Not Obscured (Minimum)</p>
-        <div><span>Major</span><span>Open</span></div>
+      <div className="hero-workspace__decision">
+        <span>Severity</span>
+        <strong>Major</strong>
+        <span>Status</span>
+        <strong>Ready for review</strong>
+        <span>Owner</span>
+        <strong>Checkout team</strong>
       </div>
     </div>
   );
 }
 
-function VisionPanel() {
+function DeliverPanel() {
   return (
-    <div className="audit-playground__vision">
-      <div className="audit-playground__vision-card audit-playground__vision-card--source">
-        <span className="audit-playground__label">Original</span>
-        <div aria-hidden="true"><i /><i /><i /><i /></div>
+    <div className="hero-workspace__deliver">
+      <div className="hero-workspace__report-mark"><FileCheckIcon size={28} /></div>
+      <div className="hero-workspace__report-copy">
+        <span className="hero-workspace__section-label">Audit delivery</span>
+        <strong>Checkout accessibility audit</strong>
+        <p>A clear handoff with approved findings, evidence, WCAG mapping, remediation guidance, and retest history.</p>
       </div>
-      <span className="audit-playground__vision-arrow" aria-hidden="true">→</span>
-      <div className="audit-playground__vision-card audit-playground__vision-card--simulated">
-        <span className="audit-playground__label">Deuteranopia</span>
-        <div aria-hidden="true"><i /><i /><i /><i /></div>
+      <div className="hero-workspace__delivery-options">
+        <span><CheckIcon size={14} /> Export a portable audit</span>
+        <span><CheckIcon size={14} /> Publish only when approved</span>
+        <span><CheckIcon size={14} /> Keep local work private</span>
       </div>
-      <p>Move a live lens across any application and catch meaning that disappears with color.</p>
     </div>
   );
 }
 
 export function AuditPlayground() {
-  const [mode, setMode] = useState<Mode>("Contrast");
+  const [mode, setMode] = useState<Mode>("Capture");
   const id = useId();
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
     event.preventDefault();
-    const current = MODES.indexOf(mode);
+    const current = MODES.findIndex((item) => item.id === mode);
     const next = event.key === "Home"
       ? 0
       : event.key === "End"
         ? MODES.length - 1
-        : (current + (event.key === "ArrowRight" ? 1 : -1) + MODES.length) % MODES.length;
-    setMode(MODES[next]);
+        : (current + (["ArrowRight", "ArrowDown"].includes(event.key) ? 1 : -1) + MODES.length) % MODES.length;
+    const nextMode = MODES[next];
+    setMode(nextMode.id);
     const tabs = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("[role='tab']");
     tabs?.[next]?.focus();
   }
 
   return (
-    <div className="audit-playground" aria-label="Interactive preview of TheWCAG desktop tools">
-      <div className="audit-playground__chrome">
-        <div className="audit-playground__title">
-          <span className="audit-playground__mark" aria-hidden="true">W</span>
-          <div><strong>Live screen audit</strong><small>TheWCAG desktop workspace</small></div>
+    <div className="hero-workspace" aria-label="Explore the connected TheWCAG audit workflow">
+      <div className="hero-workspace__chrome">
+        <div className="hero-workspace__brand">
+          <span aria-hidden="true">W</span>
+          <div><strong>TheWCAG</strong><small>Checkout accessibility audit</small></div>
         </div>
-        <span className="audit-playground__local"><CheckIcon size={12} /> Local</span>
+        <span className="hero-workspace__local"><CheckIcon size={12} /> Local audit</span>
       </div>
 
-      <div className="audit-playground__tabs" role="tablist" aria-label="Preview a desktop tool">
-        {MODES.map((item) => (
-          <button
-            key={item}
-            id={`${id}-${item}-tab`}
-            type="button"
-            role="tab"
-            aria-selected={mode === item}
-            aria-controls={`${id}-${item}-panel`}
-            tabIndex={mode === item ? 0 : -1}
-            onClick={() => setMode(item)}
-            onKeyDown={handleKeyDown}
-          >
-            {item}
-          </button>
-        ))}
+      <div className="hero-workspace__body">
+        <div className="hero-workspace__tabs" role="tablist" aria-label="Audit workflow stages">
+          {MODES.map((item, index) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                id={`${id}-${item.id}-tab`}
+                type="button"
+                role="tab"
+                aria-selected={mode === item.id}
+                aria-controls={`${id}-${item.id}-panel`}
+                tabIndex={mode === item.id ? 0 : -1}
+                onClick={() => setMode(item.id)}
+                onKeyDown={handleKeyDown}
+              >
+                <span className="hero-workspace__step">{String(index + 1).padStart(2, "0")}</span>
+                <Icon size={16} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div
+          id={`${id}-${mode}-panel`}
+          className="hero-workspace__panel"
+          role="tabpanel"
+          aria-labelledby={`${id}-${mode}-tab`}
+        >
+          {mode === "Capture" && <CapturePanel />}
+          {mode === "Draft" && <DraftPanel />}
+          {mode === "Review" && <ReviewPanel />}
+          {mode === "Deliver" && <DeliverPanel />}
+        </div>
       </div>
 
-      <div
-        id={`${id}-${mode}-panel`}
-        className="audit-playground__panel"
-        role="tabpanel"
-        aria-labelledby={`${id}-${mode}-tab`}
-      >
-        {mode === "Contrast" && <ContrastPanel />}
-        {mode === "Evidence" && <EvidencePanel />}
-        {mode === "Vision" && <VisionPanel />}
-      </div>
-
-      <div className="audit-playground__status">
-        <span><kbd>⌘⇧C</kbd> Capture anywhere</span>
-        <span>WCAG 2.2 AA</span>
+      <div className="hero-workspace__footer">
+        <span>Browser context intact</span>
+        <span>Provider controlled by you</span>
+        <span>Publish only when ready</span>
       </div>
     </div>
   );
