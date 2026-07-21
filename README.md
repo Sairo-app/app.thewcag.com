@@ -77,7 +77,7 @@ The desktop application uses one React bundle for multiple sandboxed Electron wi
 - `annotate`: re-editable screenshot editor with keyboard-accessible annotation selection and a handoff into report review.
 - `lens`: live color-vision and low-vision simulation.
 
-Native services live in `apps/desktop/electron/`; the renderer sees only the allowlisted API exposed by `electron/preload.ts`. Context isolation, sandboxing, navigation blocking, CSP, sender validation, permission denial, bounded payload validation, ASAR packaging, hardened runtime, and signed updates form the desktop trust boundary. Electron is the repository's only desktop runtime. A bounded one-time importer preserves local data created by earlier desktop releases.
+Native services live in `apps/desktop/electron/`; the renderer sees only the allowlisted API exposed by `electron/preload.ts`. Context isolation, sandboxing, navigation blocking, CSP, sender validation, permission denial, bounded payload validation, ASAR packaging, hardened runtime, signed and notarized macOS releases, and integrity-checked updates form the desktop trust boundary. Electron is the repository's only desktop runtime. A bounded one-time importer preserves local data created by earlier desktop releases.
 
 ### Data and trust boundaries
 
@@ -311,11 +311,11 @@ git tag v2.4.1
 git push origin v2.4.1
 ```
 
-The release workflow first rejects a tag that does not exactly match the desktop package version and refuses to publish unless all mandatory Apple and Windows signing credentials are present. It then:
+The release workflow first rejects a tag that does not exactly match the desktop package version and refuses to publish unless all mandatory Apple signing and notarization credentials are present. It then:
 
 1. Runs the quality gate.
 2. Builds, signs, notarizes, and staples a universal macOS app and DMG for Apple Silicon and Intel.
-3. Imports the Windows PFX and builds an Authenticode-signed NSIS installer.
+3. Builds an unsigned Windows NSIS installer. Windows may show an Unknown Publisher or SmartScreen warning until Authenticode signing is added.
 4. Generates electron-updater metadata and differential blockmaps for macOS and Windows.
 5. Publishes the installers, update archives, blockmaps, and platform manifests to one immutable GitHub Release.
 

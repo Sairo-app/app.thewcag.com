@@ -58,8 +58,9 @@ Keep desktop, web, shared math, documentation, and release behavior aligned.
 ## Release invariants
 
 - The release tag must exactly match `apps/desktop/package.json`.
-- Production releases require Apple Developer ID signing and notarization plus
-  Windows Authenticode signing. Never publish unsigned fallbacks.
+- Production releases require Apple Developer ID signing and notarization.
+  Windows installers are published unsigned and must be identified honestly in
+  release notes until a CI-compatible Authenticode service is adopted.
 - GitHub Releases is the only installer and update source. Require DMG, universal
   ZIP, NSIS EXE, blockmaps, `latest-mac.yml`, `latest.yml`, and checksums.
 - Native icons are generated from `apps/web/public/logo.png` with

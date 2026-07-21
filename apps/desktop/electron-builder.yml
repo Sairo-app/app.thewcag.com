@@ -70,7 +70,10 @@ win:
       arch:
         - x64
   icon: resources/icon.ico
-  verifyUpdateCodeSignature: true
+  # Windows releases are intentionally unsigned until a CI-compatible signing
+  # service is adopted. Update artifacts remain protected by the SHA-512 values
+  # generated in latest.yml and are served from the canonical GitHub release.
+  verifyUpdateCodeSignature: false
 
 nsis:
   oneClick: false

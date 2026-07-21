@@ -21,21 +21,19 @@ jobs:
       APPLE_ID: ${{ secrets.APPLE_ID }}
       APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
-      WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
     steps:
       - uses: actions/checkout@v7
       - name: Require release tag to match desktop version
         run: node scripts/validate-release-version.mjs "${GITHUB_REF_NAME}"
-      - name: Require production signing credentials
+      - name: Require macOS signing and notarization credentials
         shell: bash
         run: |
           missing=()
-          for name in MAC_CERTIFICATE MAC_CERTIFICATE_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID WINDOWS_CERTIFICATE WINDOWS_CERTIFICATE_PASSWORD; do
+          for name in MAC_CERTIFICATE MAC_CERTIFICATE_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
             if [ -z "${!name}" ]; then missing+=("$name"); fi
           done
           if [ "${#missing[@]}" -gt 0 ]; then
-            echo "Production release blocked. Missing signing secrets: ${missing[*]}"
+            echo "Production release blocked. Missing Apple signing secrets: ${missing[*]}"
             exit 1
           fi
 
@@ -94,11 +92,10 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Build and Authenticode-sign Windows installer
+      - name: Build unsigned Windows installer
         working-directory: apps/desktop
         env:
-          CSC_LINK: ${{ secrets.WINDOWS_CERTIFICATE }}
-          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: pnpm build && pnpm exec electron-builder --win --x64 --publish never
       - name: Upload Windows installer and updater metadata
         uses: actions/upload-artifact@v7
@@ -130,7 +127,7 @@ jobs:
         working-directory: release-files
         shell: bash
         run: shasum -a 256 * > SHA256SUMS.txt
-      - name: Publish signed Electron release
+      - name: Publish Electron release
         uses: softprops/action-gh-release@v3
         with:
           name: TheWCAG ${{ github.ref_name }}
@@ -139,7 +136,7 @@ jobs:
           body: |
             Electron release for macOS and Windows.
 
-            macOS includes a signed and notarized universal DMG and ZIP. Windows includes an Authenticode-signed x64 installer. Automatic-update metadata and SHA-256 checksums are attached to this release.
+            macOS includes a signed and notarized universal DMG and ZIP. Windows includes an unsigned x64 installer and may show an Unknown Publisher or SmartScreen warning. Automatic-update metadata and SHA-256 checksums are attached to this release.
           fail_on_unmatched_files: true
           make_latest: true
           files: release-files/*

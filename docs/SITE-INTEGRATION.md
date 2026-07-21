@@ -46,15 +46,15 @@ through the GitHub API and redirects to its DMG or NSIS installer.
 Tagged builds publish:
 
 - A signed and notarized universal macOS DMG and ZIP.
-- An Authenticode-signed Windows x64 NSIS installer.
+- An unsigned Windows x64 NSIS installer.
 - Electron differential-update blockmaps.
 - `latest-mac.yml` and `latest.yml` for `electron-updater`.
 - `SHA256SUMS.txt` for manual verification.
 
 The release workflow rejects legacy archive formats and will not publish when any
-platform artifact, updater manifest, integrity value, or signing credential is
-missing. Do not copy installers into `apps/web/public`; the stable download route
-keeps the website independent of application bundle size.
+platform artifact, updater manifest, integrity value, or required Apple signing
+credential is missing. Do not copy installers into `apps/web/public`; the stable
+download route keeps the website independent of application bundle size.
 
 ## Shared contracts
 

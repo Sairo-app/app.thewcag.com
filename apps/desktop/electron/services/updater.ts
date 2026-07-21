@@ -29,7 +29,7 @@ export class UpdateService {
 
   async check(manual = true): Promise<UpdateState> {
     if (!app.isPackaged) {
-      this.set({ status: "current", version: app.getVersion(), message: "Updates are checked in signed builds" });
+      this.set({ status: "current", version: app.getVersion(), message: "Updates are checked in installed release builds" });
       return this.state;
     }
     if (!existsSync(join(process.resourcesPath, "app-update.yml"))) {

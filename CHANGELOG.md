@@ -18,7 +18,7 @@
 - Rebuilt contrast inspection, multi-monitor high-DPI capture, the protected
   color-vision lens, annotation and crop tools, capture library, findings,
   the complete 55-criterion WCAG 2.2 checklist, palette matrix, settings,
-  secure sign-in, report publishing, and signed automatic updates.
+  secure sign-in, report publishing, and integrity-checked automatic updates.
 - Added atomic JSON and capture persistence, bounded IPC validation, one-time
   legacy desktop data migration, OS-encrypted credentials, global shortcuts, native
   menus and tray, reduced motion, permission guidance, and browser preview.
@@ -55,13 +55,14 @@
 - Extended `pnpm verify` to run Electron service tests and the production
   main/preload/renderer build.
 - Replaced the Tauri release pipeline with electron-builder: universal signed
-  and notarized macOS DMG/ZIP output, Authenticode-signed Windows NSIS output,
+  and notarized macOS DMG/ZIP output, unsigned Windows NSIS output,
   differential blockmaps, and electron-updater platform manifests.
 - Tagged releases must match the desktop package version and have all required
-  signing credentials; unsigned production publishing remains blocked.
+  Apple signing and notarization credentials. Windows installers are published
+  unsigned and identified as such in the GitHub release.
 - GitHub Releases now reject legacy Tauri assets, validate the complete Electron
   installer and updater set, publish checksums, and explicitly mark the new
-  signed Electron release as latest.
+  Electron release as latest.
 
 ## v2.4.0 — 2026-07-09
 
