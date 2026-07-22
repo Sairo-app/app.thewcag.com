@@ -9,8 +9,10 @@ import {
   ContrastIcon,
   CropIcon,
   DownloadIcon,
-  EyeIcon,
+  FileCheckIcon,
+  FlagIcon,
   ImageIcon,
+  LinkIcon,
   LogInIcon,
   LogOutIcon,
 } from "@/components/icons";
@@ -18,10 +20,12 @@ import {
 const MOBILE_NAV = [
   ["/getting-started", "Getting started", <BookIcon key="getting-started" size={16} />],
   ["/accessibility-audit-software", "Audit software", <BookIcon key="software" size={16} />],
+  ["/accessibility-reporting-software", "Accessible reporting", <FileCheckIcon key="reporting" size={16} />],
+  ["/accessibility-issue-tracker-integrations", "Issue tracker integrations", <LinkIcon key="integrations" size={16} />],
+  ["/accessibility-program-management", "Program management", <FlagIcon key="program" size={16} />],
+  ["/screenshot-tool", "Screenshot tool", <CropIcon key="screenshots" size={16} />],
   ["/chrome-accessibility-extension", "Chrome extension", <ContrastIcon key="extension" size={16} />],
   ["/pricing", "Pricing", <BookIcon key="pricing" size={16} />],
-  ["/#platforms", "Mac and Windows", <CropIcon key="platforms" size={16} />],
-  ["/wcag-contrast", "Contrast guide", <EyeIcon key="resources" size={16} />],
 ] as const;
 
 export async function Header() {

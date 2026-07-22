@@ -20,8 +20,10 @@ export const metadata: Metadata = createPageMetadata({
 
 const FREE_FEATURES = [
   "Desktop audit workstation and browser extension",
-  "Guided audit sessions and coverage map",
-  "Local reports, exports, evidence, and retesting",
+  "Four-stage guided audits and finding-owned evidence",
+  "Jira, Linear, and GitHub Issues connectors",
+  "Accessible local reports, VPAT authoring, packages, and retesting",
+  "Local accessibility program trends with table equivalents",
   "Bring-your-own-key AI authoring",
 ];
 

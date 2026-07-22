@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer, JsonLd } from "@/components/Footer";
@@ -6,37 +7,37 @@ import { ProductLinks } from "@/components/ProductLinks";
 import { createPageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Accessibility Screenshot Tool - Full How-To Guide",
+  title: "Accessibility Screenshot and Annotation Tool",
   description:
-    "A complete guide to TheWCAG's screenshot and annotation tool: capture any region, flag issues against WCAG success criteria, measure target sizes, probe contrast, and publish a shareable report.",
+    "Capture and annotate accessibility evidence without starting an audit. Copy or export PNG and Markdown, or attach multiple captures directly to a finding.",
   path: "/screenshot-tool",
   keywords: ["accessibility screenshot tool", "WCAG annotation tool", "accessibility evidence capture", "annotated accessibility report"],
 });
 
 const STEPS: { title: string; body: string }[] = [
   {
-    title: "Capture a region",
-    body: "Press the Capture shortcut (default ⌥⌘S on macOS, Ctrl+Alt+S on Windows) and drag a box around the required evidence. Use the app menu or tray action when you need a full-screen capture. The result opens in the annotation window.",
+    title: "Open the standalone capture library",
+    body: "Choose Standalone captures, use the tray action, or press the Capture shortcut (default ⌥⌘S on macOS, Ctrl+Alt+S on Windows). You do not need an audit, a finding, or an account.",
   },
   {
-    title: "Flag an issue",
-    body: "Choose the issue-marker tool and click where the problem appears. Add the WCAG criterion, severity, and note for each marker, then use Add findings to create structured finding rows in the selected audit.",
+    title: "Capture the necessary context",
+    body: "Drag around the affected region or choose a full-screen capture when the surrounding application state matters. The most recent 100 local captures remain available in the library.",
   },
   {
-    title: "Describe it against WCAG",
-    body: "For each marker, pick the WCAG success criterion it violates (e.g. 1.4.3 Contrast, 2.5.8 Target Size), set a severity (blocker, major, minor), and write a note. This turns a screenshot into a structured, standards-referenced report.",
+    title: "Annotate the evidence",
+    body: "Add issue markers, arrows, boxes, text, measurements, focus-order labels, contrast probes, crops, and irreversible solid redactions. Marker notes can reference a WCAG criterion without making an automatic conformance decision.",
   },
   {
-    title: "Measure & probe",
-    body: "Use the ruler to record an element's dimensions and review the result against WCAG 2.5.8 and its exceptions. Use the contrast probe to click two points in the capture and record their exact ratio.",
+    title: "Copy or export locally",
+    body: "Copy or export the annotated image as PNG, or copy Markdown that describes the capture and its annotations. This remains a screenshot-only workflow unless you choose to connect the capture to an audit.",
   },
   {
-    title: "Redact anything sensitive",
-    body: "Draw a solid block over private data before sharing. Prefer solid redaction over pixelation - pixelation can sometimes be reversed on text.",
+    title: "Attach evidence while writing a finding",
+    body: "Inside finding authoring, choose Add evidence to run the same capture and annotation flow and return the result directly to that finding. Attach multiple images or select existing captures from the local library.",
   },
   {
-    title: "Save or publish",
-    body: "Export or copy the annotated image as PNG. Add markers to the audit to include their structured findings in Markdown or printable HTML audit exports, or publish the reviewed capture to an unlisted app.thewcag.com link.",
+    title: "Share only when you decide",
+    body: "Local export never requires an account. If you publish reviewed evidence, TheWCAG creates an unlisted report link and keeps the working audit private.",
   },
 ];
 
@@ -47,6 +48,10 @@ const SHORTCUTS: [string, string, string][] = [
 ];
 
 const FAQ = [
+  {
+    q: "Do I need to create an audit or finding?",
+    a: "No. Standalone captures are a complete screenshot-only workflow. Capture, annotate, copy, and export without entering the audit workspace.",
+  },
   {
     q: "Do reviewers need to install anything to see a report?",
     a: "No. Published reports are web pages at app.thewcag.com/s/… that open in any browser. Only the person creating reports needs the app and an account.",
@@ -69,9 +74,9 @@ export default function ScreenshotToolPage() {
         data={{
           "@context": "https://schema.org",
           "@type": "HowTo",
-          name: "How to audit accessibility with TheWCAG's screenshot tool",
+          name: "How to capture and annotate accessibility evidence with TheWCAG",
           description:
-            "Capture a screenshot, flag issues against WCAG success criteria, measure target sizes, probe contrast, and publish a shareable report.",
+            "Capture and annotate accessibility evidence, export it locally, or attach it directly to a structured finding.",
           step: STEPS.map((s, i) => ({
             "@type": "HowToStep",
             position: i + 1,
@@ -83,9 +88,9 @@ export default function ScreenshotToolPage() {
       <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-16">
         <h1 className="text-3xl font-bold tracking-tight">The accessibility screenshot tool</h1>
         <p className="mt-3 max-w-2xl text-muted">
-          TheWCAG turns a screenshot into a structured accessibility report. Capture any part of any
-          app, flag issues against specific WCAG success criteria, measure target sizes, probe
-          contrast, and share the result as a link your team can open. Here is the full workflow.
+          Capture and annotate any part of any app without creating an audit. Keep a local library,
+          copy or export PNG and Markdown, or use the same capture flow from inside a finding so the
+          evidence is linked immediately.
         </p>
         <div className="mt-6">
           <Link
@@ -95,6 +100,21 @@ export default function ScreenshotToolPage() {
             Download the free app
           </Link>
         </div>
+
+        <figure className="guide-figure">
+          <div className="guide-figure__image">
+            <Image
+              src="/guides/getting-started/standalone-capture-library.png"
+              alt="TheWCAG standalone capture library with region and full-screen capture actions and a recent local capture, separate from the audit stages."
+              width={1191}
+              height={768}
+              priority
+            />
+          </div>
+          <figcaption>
+            <p><strong>Screenshot-only by design.</strong> The capture library remains a standalone utility even when an audit is open.</p>
+          </figcaption>
+        </figure>
 
         <section className="mt-14" aria-labelledby="steps">
           <h2 id="steps" className="text-xl font-bold tracking-tight">

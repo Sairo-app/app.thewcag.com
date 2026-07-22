@@ -22,19 +22,19 @@ export const metadata: Metadata = createPageMetadata({
 
 const WORKFLOW = [
   ["Plan", "Define the evaluation goal, included and excluded scope, representative sample, browser and device matrix, assistive technologies, and methodology."],
-  ["Inspect", "Use screen-wide contrast inspection, target measurement, palette analysis, vision simulation, and guided test runs across web and native interfaces."],
-  ["Evidence", "Capture high-DPI screenshots, annotate barriers, link browser evidence, and keep every finding tied to its location and supporting proof."],
+  ["Inspect", "Run guided manual tests, use desktop inspection tools, and capture annotated evidence directly inside finding authoring."],
   ["Review", "Triage severity, ownership, WCAG mapping, repeated occurrences, accepted risk, remediation dates, and before-and-after retest evidence."],
-  ["Deliver", "Run readiness checks, distinguish focused reviews from complete audits, then export a portable record or publish a controlled report."],
+  ["Deliver", "Run readiness checks, distinguish focused reviews from complete audits, then export an accessible report or publish a controlled link."],
 ] as const;
 
 const CAPABILITIES = [
   ["Evaluation planning", "Goals, scope, exclusions, representative samples, environments, assistive technologies, and reusable audit templates."],
   ["Guided manual testing", "Structured scripts for authentication, checkout, forms, media, documents, components, and regression work."],
-  ["Evidence capture", "Region and full-screen capture, issue badges, arrows, measurements, contrast probes, focus order, text, crop, and redaction."],
-  ["Findings management", "Stable references, affected users, severity rationale, owners, tickets, dates, repeated occurrences, and retest history."],
+  ["Finding-owned evidence", "Capture and annotate without leaving a finding, attach multiple images, and retain before-and-after remediation evidence."],
+  ["Findings management", "Stable references, affected users, severity rationale, owners, Jira/Linear/GitHub tickets, dates, occurrences, and retest history."],
   ["WCAG 2.2 checklist", "Level A or AA scope, manual verification prompts, W3C references, notes, traceability, decision shortcuts, and undo."],
-  ["Audit delivery", "Markdown, printable HTML, portable integrity-checked audit packages, privacy checks, and optional public review links."],
+  ["Accessible delivery", "Branded HTML and PDF, Markdown, human-authored VPAT responses, audience sections, audit packages, and optional public links."],
+  ["Program management", "Recurrence, median retest time, component hotspots, and regressions from owned local audit history—never a conformance score."],
 ] as const;
 
 export default function AccessibilityAuditSoftwarePage() {
@@ -70,7 +70,7 @@ export default function AccessibilityAuditSoftwarePage() {
 
         <div className="mt-8 flex flex-wrap gap-3">
           <Link href="/download" className="button button--primary">Download for macOS or Windows</Link>
-          <Link href="/chrome-accessibility-extension" className="button button--secondary">Explore browser evidence capture</Link>
+          <Link href="/getting-started" className="button button--secondary">Follow the first-audit guide</Link>
         </div>
 
         <section aria-labelledby="workflow-heading">
@@ -117,6 +117,16 @@ export default function AccessibilityAuditSoftwarePage() {
               </ul>
             </div>
           </div>
+        </section>
+
+        <section aria-labelledby="evidence-heading">
+          <h2 id="evidence-heading">Evidence belongs to the finding</h2>
+          <p className="mt-3">
+            Use <strong>Add evidence</strong> while authoring a finding to open the existing capture and annotation flow. The saved capture returns to the same finding, and a finding can hold multiple annotated images plus before-and-after remediation evidence. The optional Findings &amp; captures view remains available for review and for legacy unassigned captures.
+          </p>
+          <p className="mt-3">
+            Need only the screenshot tool? The <Link href="/screenshot-tool">standalone capture library</Link> works without creating an audit or finding.
+          </p>
         </section>
 
         <section className="rounded-xl border border-border bg-card p-6" aria-labelledby="audience-heading">

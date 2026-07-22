@@ -20,6 +20,9 @@ const allowlist = validateAxeTriageAllowlist(allowlistJson);
 const ROUTES = [
   "/",
   "/getting-started",
+  "/accessibility-reporting-software",
+  "/accessibility-issue-tracker-integrations",
+  "/accessibility-program-management",
   "/download",
   "/pricing",
   "/wcag-contrast",

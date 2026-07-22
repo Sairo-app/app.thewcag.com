@@ -6,8 +6,8 @@ import { usePathname } from "next/navigation";
 const NAV = [
   { href: "/getting-started", label: "Getting started" },
   { href: "/accessibility-audit-software", label: "Audit software" },
-  { href: "/chrome-accessibility-extension", label: "Chrome extension" },
-  { href: "/#platforms", label: "Platforms" },
+  { href: "/accessibility-reporting-software", label: "Reporting" },
+  { href: "/accessibility-issue-tracker-integrations", label: "Integrations" },
   { href: "/pricing", label: "Pricing" },
 ];
 

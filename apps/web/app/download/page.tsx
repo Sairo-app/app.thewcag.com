@@ -9,7 +9,7 @@ import { createPageMetadata } from "@/lib/seo";
 export const metadata: Metadata = createPageMetadata({
   title: "Download TheWCAG for macOS & Windows",
   description:
-    "Download TheWCAG for macOS or Windows. Plan WCAG 2.2 audits, inspect interfaces, capture evidence, manage findings, retest fixes, and deliver reports.",
+    "Download TheWCAG for macOS or Windows. Run four-stage WCAG 2.2 audits with finding-owned evidence, remediation tickets, accessible reports, and retesting.",
   path: "/download",
   keywords: ["download accessibility audit software", "macOS WCAG tool", "Windows accessibility testing app", "TheWCAG download"],
 });
@@ -46,13 +46,13 @@ export default function DownloadPage() {
           operatingSystem: "macOS, Windows",
           offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
           description:
-            "Local-first accessibility audit workstation with planning, guided testing, browser and desktop evidence, WCAG 2.2 findings, retesting, and report delivery.",
+            "Local-first accessibility audit workstation with guided testing, finding-owned evidence, remediation tickets, WCAG 2.2 review, accessible reports, and retesting.",
         }}
       />
       <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-16">
         <h1 className="text-3xl font-bold tracking-tight">Download TheWCAG</h1>
         <p className="mt-3 max-w-2xl text-muted">
-          Install the local-first accessibility audit workstation. Plan scope, inspect any rendered interface, capture browser and desktop evidence, manage WCAG 2.2 findings, retest remediation, and deliver a reviewable record from your Mac or PC.
+          Install the local-first accessibility audit workstation. Plan scope, inspect rendered interfaces, attach browser and desktop evidence to findings, coordinate remediation, retest fixes, and deliver an accessible record from your Mac or PC.
         </p>
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2">
@@ -90,9 +90,9 @@ export default function DownloadPage() {
               ["Audit planning", "Define evaluation goals, scope, exclusions, representative samples, environments, assistive technologies, and reusable audit templates."],
               ["Guided manual testing", "Run repeatable scripts for authentication, checkout, forms, media, documents, components, and regression work."],
               ["Screen-wide inspection", "Check contrast, target size, palettes, color-vision deficiencies, low acuity, and temporary interface states across any application."],
-              ["Editable evidence", "Capture high-DPI regions or screens and add issue markers, arrows, measurements, focus order, contrast probes, text, crop, and redaction."],
-              ["Findings and WCAG decisions", "Track stable references, affected users, severity rationale, owners, dates, repeated occurrences, accepted risk, failed criteria, and retests."],
-              ["Portable delivery", "Export Markdown or printable HTML, move integrity-checked audit packages between computers, or publish a selected unlisted report."],
+              ["Finding-owned evidence", "Capture and annotate directly inside a finding, attach multiple images, and retain explicit before-and-after remediation evidence."],
+              ["Findings, tickets, and WCAG decisions", "Track stable references, affected users, Jira/Linear/GitHub tickets, ownership, dates, accepted risk, criterion decisions, and retests."],
+              ["Accessible delivery", "Export branded accessible HTML, PDF, or Markdown, author VPAT responses manually, move integrity-checked packages, or publish an unlisted report."],
             ].map(([t, d]) => (
               <div key={t}>
                 <dt className="text-sm font-semibold">{t}</dt>

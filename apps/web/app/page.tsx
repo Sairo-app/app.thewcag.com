@@ -20,7 +20,7 @@ import {
 export const metadata: Metadata = createPageMetadata({
   title: "Accessibility Audit Software for Real Interface Evidence",
   description:
-    "TheWCAG combines a macOS and Windows accessibility audit workstation, Chrome evidence capture, WCAG 2.2 planning, findings, retesting, and controlled reports.",
+    "TheWCAG combines local WCAG 2.2 audits, finding-owned evidence, remediation tickets, accessible reports, retesting, and program trends on macOS and Windows.",
   path: "/",
   keywords: ["accessibility audit software", "WCAG audit tool", "accessibility testing app", "Chrome accessibility extension"],
 });
@@ -73,8 +73,26 @@ const CAPABILITIES = [
   },
   {
     icon: PaletteIcon,
+    title: "Accessible reports and VPAT authoring",
+    body: "Create audience-specific HTML or PDF reports and author every VPAT response explicitly—never from an automated signal.",
+    href: "/accessibility-reporting-software",
+  },
+  {
+    icon: CheckIcon,
+    title: "Tickets without retyping",
+    body: "Map complete findings into Jira, Linear, or GitHub Issues and review external changes before they affect local audit decisions.",
+    href: "/accessibility-issue-tracker-integrations",
+  },
+  {
+    icon: BookIcon,
+    title: "Program trends without a score",
+    body: "Review recurrence, retest time, component hotspots, and regressions from owned audit history while untested work stays visible.",
+    href: "/accessibility-program-management",
+  },
+  {
+    icon: PaletteIcon,
     title: "Audit planning and delivery",
-    body: "Define scope, run guided tests, verify checklist traceability, retest remediation, and produce a defensible audit record.",
+    body: "Define scope, run guided tests, verify finding-to-evidence traceability, retest remediation, and produce a defensible audit record.",
     href: "/accessibility-audit-software",
   },
 ] as const;
@@ -90,10 +108,9 @@ const SHARED_FEATURES = [
 
 const WORKFLOW = [
   ["Plan", "Define scope, representative samples, environments, assistive technologies, and the evaluation method."],
-  ["Inspect", "Use desktop instruments and guided scripts across the interface you need to evaluate."],
-  ["Evidence", "Capture the exact state and connect each barrier to its context and the standard."],
+  ["Inspect", "Use guided scripts and desktop instruments, then capture and annotate evidence directly inside each finding."],
   ["Review", "Triage findings, trace failed criteria, assign remediation, and record retest outcomes."],
-  ["Deliver", "Run readiness checks, export the audit record, or publish only the report you choose."],
+  ["Deliver", "Run readiness checks, create accessible audience-specific reports, or publish only the evidence you choose."],
 ] as const;
 
 export default function Home() {
@@ -103,14 +120,24 @@ export default function Home() {
       <JsonLd
         data={{
           "@context": "https://schema.org",
-          "@type": "SoftwareApplication",
-          name: "TheWCAG",
-          applicationCategory: "DeveloperApplication",
-          operatingSystem: "macOS, Windows",
-          url: SITE_URL,
-          offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-          description: metadata.description,
-          featureList: ["Audit planning", "Chrome evidence capture", "WCAG 2.2 checklist", "Annotated screenshots", "Findings and retesting", "Portable audit exports"],
+          "@graph": [
+            {
+              "@type": "WebSite",
+              name: "TheWCAG",
+              alternateName: "The WCAG",
+              url: SITE_URL,
+            },
+            {
+              "@type": "SoftwareApplication",
+              name: "TheWCAG",
+              applicationCategory: "DeveloperApplication",
+              operatingSystem: "macOS, Windows",
+              url: SITE_URL,
+              offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+              description: metadata.description,
+              featureList: ["Audit planning", "Finding-owned evidence", "WCAG 2.2 checklist", "Jira, Linear, and GitHub Issues", "Accessible reports and VPAT authoring", "Retesting and program trends"],
+            },
+          ],
         }}
       />
 
@@ -162,7 +189,7 @@ export default function Home() {
             </div>
             <Link href="/getting-started" className="home-paths__link">
               <strong>Run your first audit</strong>
-              <span>Follow the screenshot-led setup and five-stage workflow.</span>
+              <span>Follow the guided sample and four-stage workflow.</span>
               <ArrowRightIcon size={16} />
             </Link>
             <Link href="/download" className="home-paths__link">

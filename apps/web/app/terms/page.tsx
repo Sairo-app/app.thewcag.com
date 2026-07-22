@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { createPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "Terms of use", description: "Terms governing use of TheWCAG desktop app, browser extension, hosted reports, and AI-assisted authoring." };
+export const metadata: Metadata = createPageMetadata({ title: "Terms of Use", description: "Terms governing the TheWCAG desktop app, browser extension, issue connectors, local exports, hosted reports, and AI-assisted authoring.", path: "/terms" });
 
 export default function TermsPage() {
   return (

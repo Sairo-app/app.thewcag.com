@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRightIcon, BookIcon, ContrastIcon, CropIcon, DownloadIcon } from "./icons";
+import { ArrowRightIcon, BookIcon, ContrastIcon, CropIcon, DownloadIcon, FileCheckIcon, FlagIcon, LinkIcon } from "./icons";
 
 export function ProductLinks({
   heading = "Continue through the complete audit workflow",
@@ -22,7 +22,22 @@ export function ProductLinks({
         </Link>
         <Link href="/accessibility-audit-software">
           <ContrastIcon size={18} />
-          <span><strong>Audit workstation</strong><small>Plan, test, document, retest, and deliver</small></span>
+          <span><strong>Audit workstation</strong><small>Plan, inspect, review, and deliver</small></span>
+          <ArrowRightIcon size={16} />
+        </Link>
+        <Link href="/accessibility-reporting-software">
+          <FileCheckIcon size={18} />
+          <span><strong>Accessible reporting</strong><small>HTML, PDF, audience sections, and human VPAT responses</small></span>
+          <ArrowRightIcon size={16} />
+        </Link>
+        <Link href="/accessibility-issue-tracker-integrations">
+          <LinkIcon size={18} />
+          <span><strong>Issue tracker integrations</strong><small>Jira, Linear, and GitHub Issues without retyping</small></span>
+          <ArrowRightIcon size={16} />
+        </Link>
+        <Link href="/accessibility-program-management">
+          <FlagIcon size={18} />
+          <span><strong>Program management</strong><small>Recurrence, retest time, hotspots, and regressions</small></span>
           <ArrowRightIcon size={16} />
         </Link>
         <Link href="/chrome-accessibility-extension">
