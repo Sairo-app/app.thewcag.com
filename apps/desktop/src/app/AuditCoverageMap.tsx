@@ -49,8 +49,8 @@ export function AuditCoverageMap({
           <span className="section-label">Traceability</span>
           <h2 id="coverage-map-title">Audit coverage map</h2>
           <p>
-            See which planned sample has a test record, supporting evidence,
-            findings, and mapped WCAG decisions. This view does not change the audit.
+            See which planned sample has a test record, findings with linked evidence,
+            and mapped WCAG decisions. This view does not change the audit.
           </p>
         </div>
         <div className="coverage-score" aria-label={`${coverage.percent}% of sample items covered`}>
@@ -74,7 +74,7 @@ export function AuditCoverageMap({
             <div className="coverage-table-head" role="row">
               <span role="columnheader">Sample</span>
               <span role="columnheader">Guided test</span>
-              <span role="columnheader">Evidence</span>
+              <span role="columnheader">Finding evidence</span>
               <span role="columnheader">Findings</span>
               <span role="columnheader">WCAG</span>
               <span role="columnheader" className="sr-only">Action</span>
@@ -104,11 +104,11 @@ export function AuditCoverageMap({
                     <button
                       type="button"
                       className="coverage-link"
-                      onClick={() => onNavigate("evidence")}
-                      aria-label={`Open ${row.captures.length} captures for ${row.sample.label}`}
+                      onClick={onOpenFindings}
+                      aria-label={`Open findings with ${row.captures.length} linked captures for ${row.sample.label}`}
                     >
                       <strong>{row.captures.length}</strong>
-                      <span>{row.captures.length === 1 ? "capture" : "captures"}</span>
+                      <span>{row.captures.length === 1 ? "linked capture" : "linked captures"}</span>
                     </button>
                   </div>
                   <div className="coverage-cell" role="cell" data-label="Findings">
@@ -118,8 +118,8 @@ export function AuditCoverageMap({
                       onClick={onOpenFindings}
                       aria-label={`Open ${row.findings.length} findings for ${row.sample.label}`}
                     >
-                      <strong>{row.findings.length}</strong>
-                      <span>{row.findings.length === 1 ? "finding" : "findings"}</span>
+                      <strong>{row.findingsWithEvidence}/{row.findings.length}</strong>
+                      <span>with evidence</span>
                     </button>
                   </div>
                   <div className="coverage-cell" role="cell" data-label="WCAG">
@@ -164,10 +164,10 @@ export function AuditCoverageMap({
         <div className="coverage-unassigned">
           <LinkSimple size={19} />
           <div>
-            <strong>{unassigned} existing {unassigned === 1 ? "record needs" : "records need"} a sample link</strong>
+            <strong>{unassigned} existing {unassigned === 1 ? "record needs" : "records need"} assignment review</strong>
             <p>
-              {coverage.unassigned.testRuns.length} tests, {coverage.unassigned.captures.length} captures,
-              and {coverage.unassigned.findings.length} findings remain visible and are not counted against a sample.
+              {coverage.unassigned.testRuns.length} tests and {coverage.unassigned.findings.length} findings need a sample;
+              {" "}{coverage.unassigned.captures.length} captures are preserved in the unassigned bucket until linked to a finding.
             </p>
           </div>
           {coverage.rows[0] ? (

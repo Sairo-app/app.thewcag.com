@@ -4,6 +4,11 @@ import type {
   CaptureEntry,
   Finding,
 } from "../shared/desktop";
+import {
+  findingEvidenceCaptureIds,
+  findingHasEvidence,
+  referencedEvidenceCaptureIds,
+} from "../shared/finding-evidence";
 import { auditTestRunComplete } from "./audit-plan";
 
 export interface AuditChecklistEntry {
@@ -24,6 +29,8 @@ export interface AuditCoverageRow {
   testRuns: AuditTestRun[];
   captures: CaptureEntry[];
   findings: Finding[];
+  findingsWithEvidence: number;
+  findingsWithoutEvidence: number;
   criteria: string[];
   state: AuditCoverageState;
   gap: string;
@@ -64,6 +71,7 @@ function coverageState(
   sample: AuditSampleItem,
   runs: AuditTestRun[],
   traceCount: number,
+  findingsWithoutEvidence: number,
 ): Pick<AuditCoverageRow, "state" | "gap"> {
   if (sample.status === "blocked" || runs.some((run) => run.status === "blocked")) {
     return { state: "blocked", gap: sample.notes.trim() || "Testing is blocked." };
@@ -73,6 +81,12 @@ function coverageState(
       return {
         state: "gap",
         gap: "The sample is marked tested, but a linked guided run is incomplete.",
+      };
+    }
+    if (findingsWithoutEvidence) {
+      return {
+        state: "gap",
+        gap: `${findingsWithoutEvidence} finding${findingsWithoutEvidence === 1 ? " needs" : "s need"} linked evidence.`,
       };
     }
     return traceCount
@@ -100,10 +114,17 @@ export function buildAuditCoverage(input: {
   checklist: Record<string, AuditChecklistEntry>;
 }): AuditCoverage {
   const sampleIds = new Set(input.sampleItems.map((sample) => sample.id));
+  const availableCaptureIds = new Set(input.captures.map((capture) => capture.id));
+  const assignedCaptureIds = referencedEvidenceCaptureIds(input.findings);
   const rows = input.sampleItems.map((sample): AuditCoverageRow => {
     const testRuns = input.testRuns.filter((run) => run.sampleItemId === sample.id);
-    const captures = input.captures.filter((capture) => capture.sampleItemId === sample.id);
     const findings = input.findings.filter((finding) => finding.sampleItemId === sample.id);
+    const captureIds = new Set(findings.flatMap(findingEvidenceCaptureIds));
+    const captures = input.captures.filter((capture) => captureIds.has(capture.id));
+    const findingsWithEvidence = findings.filter((finding) =>
+      findingHasEvidence(finding, availableCaptureIds),
+    ).length;
+    const findingsWithoutEvidence = findings.length - findingsWithEvidence;
     const findingKeys = new Set(findings.map((finding) => finding.key));
     const criteria = new Set(findings.flatMap(criteriaForFinding));
     Object.entries(input.checklist).forEach(([criterion, entry]) => {
@@ -116,12 +137,14 @@ export function buildAuditCoverage(input: {
       }
     });
     const traceCount = testRuns.length + captures.length + findings.length + criteria.size;
-    const state = coverageState(sample, testRuns, traceCount);
+    const state = coverageState(sample, testRuns, traceCount, findingsWithoutEvidence);
     return {
       sample,
       testRuns,
       captures,
       findings,
+      findingsWithEvidence,
+      findingsWithoutEvidence,
       criteria: [...criteria].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
       ...state,
     };
@@ -139,9 +162,7 @@ export function buildAuditCoverage(input: {
     percent: rows.length ? Math.round((complete / rows.length) * 100) : 0,
     unassigned: {
       testRuns: input.testRuns.filter((run) => !run.sampleItemId || !sampleIds.has(run.sampleItemId)),
-      captures: input.captures.filter(
-        (capture) => !capture.sampleItemId || !sampleIds.has(capture.sampleItemId),
-      ),
+      captures: input.captures.filter((capture) => !assignedCaptureIds.has(capture.id)),
       findings: input.findings.filter(
         (finding) => !finding.sampleItemId || !sampleIds.has(finding.sampleItemId),
       ),

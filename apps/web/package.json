@@ -7,7 +7,9 @@
     "dev": "next dev -p 3100",
     "build": "next build",
     "start": "next start -p 3100",
+    "a11y:scan": "playwright test --config=playwright.a11y.config.ts",
     "test": "vitest run",
+    "test:critical": "vitest run app/api/billing/webhooks lib/billing/webhook-claim.test.ts lib/device-auth.test.ts app/api/device app/api/s",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/migrate.mjs"
@@ -25,10 +27,12 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.51.1",
     "@tailwindcss/postcss": "^4.1.0",
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "axe-core": "^4.12.1",
     "drizzle-kit": "^0.28.1",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.7.0",

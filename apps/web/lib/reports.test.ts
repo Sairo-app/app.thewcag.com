@@ -1,17 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { decodePngBase64, sanitizeReportIssues } from "./reports";
+import {
+  DEFAULT_REPORT_ISSUE_QUERY,
+  filterAndSortReportIssues,
+  reportImageAlt,
+  reportIssueEmptyState,
+} from "./report-view";
+import { buildSharedReportMetadata, decodePngBase64, sanitizeReportIssues } from "./reports";
+import type { ReportIssue } from "./schema";
+
+const reportIssues: ReportIssue[] = [
+  { n: 1, sc: "2.4.7", label: "Focus is hidden", severity: "major", note: "Keep focus visible.", status: "retest" },
+  { n: 2, sc: "1.4.10", label: "Layout clips", severity: "minor", note: "Allow content to reflow.", status: "fixed" },
+  { n: 3, sc: "1.4.3", label: "Text has low contrast", severity: "blocker", note: "Increase contrast.", status: "open" },
+  { n: 4, label: "Unmapped keyboard issue", severity: "major", note: "", status: "accepted" },
+];
 
 describe("sanitizeReportIssues", () => {
   it("normalizes untrusted issue fields and assigns stable sequential numbers", () => {
     const issues = sanitizeReportIssues([
-      { n: 99, sc: " 1.4.3 ", label: "  Contrast\u0000 issue  ", severity: "BLOCKER", note: " Fix it " },
+      { n: 99, sc: " 1.4.3 ", label: "  Contrast\u0000 issue  ", severity: "BLOCKER", note: " Fix it ", status: "RETEST" },
       { n: -2, sc: "javascript:alert(1)", label: "", severity: "unknown", note: 4 },
       null,
     ]);
 
     expect(issues).toEqual([
-      { n: 1, sc: "1.4.3", label: "Contrast  issue", severity: "blocker", note: "Fix it" },
-      { n: 2, sc: undefined, label: "Accessibility issue", severity: "major", note: "" },
+      { n: 1, sc: "1.4.3", label: "Contrast  issue", severity: "blocker", note: "Fix it", status: "retest" },
+      { n: 2, sc: undefined, label: "Accessibility issue", severity: "major", note: "", status: "open" },
     ]);
   });
 
@@ -23,6 +37,83 @@ describe("sanitizeReportIssues", () => {
     expect(issues).toHaveLength(2);
     expect(issues[0].label).toHaveLength(120);
     expect(issues[0].note).toHaveLength(1000);
+  });
+});
+
+describe("public report finding explorer", () => {
+  it("filters by severity, WCAG criterion, and remediation status together", () => {
+    expect(
+      filterAndSortReportIssues(reportIssues, {
+        severity: "blocker",
+        criterion: "1.4.3",
+        status: "open",
+        sort: "number",
+      }).map((issue) => issue.n),
+    ).toEqual([3]);
+
+    expect(
+      filterAndSortReportIssues(reportIssues, {
+        ...DEFAULT_REPORT_ISSUE_QUERY,
+        criterion: "unmapped",
+      }).map((issue) => issue.n),
+    ).toEqual([4]);
+  });
+
+  it("sorts severity by remediation priority and WCAG criteria numerically without mutating input", () => {
+    const original = reportIssues.map((issue) => issue.n);
+    expect(
+      filterAndSortReportIssues(reportIssues, { ...DEFAULT_REPORT_ISSUE_QUERY, sort: "severity" }).map(
+        (issue) => issue.n,
+      ),
+    ).toEqual([3, 1, 4, 2]);
+    expect(
+      filterAndSortReportIssues(reportIssues, { ...DEFAULT_REPORT_ISSUE_QUERY, sort: "criterion" }).map(
+        (issue) => issue.n,
+      ),
+    ).toEqual([3, 2, 1, 4]);
+    expect(reportIssues.map((issue) => issue.n)).toEqual(original);
+  });
+
+  it("sorts remediation status with unresolved findings first", () => {
+    expect(
+      filterAndSortReportIssues(reportIssues, { ...DEFAULT_REPORT_ISSUE_QUERY, sort: "status" }).map(
+        (issue) => issue.n,
+      ),
+    ).toEqual([3, 1, 2, 4]);
+  });
+
+  it("distinguishes an empty report from a filter with no matches", () => {
+    expect(reportIssueEmptyState(0, 0)).toBe("no-findings");
+    expect(reportIssueEmptyState(4, 0)).toBe("no-matches");
+    expect(reportIssueEmptyState(4, 1)).toBeNull();
+  });
+
+  it("gives the annotated image full finding text instead of a generic alt", () => {
+    const alt = reportImageAlt("Checkout", reportIssues.slice(0, 1));
+    expect(alt).toContain("Finding 1, major, WCAG 2.4.7, Focus is hidden: Keep focus visible.");
+  });
+});
+
+describe("shared report metadata guardrails", () => {
+  it("keeps reports unlisted and emits matching Open Graph and Twitter previews", () => {
+    const metadata = buildSharedReportMetadata({
+      slug: "public-report",
+      title: "Checkout accessibility review",
+      description: "Four published findings.",
+      issueCount: 4,
+    });
+
+    expect(metadata.robots).toEqual({ index: false, follow: false });
+    expect(metadata.openGraph).toMatchObject({
+      title: "Checkout accessibility review",
+      description: "Four published findings.",
+      type: "article",
+      images: [{ url: expect.stringMatching(/\/api\/s\/public-report\/image$/), width: 1400 }],
+    });
+    expect(metadata.twitter).toMatchObject({
+      card: "summary_large_image",
+      images: [expect.stringMatching(/\/api\/s\/public-report\/image$/)],
+    });
   });
 });
 

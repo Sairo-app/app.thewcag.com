@@ -94,9 +94,9 @@ export function AnnotateView() {
   const [redo, setRedo] = useState<AnnotationDoc[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [exporting, setExporting] = useState<"copy" | "export" | null>(null);
+  const [exporting, setExporting] = useState<"copy" | "export" | "copy-markdown" | "export-markdown" | null>(null);
   const [retryAction, setRetryAction] = useState<
-    "copy" | "export" | "save" | null
+    "copy" | "export" | "copy-markdown" | "export-markdown" | "save" | null
   >(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const baseRef = useRef<HTMLCanvasElement | null>(null);
@@ -537,6 +537,57 @@ export function AnnotateView() {
       setExporting(null);
     }
   }
+  function captureMarkdown(): string {
+    const title = capture?.title || "Annotated capture";
+    const annotations = doc.shapes.map((shape, index) => {
+      const issue = shape.kind === "badge"
+        ? ISSUE_TYPES.find((item) => item.id === shape.issueType)
+        : undefined;
+      const label = issue?.label || TOOLS.find((item) => item.id === shape.kind)?.label || shape.kind;
+      const details = [
+        shape.severity,
+        issue?.sc ? `WCAG ${issue.sc}` : "",
+        shape.note || shape.text,
+      ].filter(Boolean).join(" · ");
+      return `${index + 1}. **${label}**${details ? ` — ${details}` : ""}`;
+    });
+    return [
+      `# ${title.replace(/[\r\n#]+/g, " ").trim()}`,
+      "",
+      `- Captured: ${capture ? new Date(capture.createdAt).toISOString() : "Unknown"}`,
+      `- Dimensions: ${capture ? `${capture.width} × ${capture.height}` : "Unknown"}`,
+      `- Annotations: ${doc.shapes.length}`,
+      "",
+      "## Annotations",
+      "",
+      ...(annotations.length ? annotations : ["No annotations recorded."]),
+      "",
+    ].join("\n");
+  }
+  async function exportMarkdown(copy = false) {
+    if (exporting) return;
+    const action = copy ? "copy-markdown" : "export-markdown";
+    setExporting(action);
+    try {
+      const text = captureMarkdown();
+      if (copy) {
+        await desktop.invoke("clipboard:write-text", { text });
+        show("Annotation Markdown copied");
+      } else {
+        const path = await desktop.invoke<string | null>("dialog:save-text", {
+          name: `${capture?.title || "annotated-capture"}.md`,
+          text,
+        });
+        if (path) show("Annotation Markdown exported");
+      }
+      setRetryAction(null);
+    } catch (error) {
+      setRetryAction(action);
+      show(messageFromError(error, "The annotation Markdown could not be exported. Try again."), true);
+    } finally {
+      setExporting(null);
+    }
+  }
   function retryLastAction() {
     const action = retryAction;
     setRetryAction(null);
@@ -544,6 +595,9 @@ export function AnnotateView() {
     if (action === "save") void save();
     if (action === "copy" || action === "export") {
       void exportPng(action === "copy");
+    }
+    if (action === "copy-markdown" || action === "export-markdown") {
+      void exportMarkdown(action === "copy-markdown");
     }
   }
   async function addFindings() {
@@ -563,6 +617,7 @@ export function AnnotateView() {
         severity: shape.severity || "major",
         status: "open",
         note: shape.note || issue.template,
+        evidenceCaptureIds: [id],
         captureId: id,
         createdAt: Date.now(),
       };
@@ -641,6 +696,20 @@ export function AnnotateView() {
             onClick={() => void exportPng(false)}
           >
             {exporting === "export" ? "Exporting" : "Export"}
+          </Button>
+          <Button
+            icon={Clipboard}
+            disabled={saving || Boolean(exporting)}
+            onClick={() => void exportMarkdown(true)}
+          >
+            {exporting === "copy-markdown" ? "Copying" : "Copy Markdown"}
+          </Button>
+          <Button
+            icon={DownloadSimple}
+            disabled={saving || Boolean(exporting)}
+            onClick={() => void exportMarkdown(false)}
+          >
+            {exporting === "export-markdown" ? "Exporting" : "Export Markdown"}
           </Button>
           <Button
             variant="primary"
@@ -882,8 +951,9 @@ export function AnnotateView() {
                 </div>
               </dl>
               <p>
-                Select an annotation to edit its details. Issue badges become
-                structured audit findings.
+                {capture?.auditId
+                  ? "Select an annotation to edit its details. Issue badges can become structured audit findings."
+                  : "Select an annotation to edit its details. This capture remains independent of any audit or finding."}
               </p>
               {doc.shapes.length ? (
                 <div
@@ -910,7 +980,7 @@ export function AnnotateView() {
               ) : null}
             </div>
           )}
-          <div className="inspector-footer">
+          {capture?.auditId ? <div className="inspector-footer">
             <Button
               variant="primary"
               disabled={!doc.shapes.some((shape) => shape.kind === "badge")}
@@ -921,7 +991,7 @@ export function AnnotateView() {
             <Button icon={ShareNetwork} onClick={() => void reviewReport()}>
               Review report
             </Button>
-          </div>
+          </div> : <div className="inspector-footer standalone-annotation-footer"><strong>Standalone capture</strong><span>Use the title-bar actions to copy or export PNG and Markdown.</span></div>}
         </aside>
       </div>
     </div>

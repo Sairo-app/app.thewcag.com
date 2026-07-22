@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Footer, JsonLd } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { ArrowRightIcon, CheckIcon, DownloadIcon } from "@/components/icons";
+import { GuideDownloadLink, GuideTelemetryConsent } from "@/components/GuideTelemetry";
 import { breadcrumbJsonLd, createPageMetadata, SITE_URL } from "@/lib/seo";
 
 export const metadata: Metadata = createPageMetadata({
@@ -118,9 +119,10 @@ export default function GettingStartedPage() {
             This guide follows the real TheWCAG desktop application from a blank audit to a reviewable report. Every screenshot below was captured from the current Windows build using a safe example project. The evaluation itself takes as long as its agreed scope requires.
           </p>
           <div className="guide-actions">
-            <Link href="/download" className="button button--primary"><DownloadIcon size={17} />Download TheWCAG</Link>
+            <GuideDownloadLink className="button button--primary"><DownloadIcon size={17} />Download TheWCAG</GuideDownloadLink>
             <a href="#install" className="button button--secondary">Start the guide <ArrowRightIcon size={16} /></a>
           </div>
+          <GuideTelemetryConsent />
           <dl className="guide-facts" aria-label="Guide facts">
             <div><dt>Account</dt><dd>Not required for local audits</dd></div>
             <div><dt>Platforms</dt><dd>Windows and macOS</dd></div>
@@ -270,7 +272,7 @@ export default function GettingStartedPage() {
             <section className="guide-next" aria-labelledby="guide-next-heading">
               <div><span>Ready for the real project?</span><h2 id="guide-next-heading">Start with the scope, not the screenshot.</h2><p>A defensible audit begins with a clear goal and representative sample. The evidence tools become useful once everyone agrees what is being evaluated.</p></div>
               <div className="guide-actions">
-                <Link href="/download" className="button button--primary">Download the desktop app</Link>
+                <GuideDownloadLink className="button button--primary">Download the desktop app</GuideDownloadLink>
                 <Link href="/chrome-accessibility-extension" className="button button--secondary">Add browser capture</Link>
               </div>
             </section>

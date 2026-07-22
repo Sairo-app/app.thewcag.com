@@ -2,7 +2,10 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const standaloneOutput = process.platform !== 'win32'
+// The Playwright accessibility job starts the built app with `next start`, so
+// keep that environment on the regular production output. Deployments still
+// receive the standalone bundle used by Docker/Coolify.
+const standaloneOutput = process.platform !== 'win32' && process.env.ACCESSIBILITY_SCAN_FIXTURE !== '1'
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {

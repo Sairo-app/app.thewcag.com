@@ -36,6 +36,13 @@ export function mergeFindings(existing: Finding[], incoming: unknown): Finding[]
         ? finding.status as Finding["status"]
         : "open",
       note: typeof finding.note === "string" ? finding.note.slice(0, 5_000) : "",
+      evidenceCaptureIds: Array.isArray(finding.evidenceCaptureIds)
+        ? [...new Set(finding.evidenceCaptureIds)]
+            .filter((captureId): captureId is string => typeof captureId === "string" && Boolean(captureId.trim()))
+            .slice(0, 100)
+        : typeof finding.captureId === "string"
+          ? [finding.captureId]
+          : undefined,
       captureId: typeof finding.captureId === "string" ? finding.captureId : undefined,
       createdAt: typeof finding.createdAt === "number" ? finding.createdAt : Date.now(),
     };

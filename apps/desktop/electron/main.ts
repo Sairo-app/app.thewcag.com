@@ -17,6 +17,8 @@ import { ScreenCaptureService } from "./services/screen-capture";
 import { SettingsService } from "./services/settings";
 import { JsonStore } from "./services/store";
 import { UpdateService } from "./services/updater";
+import { TicketConnectorService } from "./services/ticket-connectors";
+import { FunnelTelemetryService } from "./services/funnel-telemetry";
 import { WindowManager } from "./windows";
 import { createTray, installApplicationMenu } from "./menu";
 import { registerIpc } from "./ipc";
@@ -113,20 +115,22 @@ async function start(): Promise<void> {
   const captureCoordinator = new CaptureCoordinator(screenCapture, captures, windows);
   const auth = new AuthService(userData, store);
   const ai = new AiAuthoringService(userData, auth);
+  const tickets = new TicketConnectorService(userData);
   const notifyError = (error: unknown) => windows.broadcast("notification", { text: error instanceof Error ? error.message : String(error), error: true });
   const settings = new SettingsService(store, {
     inspect: () => void captureCoordinator.begin("pair").catch(notifyError),
-    capture: () => void captureCoordinator.begin("capture").catch(notifyError),
+    capture: () => void captureCoordinator.begin("capture", undefined, {}, true).catch(notifyError),
     lens: () => { windows.toggleLens(); },
   }, (action, accelerator) => {
     windows.broadcast("shortcut:failed", { action, accelerator });
     windows.broadcast("notification", { text: `The ${action} shortcut ${accelerator} is already in use`, error: true });
   },
   (value) => screenCapture.setHighDpi(value.captureHighDpi));
+  const telemetry = new FunnelTelemetryService(settings, store);
   const updates = new UpdateService((state) => windows.broadcast("update:state", state));
 
   services = { auth, windows, settings, captureCoordinator };
-  registerIpc({ ai, auth, captureCoordinator, captures, capture: screenCapture, settings, store, updates, windows });
+  registerIpc({ ai, auth, captureCoordinator, captures, capture: screenCapture, settings, store, telemetry, tickets, updates, windows });
 
   protocol.handle("thewcag-asset", async (request) => {
     if (request.method !== "GET") {

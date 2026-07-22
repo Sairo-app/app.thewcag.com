@@ -19,6 +19,9 @@ import type { ScreenCaptureService } from "./services/screen-capture";
 import type { SettingsService } from "./services/settings";
 import type { JsonStore } from "./services/store";
 import type { UpdateService } from "./services/updater";
+import type { TicketConnectorService } from "./services/ticket-connectors";
+import type { FunnelTelemetryService } from "./services/funnel-telemetry";
+import { parseDesktopTelemetryRequest } from "./services/funnel-telemetry";
 import type { WindowManager } from "./windows";
 import { discoverWebsite } from "./services/scope-discovery";
 
@@ -30,6 +33,8 @@ interface Services {
   capture: ScreenCaptureService;
   settings: SettingsService;
   store: JsonStore;
+  tickets: TicketConnectorService;
+  telemetry: FunnelTelemetryService;
   updates: UpdateService;
   windows: WindowManager;
 }
@@ -151,7 +156,7 @@ export function registerIpc(services: Services): void {
       sampleItemId: typeof request.sampleItemId === "string" ? stringField(request, "sampleItemId", 100) : undefined,
       testRunId: typeof request.testRunId === "string" ? stringField(request, "testRunId", 100) : undefined,
     };
-    return services.captureCoordinator.begin(mode, auditId, context);
+    return services.captureCoordinator.begin(mode, auditId, context, request.standalone === true);
   });
 
   register("capture:fullscreen", (_event, payload) => {
@@ -161,7 +166,7 @@ export function registerIpc(services: Services): void {
       sampleItemId: typeof value.sampleItemId === "string" ? stringField(value, "sampleItemId", 100) : undefined,
       testRunId: typeof value.testRunId === "string" ? stringField(value, "testRunId", 100) : undefined,
     };
-    return services.captureCoordinator.fullscreen(auditId, context);
+    return services.captureCoordinator.fullscreen(auditId, context, value.standalone === true);
   });
 
   register("capture:create", async (_event, payload) => {
@@ -254,7 +259,7 @@ export function registerIpc(services: Services): void {
   register("audit:activate", (_event, payload) => services.captureCoordinator.activateAudit(stringField(asObject(payload), "auditId", 48)));
   register("workspace:navigate", (event, payload) => {
     const tool = stringField(asObject(payload), "tool", 24);
-    const allowed: WorkspaceTool[] = ["plan", "inspect", "evidence", "review", "share", "vision", "palette", "settings", "capture", "checklist"];
+    const allowed: WorkspaceTool[] = ["plan", "inspect", "evidence", "review", "share", "captures", "vision", "palette", "settings", "capture", "checklist"];
     if (!allowed.includes(tool as WorkspaceTool)) throw new Error("Unsupported workspace destination");
     services.windows.navigate(tool as WorkspaceTool);
     if (viewFromUrl(event.sender.getURL()) !== "main") currentWindow(event).close();
@@ -263,6 +268,9 @@ export function registerIpc(services: Services): void {
   register("settings:get", () => services.settings.get());
   register("settings:save", (_event, payload) => services.settings.save(payload as AppSettings));
   register("settings:reset", () => services.settings.reset());
+  register("telemetry:emit", (_event, payload) =>
+    services.telemetry.emit(parseDesktopTelemetryRequest(payload)),
+  );
 
   register("auth:sign-in", () => services.auth.signIn());
   register("auth:sign-out", async () => {
@@ -275,6 +283,11 @@ export function registerIpc(services: Services): void {
   register("ai:test-provider", (_event, payload) => services.ai.testProvider(payload));
   register("ai:remove-provider", (_event, payload) => services.ai.removeProvider(payload));
   register("ai:set-active", (_event, payload) => services.ai.setActive(payload));
+  register("ticket:configuration", () => services.tickets.configuration());
+  register("ticket:save-connector", (_event, payload) => services.tickets.saveConnector(payload));
+  register("ticket:remove-connector", (_event, payload) => services.tickets.removeConnector(payload));
+  register("ticket:create", (_event, payload) => services.tickets.create(payload));
+  register("ticket:sync", (_event, payload) => services.tickets.sync(payload));
   register("report:publish", (_event, payload) => services.auth.publish(payload));
 
   register("dialog:save-image", async (event, payload) => {
@@ -289,6 +302,45 @@ export function registerIpc(services: Services): void {
     const image = nativeImage.createFromDataURL(dataUrl);
     await import("node:fs/promises").then(({ writeFile }) => writeFile(response.filePath!, image.toPNG()));
     return response.filePath;
+  });
+  register("dialog:save-pdf", async (event, payload) => {
+    const value = asObject(payload);
+    const html = stringField(value, "html", 10 * 1024 * 1024);
+    const requestedName = stringField(value, "name", 140).replace(/[^a-zA-Z0-9._-]/g, "-");
+    const name = requestedName.endsWith(".pdf") ? requestedName : `${requestedName}.pdf`;
+    const response = await dialog.showSaveDialog(currentWindow(event), {
+      defaultPath: name,
+      filters: [{ name: "Accessible PDF report", extensions: ["pdf"] }],
+    });
+    if (response.canceled || !response.filePath) return null;
+    const reportWindow = new BrowserWindow({
+      show: false,
+      width: 1240,
+      height: 1754,
+      webPreferences: {
+        contextIsolation: true,
+        javascript: false,
+        nodeIntegration: false,
+        sandbox: true,
+      },
+    });
+    reportWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    try {
+      const dataUrl = `data:text/html;charset=utf-8;base64,${Buffer.from(html, "utf8").toString("base64")}`;
+      await reportWindow.loadURL(dataUrl);
+      const pdf = await reportWindow.webContents.printToPDF({
+        displayHeaderFooter: false,
+        generateDocumentOutline: true,
+        generateTaggedPDF: true,
+        pageSize: "A4",
+        preferCSSPageSize: true,
+        printBackground: true,
+      });
+      await import("node:fs/promises").then(({ writeFile }) => writeFile(response.filePath!, pdf));
+      return response.filePath;
+    } finally {
+      if (!reportWindow.isDestroyed()) reportWindow.destroy();
+    }
   });
   register("dialog:save-text", async (event, payload) => {
     const value = asObject(payload);

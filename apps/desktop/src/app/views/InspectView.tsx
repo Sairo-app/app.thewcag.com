@@ -137,7 +137,7 @@ export function InspectView({
         title: "Contrast finding saved",
         detail: `${verdict.ratio.toFixed(2)}:1, ${MODES[mode].sc}`,
       });
-      show("Finding saved to evidence");
+      show("Finding saved. Add its evidence from the findings register.");
     } catch (error) {
       show(messageFromError(error), true);
     }
@@ -276,6 +276,7 @@ export function InspectView({
             </button>
           </div>
           <Button
+            id="contrast-picker-action"
             variant="primary"
             icon={Crosshair}
             disabled={pending}
@@ -373,7 +374,7 @@ export function InspectView({
           variant="quiet"
           onClick={() => onNavigate("evidence")}
         >
-          Capture evidence
+          Open capture library
         </Button>
       </div>
       {history.length ? (

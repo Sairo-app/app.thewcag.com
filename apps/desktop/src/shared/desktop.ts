@@ -7,7 +7,7 @@ import type {
 
 export type AppView = "main" | "overlay" | "annotate" | "lens";
 export type WorkspaceStage = "plan" | "inspect" | "evidence" | "review" | "share";
-export type WorkspaceUtility = "vision" | "palette" | "settings";
+export type WorkspaceUtility = "program" | "captures" | "vision" | "palette" | "settings";
 export type WorkspaceTool = WorkspaceStage | WorkspaceUtility | "capture" | "checklist";
 export type OverlayMode = "pair" | "foreground" | "background" | "capture" | "measure";
 
@@ -203,6 +203,8 @@ export interface AuditProject extends AuditBrief {
   id: string;
   createdAt: number;
   archivedAt?: number;
+  /** Bundled training data. Never inferred for a user's real audit. */
+  demo?: boolean;
 }
 
 export interface AuditActivity {
@@ -225,6 +227,69 @@ export interface PublishedReport {
   createdAt: number;
 }
 
+export type TicketConnectorId = "jira" | "linear" | "github";
+export type TicketSourceField =
+  | "title"
+  | "description"
+  | "actualResult"
+  | "expectedResult"
+  | "userImpact"
+  | "wcagMapping"
+  | "severity"
+  | "evidenceLink"
+  | "owner"
+  | "targetDate";
+export type TicketFieldMapping = Record<TicketSourceField, string>;
+export type TicketFieldValues = Record<TicketSourceField, string>;
+
+export interface TicketExternalSnapshot {
+  fields: Partial<TicketFieldValues>;
+  status: string;
+  fetchedAt: number;
+}
+
+export interface TicketSyncConflict {
+  field: TicketSourceField | "status";
+  kind: "external-change" | "diverged";
+  baselineValue: string;
+  localValue: string;
+  externalValue: string;
+}
+
+export interface FindingTicketLink {
+  connector: TicketConnectorId;
+  externalId: string;
+  key: string;
+  url: string;
+  externalStatus: string;
+  syncState: "in-sync" | "review" | "error";
+  baseline: TicketExternalSnapshot;
+  pendingExternal?: TicketExternalSnapshot;
+  conflicts: TicketSyncConflict[];
+  createdAt: number;
+  lastSyncedAt: number;
+  lastError?: string;
+}
+
+export interface TicketConnectorPublicConfig {
+  id: TicketConnectorId;
+  label: string;
+  configured: boolean;
+  credentialHint?: string;
+  mapping: TicketFieldMapping;
+  baseUrl?: string;
+  email?: string;
+  projectKey?: string;
+  issueType?: string;
+  teamId?: string;
+  repository?: string;
+}
+
+export interface TicketConnectorConfiguration {
+  secureStorageAvailable: boolean;
+  connectors: TicketConnectorPublicConfig[];
+}
+
 export interface Finding {
   key: string;
   reference?: string;
@@ -238,10 +303,16 @@ export interface Finding {
   location?: string;
   owner?: string;
   ticket?: string;
+  ticketLink?: FindingTicketLink;
   dueDate?: string;
+  evidenceLink?: string;
   riskAcceptance?: string;
   retestNote?: string;
   retestedAt?: number;
+  /** Local auditor-authored remediation transitions used for longitudinal metrics. */
+  statusHistory?: FindingStatusTransition[];
+  /** Ordered, finding-owned evidence. `captureId` remains as a legacy primary pointer. */
+  evidenceCaptureIds?: string[];
   captureId?: string;
   beforeCaptureId?: string;
   afterCaptureId?: string;
@@ -274,6 +345,11 @@ export interface Finding {
     generatedAt: number;
   };
   modifiedAt?: number;
+}
+
+export interface FindingStatusTransition {
+  status: Finding["status"];
+  changedAt: number;
 }
 
 export interface FindingOccurrence {
@@ -309,6 +385,14 @@ export interface ChecklistShortcutSettings {
   expand: string;
 }
 
+export const FUNNEL_TELEMETRY_EVENTS = [
+  "guide_to_download",
+  "download_to_first_plan",
+  "first_plan_to_first_deliver",
+] as const;
+
+export type FunnelTelemetryEvent = (typeof FUNNEL_TELEMETRY_EVENTS)[number];
+
 export interface AppSettings {
   shortcuts: ShortcutSettings;
   checklistShortcuts: ChecklistShortcutSettings;
@@ -316,6 +400,7 @@ export interface AppSettings {
   appearance: "light";
   reduceMotion: boolean;
   captureHighDpi: boolean;
+  shareAnonymousFunnelTelemetry: boolean;
 }
 
 export interface Account {
@@ -420,6 +505,7 @@ export type InvokeChannel =
   | "settings:get"
   | "settings:save"
   | "settings:reset"
+  | "telemetry:emit"
   | "auth:sign-in"
   | "auth:sign-out"
   | "auth:account"
@@ -428,8 +514,14 @@ export type InvokeChannel =
   | "ai:test-provider"
   | "ai:remove-provider"
   | "ai:set-active"
+  | "ticket:configuration"
+  | "ticket:save-connector"
+  | "ticket:remove-connector"
+  | "ticket:create"
+  | "ticket:sync"
   | "report:publish"
   | "dialog:save-image"
+  | "dialog:save-pdf"
   | "dialog:save-text"
   | "dialog:open-text"
   | "clipboard:write-text"

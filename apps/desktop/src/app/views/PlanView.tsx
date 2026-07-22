@@ -634,12 +634,16 @@ export function PlanView({
             <div className="audit-discovery-action">
               <Button
                 icon={MagicWand}
-                disabled={discoveryBusy || !audit.target.trim() || loadedAuditId !== audit.id}
+                disabled={audit.demo || discoveryBusy || !audit.target.trim() || loadedAuditId !== audit.id}
                 onClick={() => void inspectWebsite()}
               >
-                {discoveryBusy ? "Inspecting public pages…" : discovery ? "Inspect website again" : "Inspect website"}
+                {audit.demo ? "Bundled sample" : discoveryBusy ? "Inspecting public pages…" : discovery ? "Inspect website again" : "Inspect website"}
               </Button>
-              <small>Reads at most 9 public HTML pages (1 MB each), stays on the final origin, and does not sign in or submit forms.</small>
+              <small>
+                {audit.demo
+                  ? "The guided sample uses bundled evidence and never requests a website."
+                  : "Reads at most 9 public HTML pages (1 MB each), stays on the final origin, and does not sign in or submit forms."}
+              </small>
             </div>
           </div>
           {discovery ? (

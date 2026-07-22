@@ -32,6 +32,8 @@ export function App() {
   const [startupError, setStartupError] = useState<string | null>(null);
   const queryView = (new URLSearchParams(location.search).get("view") || "main") as AppView;
   useEffect(() => {
+    document.documentElement.lang = "en";
+    document.title = "TheWCAG workstation";
     let active = true;
     const timeout = window.setTimeout(() => {
       if (active) setStartupError("The desktop service did not finish starting. Reload the workspace or restart TheWCAG.");
@@ -54,6 +56,6 @@ export function App() {
   }, []);
 
   if (startupError) return <StartupFailure message={startupError} />;
-  if (!platform) return <div className="boot-screen"><img className="brand-mark" src="./logo.png" alt="" aria-hidden draggable={false} /><span>Opening workspace</span></div>;
+  if (!platform) return <div className="boot-screen" role="status" aria-live="polite" aria-busy="true"><img className="brand-mark" src="./logo.png" alt="" aria-hidden draggable={false} /><span>Opening workspace</span></div>;
   return <ErrorBoundary>{queryView === "overlay" ? <OverlayView /> : queryView === "lens" ? <LensView /> : queryView === "annotate" ? <AnnotateView /> : <Workspace platform={platform} />}</ErrorBoundary>;
 }

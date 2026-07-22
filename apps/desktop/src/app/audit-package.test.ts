@@ -130,4 +130,30 @@ describe("audit packages", () => {
     source.sections.testRuns[0].sampleItemId = "x".repeat(101);
     await expect(serializeAuditPackage(source)).rejects.toThrow("invalid guided test records");
   });
+
+  it("migrates legacy finding evidence and preserves orphaned captures in an unassigned bucket", async () => {
+    const source = payload();
+    source.sections.findings = [{
+      key: "legacy-finding",
+      title: "Legacy issue",
+      wcag: "1.4.3",
+      severity: "major",
+      status: "open",
+      note: "Imported from the Evidence stage",
+      captureId: "cap-linked",
+      createdAt: 1,
+    }];
+    source.captures = [
+      { id: "cap-linked", title: "Linked legacy capture", rawPngDataUrl: "data:image/png;base64,AA==" },
+      { id: "cap-orphan", title: "Orphaned legacy capture", rawPngDataUrl: "data:image/png;base64,AA==", document: '{"version":1,"nextId":1,"shapes":[]}' },
+    ];
+
+    const parsed = await parseAuditPackage(await serializeAuditPackage(source));
+    expect(parsed.sections.findings[0]).toMatchObject({
+      captureId: "cap-linked",
+      evidenceCaptureIds: ["cap-linked"],
+    });
+    expect(parsed.unassignedCaptureIds).toEqual(["cap-orphan"]);
+    expect(parsed.captures.find((capture) => capture.id === "cap-orphan")?.document).toContain('"shapes":[]');
+  });
 });

@@ -11,6 +11,9 @@ apps/desktop/release-check/
 .next/
 next-env.d.ts
 *.tsbuildinfo
+playwright-report/
+playwright-a11y-report/
+test-results/
 
 # Local design-tool and editor state
 .claude/

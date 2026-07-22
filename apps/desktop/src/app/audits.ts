@@ -7,7 +7,22 @@ import type {
   AuditScopeProfile,
   AuditTargetType,
 } from "../shared/desktop";
-import { desktop, getStored, setStored } from "./api";
+import { desktop, getStored, listCaptures, setStored } from "./api";
+
+export {
+  DEFAULT_TICKET_FIELD_MAPPINGS,
+  mapFindingToTicketFields,
+  resolveTicketConflict,
+  reviewTicketSync,
+  ticketFieldValuesFromFinding,
+} from "../shared/ticket-connectors";
+export {
+  findingEvidenceCaptureIds,
+  findingHasEvidence,
+  normalizeFindingEvidence,
+  referencedEvidenceCaptureIds,
+  unassignedCaptures,
+} from "../shared/finding-evidence";
 
 const AUDITS_KEY = "audits-v2";
 const ACTIVE_AUDIT_KEY = "active-audit-v2";
@@ -37,6 +52,7 @@ export type AuditSection =
   | "palette"
   | "sampleItems"
   | "testRuns"
+  | "vpatResponses"
   | "findingViews"
   | "activity"
   | "reports";
@@ -45,7 +61,7 @@ export type RecordAuditActivity = (
 ) => Promise<void>;
 
 const LEGACY_KEYS: Record<
-  Exclude<AuditSection, "activity" | "reports" | "sampleItems" | "testRuns" | "findingViews">,
+  Exclude<AuditSection, "activity" | "reports" | "sampleItems" | "testRuns" | "vpatResponses" | "findingViews">,
   string
 > = {
   findings: "findings",
@@ -61,15 +77,44 @@ const SECTION_DEFAULTS: Record<AuditSection, unknown> = {
   palette: ["#1F2933", "#FFF9ED", "#D9480F", "#28745D"],
   sampleItems: [],
   testRuns: [],
+  vpatResponses: {},
   findingViews: [],
   activity: [],
   reports: [],
 };
 
+const AUDIT_SECTIONS = Object.keys(SECTION_DEFAULTS) as AuditSection[];
+
+export interface AuditDeletionServices {
+  listCaptures: (auditId: string) => Promise<Array<{ id: string }>>;
+  deleteCapture: (id: string) => Promise<unknown>;
+  removeStoreKey: (key: string) => Promise<unknown>;
+}
+
 export function auditStoreKey(auditId: string, section: AuditSection): string {
   if (!/^aud-[a-z0-9-]{6,36}$/.test(auditId))
     throw new Error("Invalid audit identifier");
   return `${section}-${auditId}`;
+}
+
+export function auditDeletionKeys(auditId: string): string[] {
+  return AUDIT_SECTIONS.map((section) => auditStoreKey(auditId, section));
+}
+
+/** Permanently removes every per-audit record and local capture for an audit. */
+export async function deleteAuditData(
+  auditId: string,
+  services: AuditDeletionServices = {
+    listCaptures,
+    deleteCapture: (id) => desktop.invoke("capture:delete", { id }),
+    removeStoreKey: (key) => desktop.invoke("store:remove", { key }),
+  },
+): Promise<void> {
+  const captures = await services.listCaptures(auditId);
+  await Promise.all([
+    ...captures.map((capture) => services.deleteCapture(capture.id)),
+    ...auditDeletionKeys(auditId).map((key) => services.removeStoreKey(key)),
+  ]);
 }
 
 export function localDateInputValue(date = new Date()): string {
@@ -160,15 +205,15 @@ export function normalizeAuditProject(audit: AuditProject): AuditProject {
     conclusion: audit.conclusion ?? "in-progress",
     completedAt: audit.completedAt ?? "",
     scopeProfile: normalizeScopeProfile(audit.scopeProfile),
+    demo: audit.demo === true || undefined,
   };
 }
 
-async function migrateLegacyAudit(): Promise<{
+async function migrateLegacyAudit(legacy: AuditBrief): Promise<{
   audits: AuditProject[];
   activeId: string;
 }> {
-  const legacy = await getStored<AuditBrief | null>("audit-brief", null);
-  const audit = { ...createAuditProject(legacy?.project), ...(legacy ?? {}) };
+  const audit = { ...createAuditProject(legacy.project), ...legacy };
   await Promise.all(
     (Object.keys(LEGACY_KEYS) as Array<keyof typeof LEGACY_KEYS>).map(
       async (section) => {
@@ -185,7 +230,7 @@ async function migrateLegacyAudit(): Promise<{
       id: crypto.randomUUID(),
       auditId: audit.id,
       kind: "created",
-      title: legacy ? "Existing workspace migrated" : "Audit created",
+      title: "Existing workspace migrated",
       detail:
         "Captures, findings, and review progress now stay isolated in this audit.",
       createdAt: Date.now(),
@@ -198,6 +243,7 @@ async function migrateLegacyAudit(): Promise<{
     setStored(auditStoreKey(audit.id, "reports"), []),
     setStored(auditStoreKey(audit.id, "sampleItems"), []),
     setStored(auditStoreKey(audit.id, "testRuns"), []),
+    setStored(auditStoreKey(audit.id, "vpatResponses"), {}),
     setStored(auditStoreKey(audit.id, "findingViews"), []),
     desktop.invoke("capture:assign-unscoped", { auditId: audit.id }),
   ]);
@@ -212,7 +258,10 @@ async function loadAudits(): Promise<{
   const audits = stored
     .filter((audit) => audit && /^aud-[a-z0-9-]{6,36}$/.test(audit.id))
     .map(normalizeAuditProject);
-  if (!audits.length) return migrateLegacyAudit();
+  if (!audits.length) {
+    const legacy = await getStored<AuditBrief | null>("audit-brief", null);
+    return legacy ? migrateLegacyAudit(legacy) : { audits: [], activeId: "" };
+  }
   const requested = await getStored<string>(ACTIVE_AUDIT_KEY, audits[0].id);
   const activeId = audits.some(
     (audit) => audit.id === requested && !audit.archivedAt,
@@ -229,6 +278,7 @@ export function useAuditWorkspace() {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
   const [loadVersion, setLoadVersion] = useState(0);
+  const auditsRef = useRef<AuditProject[]>([]);
   const auditsWriteQueue = useRef<Promise<void>>(Promise.resolve());
   const activityWriteQueue = useRef<Promise<void>>(Promise.resolve());
 
@@ -253,6 +303,7 @@ export function useAuditWorkspace() {
     void loadAudits()
       .then((value) => {
         if (!mounted) return;
+        auditsRef.current = value.audits;
         setAudits(value.audits);
         setActiveId(value.activeId);
       })
@@ -266,6 +317,9 @@ export function useAuditWorkspace() {
       mounted = false;
     };
   }, [loadVersion, reportError]);
+  useEffect(() => {
+    auditsRef.current = audits;
+  }, [audits]);
 
   const activeAudit = useMemo(
     () => audits.find((audit) => audit.id === activeId) ?? audits[0] ?? null,
@@ -288,6 +342,7 @@ export function useAuditWorkspace() {
     const audit = createAuditProject(name);
     setAudits((current) => {
       const next = [audit, ...current];
+      auditsRef.current = next;
       void persistAudits(next);
       return next;
     });
@@ -303,6 +358,7 @@ export function useAuditWorkspace() {
           createdAt: Date.now(),
         } satisfies AuditActivity,
       ]),
+      setStored(auditStoreKey(audit.id, "vpatResponses"), {}),
       desktop.invoke("audit:activate", { auditId: audit.id }),
     ]).catch(reportError);
     return audit;
@@ -329,9 +385,11 @@ export function useAuditWorkspace() {
       auditor: source.auditor,
       startedAt: source.startedAt,
       scopeProfile: source.scopeProfile,
+      demo: source.demo === true || undefined,
     });
     setAudits((current) => {
       const next = [audit, ...current];
+      auditsRef.current = next;
       void persistAudits(next);
       return next;
     });
@@ -399,18 +457,37 @@ export function useAuditWorkspace() {
   );
 
   const discardAudit = useCallback(
-    (id: string) => {
-      const fallback = audits.find(
+    async (id: string) => {
+      const current = auditsRef.current;
+      if (!current.some((audit) => audit.id === id)) return false;
+      const fallback = current.find(
         (audit) => audit.id !== id && !audit.archivedAt,
       );
-      if (!fallback) return false;
-      const next = audits.filter((audit) => audit.id !== id);
-      setAudits(next);
-      void persistAudits(next);
-      if (activeId === id) selectAudit(fallback.id);
-      return true;
+      const next = current.filter((audit) => audit.id !== id);
+      try {
+        await deleteAuditData(id);
+        await persistAudits(next);
+        auditsRef.current = next;
+        setAudits(next);
+        if (activeId === id) {
+          if (fallback) {
+            setActiveId(fallback.id);
+            await Promise.all([
+              setStored(ACTIVE_AUDIT_KEY, fallback.id),
+              desktop.invoke("audit:activate", { auditId: fallback.id }),
+            ]);
+          } else {
+            setActiveId("");
+            await desktop.invoke("store:remove", { key: ACTIVE_AUDIT_KEY });
+          }
+        }
+        return true;
+      } catch (discardError) {
+        reportError(discardError);
+        return false;
+      }
     },
-    [activeId, audits, persistAudits, selectAudit],
+    [activeId, persistAudits, reportError],
   );
 
   const recordActivity = useCallback(

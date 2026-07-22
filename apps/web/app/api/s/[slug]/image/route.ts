@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { reports } from "@/lib/schema";
 import { getImage } from "@/lib/r2";
 import { isReportAvailable } from "@/lib/billing/subscriptions";
+import { A11Y_SCAN_PNG_BASE64, a11yScanReportFixture } from "@/lib/a11y-scan-fixture";
 
 export const runtime = "nodejs";
 
@@ -13,6 +14,15 @@ export const runtime = "nodejs";
  */
 export async function GET(_req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+  if (a11yScanReportFixture(slug)) {
+    return new NextResponse(Buffer.from(A11Y_SCAN_PNG_BASE64, "base64"), {
+      headers: {
+        "Content-Type": "image/png",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  }
   const [row] = await db
     .select({ imageKey: reports.imageKey, contentType: reports.imageContentType, availabilityStatus: reports.availabilityStatus, graceEndsAt: reports.graceEndsAt })
     .from(reports)

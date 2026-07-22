@@ -24,8 +24,10 @@ export class CaptureCoordinator {
     mode: OverlayMode,
     auditId?: string,
     context: { sampleItemId?: string; testRunId?: string } = {},
+    standalone = false,
   ): Promise<{ sessionId: string }> {
-    if (auditId) this.activeAuditId = auditId;
+    if (standalone) this.activeAuditId = undefined;
+    else if (auditId) this.activeAuditId = auditId;
     this.activeContext = context;
     const frames = await this.capture.captureAll();
     this.sessionId = randomUUID();
@@ -37,8 +39,10 @@ export class CaptureCoordinator {
   async fullscreen(
     auditId?: string,
     context: { sampleItemId?: string; testRunId?: string } = {},
+    standalone = false,
   ) {
-    if (auditId) this.activeAuditId = auditId;
+    if (standalone) this.activeAuditId = undefined;
+    else if (auditId) this.activeAuditId = auditId;
     this.activeContext = context;
     const frame = await this.capture.captureDisplayAtCursor();
     const entry = await this.captures.create(

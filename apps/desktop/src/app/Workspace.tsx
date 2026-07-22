@@ -10,12 +10,16 @@ import {
   type ReactNode,
 } from "react";
 import {
+  ArrowLeft,
+  ArrowRight,
   Aperture,
   Archive,
   BookOpenText,
+  Camera,
   CaretDown,
   Check,
   CheckSquare,
+  ChartBarHorizontal,
   ClipboardText,
   ClockCounterClockwise,
   Command,
@@ -27,16 +31,19 @@ import {
   SidebarSimple,
   SquaresFour,
   Target,
+  Trash,
   UserCircle,
   X,
 } from "@phosphor-icons/react";
 import type {
+  AppSettings,
   AuditActivity,
   AuditSampleItem,
   AuditTestRun,
   CaptureEntry,
   Finding,
   FindingSavedView,
+  FunnelTelemetryEvent,
   PlatformInfo,
   PublishedReport,
   WorkspaceStage,
@@ -70,10 +77,17 @@ import { PaletteView } from "./views/PaletteView";
 import { VisionView } from "./views/VisionView";
 import { SettingsView } from "./views/SettingsView";
 import { PlanView } from "./views/PlanView";
+import { ProgramDashboard } from "./views/ProgramDashboard";
 import { WCAG_CRITERIA } from "./data/wcag";
+import {
+  createGuidedSampleAuditPackage,
+  GUIDED_SAMPLE_NAME,
+} from "./guided-sample-audit";
 
 type Route = WorkspaceStage | WorkspaceUtility;
 const COMPACT_LAYOUT_QUERY = "(max-width: 1040px)";
+const COACH_MARKS_KEY = "first-run-coach-marks-v1";
+type CoachMarkId = "contrast" | "capture" | "vision";
 type IconType = ComponentType<{
   size?: number;
   weight?: "bold" | "regular" | "duotone";
@@ -87,12 +101,15 @@ const STAGES: {
 }[] = [
   { id: "plan", label: "Plan", number: "01", icon: ClipboardText },
   { id: "inspect", label: "Inspect", number: "02", icon: Target },
-  { id: "evidence", label: "Evidence", number: "03", icon: SquaresFour },
-  { id: "review", label: "Review", number: "04", icon: CheckSquare },
-  { id: "share", label: "Deliver", number: "05", icon: FileText },
+  { id: "review", label: "Review", number: "03", icon: CheckSquare },
+  { id: "share", label: "Deliver", number: "04", icon: FileText },
 ];
 
+const CAPTURE_LIBRARY = { id: "evidence" as const, label: "Findings & captures", icon: SquaresFour };
+
 const UTILITIES: { id: WorkspaceUtility; label: string; icon: IconType }[] = [
+  { id: "program", label: "Program", icon: ChartBarHorizontal },
+  { id: "captures", label: "Standalone captures", icon: Camera },
   { id: "vision", label: "Vision lens", icon: Aperture },
   { id: "palette", label: "Palette", icon: Palette },
   { id: "settings", label: "Settings", icon: GearSix },
@@ -110,9 +127,9 @@ const TITLES: Record<Route, { title: string; description: string }> = {
       "Sample any interface, verify WCAG, and save defensible findings.",
   },
   evidence: {
-    title: "Capture evidence",
+    title: "Findings and capture library",
     description:
-      "Collect, annotate, and organize the proof behind each finding.",
+      "Review finding-owned evidence and any unassigned local captures. This view is optional, not a required stage.",
   },
   review: {
     title: "Review the audit",
@@ -122,6 +139,15 @@ const TITLES: Record<Route, { title: string; description: string }> = {
     title: "Deliver the report",
     description:
       "Finalize the audit record, review public evidence, and publish with intent.",
+  },
+  program: {
+    title: "Program trends",
+    description:
+      "Review recurrence, retest timing, component hotspots, and regressions across owned local audits.",
+  },
+  captures: {
+    title: "Standalone capture library",
+    description: "Capture, annotate, copy, and export local screenshots without adding them to an audit or finding.",
   },
   vision: {
     title: "Vision lens",
@@ -140,7 +166,7 @@ const TITLES: Record<Route, { title: string; description: string }> = {
 };
 
 function normalizeRoute(tool: WorkspaceTool): Route {
-  if (tool === "capture") return "evidence";
+  if (tool === "capture") return "captures";
   if (tool === "checklist") return "review";
   return tool;
 }
@@ -181,6 +207,129 @@ function Modal({
   );
 }
 
+function formatShortcut(value: string, platform: PlatformInfo["platform"]): string {
+  return value
+    .replace("CommandOrControl", platform === "macos" ? "⌘" : "Ctrl")
+    .replaceAll("Alt", platform === "macos" ? "⌥" : "Alt")
+    .replaceAll("Shift", platform === "macos" ? "⇧" : "Shift")
+    .replaceAll("+", " + ");
+}
+
+function FirstRunExperience({
+  busy,
+  message,
+  onCreateBlank,
+  onImport,
+  onOpenCaptureLibrary,
+  onStartSample,
+}: {
+  busy: boolean;
+  message: string;
+  onCreateBlank: () => void;
+  onImport: () => void;
+  onOpenCaptureLibrary: () => void;
+  onStartSample: () => void;
+}) {
+  return (
+    <div className="first-run-shell">
+      <a className="skip-link" href="#first-run-main">Skip to first-run choices</a>
+      <main id="first-run-main" className="first-run-main" tabIndex={-1}>
+        <section className="first-run-intro" aria-labelledby="first-run-title">
+          <img src="./logo.png" alt="TheWCAG" draggable={false} />
+          <div>
+            <span className="first-run-local">Private, local workstation</span>
+            <h1 id="first-run-title">Complete your first audit in four focused stages.</h1>
+            <p>
+              Start with a small authored demo that is already planned, inspected,
+              annotated, reviewed, and ready to deliver. It uses bundled sample data
+              and never opens a network connection.
+            </p>
+          </div>
+          <div className="first-run-actions">
+            <button
+              type="button"
+              className="button button-primary first-run-primary"
+              disabled={busy}
+              onClick={onStartSample}
+            >
+              <BookOpenText size={18} weight="duotone" />
+              {busy ? "Preparing sample" : "Guided sample audit"}
+              <ArrowRight size={17} weight="bold" />
+            </button>
+            <button type="button" className="button button-secondary" disabled={busy} onClick={onCreateBlank}>
+              <Plus size={17} weight="bold" /> Create blank audit
+            </button>
+            <button type="button" className="text-action" disabled={busy} onClick={onImport}>
+              Import an audit package
+            </button>
+            <button type="button" className="text-action" disabled={busy} onClick={onOpenCaptureLibrary}>
+              Open screenshot-only capture library
+            </button>
+          </div>
+          {message ? <p className="first-run-message" role="status">{message}</p> : null}
+        </section>
+        <section className="first-run-route" aria-labelledby="first-run-route-title">
+          <div>
+            <h2 id="first-run-route-title">What the sample covers</h2>
+            <p>About five minutes. Use the real workstation, then delete the demo in one place.</p>
+          </div>
+          <ol>
+            {STAGES.map(({ id, label, icon: Icon }, index) => (
+              <li key={id}>
+                <span>{index + 1}</span>
+                <Icon size={20} weight="duotone" />
+                <strong>{label}</strong>
+                <small>{[
+                  "Read the completed local scope",
+                  "Review a saved contrast result",
+                  "Trace each decision to finding-owned evidence",
+                  "See a complete delivery record",
+                ][index]}</small>
+              </li>
+            ))}
+          </ol>
+        </section>
+      </main>
+    </div>
+  );
+}
+
+function CoachMark({
+  actionLabel,
+  children,
+  id,
+  shortcut,
+  title,
+  onAction,
+  onDismiss,
+}: {
+  actionLabel: string;
+  children: ReactNode;
+  id: CoachMarkId;
+  shortcut: string;
+  title: string;
+  onAction: () => void;
+  onDismiss: (id: CoachMarkId) => void;
+}) {
+  const titleId = `coach-${id}-title`;
+  return (
+    <aside className="coach-mark" aria-labelledby={titleId}>
+      <span className="coach-step">Demo tip</span>
+      <div>
+        <h2 id={titleId}>{title}</h2>
+        <p>{children}</p>
+        <div className="coach-actions">
+          <button type="button" className="text-action" onClick={onAction}>{actionLabel}</button>
+          <kbd>{shortcut}</kbd>
+        </div>
+      </div>
+      <button type="button" className="coach-dismiss" aria-label={`Dismiss ${title} tip`} onClick={() => onDismiss(id)}>
+        <X size={16} />
+      </button>
+    </aside>
+  );
+}
+
 export function Workspace({ platform }: { platform: PlatformInfo }) {
   const [active, setActive] = useState<Route>("plan");
   const [evidenceTab, setEvidenceTab] = useState<"captures" | "findings">("captures");
@@ -204,6 +353,17 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
   const [commandIndex, setCommandIndex] = useState(0);
   const [newAuditName, setNewAuditName] = useState("");
   const [archiveConfirm, setArchiveConfirm] = useState(false);
+  const [demoDeleteConfirm, setDemoDeleteConfirm] = useState(false);
+  const [seedingSample, setSeedingSample] = useState(false);
+  const [standaloneCaptureLibrary, setStandaloneCaptureLibrary] = useState(false);
+  const [auditDataVersion, setAuditDataVersion] = useState(0);
+  const [firstRunMessage, setFirstRunMessage] = useState("");
+  const [dismissedCoachMarks, setDismissedCoachMarks] = useState<CoachMarkId[]>([]);
+  const [shortcuts, setShortcuts] = useState<AppSettings["shortcuts"]>({
+    inspect: "Alt+CommandOrControl+P",
+    capture: "Alt+CommandOrControl+S",
+    lens: "Alt+CommandOrControl+L",
+  });
   const [stats, setStats] = useState({
     captures: 0,
     findings: 0,
@@ -248,6 +408,21 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     updateAudit,
   } = auditWorkspace;
   useEffect(() => {
+    let active = true;
+    void Promise.all([
+      desktop.invoke<AppSettings>("settings:get"),
+      getStored<CoachMarkId[]>(COACH_MARKS_KEY, []),
+    ]).then(([settings, dismissed]) => {
+      if (!active) return;
+      setShortcuts(settings.shortcuts);
+      setDismissedCoachMarks(
+        dismissed.filter((id): id is CoachMarkId =>
+          id === "contrast" || id === "capture" || id === "vision"),
+      );
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
+  useEffect(() => {
     if (auditWorkspaceError) {
       setNotice({ text: auditWorkspaceError, error: true, title: "Audit storage problem" });
     }
@@ -276,6 +451,12 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
   const startReadiness = activeAudit
     ? auditStartReadiness(activeAudit, activePlanSections.sampleItems, activePlanSections.testRuns)
     : null;
+  const emitFunnelTelemetry = useCallback((event: FunnelTelemetryEvent) => {
+    return desktop.invoke("telemetry:emit", { event }).catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    if (startReadiness?.ready) void emitFunnelTelemetry("download_to_first_plan");
+  }, [active, emitFunnelTelemetry, startReadiness?.ready]);
   const updatePlanSections = useCallback(
     (sampleItems: AuditSampleItem[], testRuns: AuditTestRun[]) => {
       setPlanSections({ auditId: activeAudit?.id ?? "", sampleItems, testRuns });
@@ -283,9 +464,24 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     [activeAudit?.id],
   );
 
+  const dismissCoachMark = useCallback((id: CoachMarkId) => {
+    setDismissedCoachMarks((current) => {
+      if (current.includes(id)) return current;
+      const next = [...current, id];
+      void setStored(COACH_MARKS_KEY, next);
+      return next;
+    });
+  }, []);
+
+  const dismissAllCoachMarks = useCallback(() => {
+    const next: CoachMarkId[] = ["contrast", "capture", "vision"];
+    setDismissedCoachMarks(next);
+    void setStored(COACH_MARKS_KEY, next);
+  }, []);
+
   const commands = useMemo(
     () =>
-      [...STAGES, ...UTILITIES].filter((item) =>
+      [...STAGES, CAPTURE_LIBRARY, ...UTILITIES].filter((item) =>
         item.label.toLowerCase().includes(query.toLowerCase()),
       ),
     [query],
@@ -317,7 +513,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
         event.preventDefault();
         setCommandOpen((value) => !value);
       }
-      if ((event.metaKey || event.ctrlKey) && /^[1-5]$/.test(event.key)) {
+      if ((event.metaKey || event.ctrlKey) && /^[1-4]$/.test(event.key)) {
         event.preventDefault();
         navigate(STAGES[Number(event.key) - 1].id);
       }
@@ -363,7 +559,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     return () => {
       cancelled = true;
     };
-  }, [active, activeId, activityOpen, activeAudit?.standard]);
+  }, [active, activeId, activityOpen, activeAudit?.standard, auditDataVersion]);
   useEffect(() => {
     const media = window.matchMedia(COMPACT_LAYOUT_QUERY);
     const onChange = () => {
@@ -395,6 +591,12 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
   }, [commands.length]);
 
   function navigate(route: Route) {
+    if (!activeAudit && (route === "evidence" || route === "captures")) {
+      setStandaloneCaptureLibrary(true);
+      setCommandOpen(false);
+      setQuery("");
+      return;
+    }
     if (
       route !== "plan" &&
       STAGES.some((stage) => stage.id === route) &&
@@ -408,6 +610,11 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
         title: "Finish audit setup",
       });
       return;
+    }
+    if (route === "share" && startReadiness?.ready) {
+      void emitFunnelTelemetry("download_to_first_plan").then(() =>
+        emitFunnelTelemetry("first_plan_to_first_deliver"),
+      );
     }
     if (route === "evidence") setEvidenceTab("captures");
     setActive(route);
@@ -503,12 +710,10 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     setNotice({ text: "Integrity-checked audit package exported", error: false });
   }
 
-  async function importAuditPackage() {
-    const text = await desktop.invoke<string | null>("dialog:open-text", {
-      extension: "json",
-    });
-    if (!text) return;
-    const payload = await parseAuditPackage(text);
+  async function installAuditPackage(
+    payload: AuditPackagePayload,
+    source: "import" | "demo",
+  ) {
     const imported = importAudit(payload.audit);
     const createdCaptureIds: string[] = [];
     const sections = [
@@ -521,6 +726,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
       "findingViews",
       "activity",
       "reports",
+      "vpatResponses",
     ] as const;
     try {
       const captureMap = new Map<string, string>();
@@ -553,6 +759,9 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
       const findings = normalizeFindingReferences(payload.sections.findings).findings.map(
         (finding) => ({
           ...finding,
+          evidenceCaptureIds: finding.evidenceCaptureIds
+            ?.map((captureId) => remapCapture(captureId))
+            .filter((captureId): captureId is string => Boolean(captureId)),
           captureId: remapCapture(finding.captureId),
           beforeCaptureId: remapCapture(finding.beforeCaptureId),
           afterCaptureId: remapCapture(finding.afterCaptureId),
@@ -567,8 +776,10 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
           id: crypto.randomUUID(),
           auditId: imported.id,
           kind: "created" as const,
-          title: "Audit package imported",
-          detail: `Integrity verified. Exported ${payload.exportedAt}.`,
+          title: source === "demo" ? "Guided sample created" : "Audit package imported",
+          detail: source === "demo"
+            ? "Bundled local training data. No network content was opened."
+            : `Integrity verified. Exported ${payload.exportedAt}.`,
           createdAt: Date.now(),
         },
         ...payload.sections.activity.map((entry) => ({
@@ -586,6 +797,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
         setStored(auditStoreKey(imported.id, "history"), payload.sections.history),
         setStored(auditStoreKey(imported.id, "palette"), payload.sections.palette),
         setStored(auditStoreKey(imported.id, "activity"), importedActivity),
+        setStored(auditStoreKey(imported.id, "vpatResponses"), {}),
         setStored(
           auditStoreKey(imported.id, "reports"),
           payload.sections.reports.map((report) => ({
@@ -596,11 +808,8 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
           })),
         ),
       ]);
-      setActive("plan");
-      setNotice({
-        text: `${imported.project} imported with verified integrity`,
-        error: false,
-      });
+      setAuditDataVersion((value) => value + 1);
+      return imported;
     } catch (error) {
       await Promise.all([
         ...createdCaptureIds.map((id) => desktop.invoke("capture:delete", { id })),
@@ -608,9 +817,64 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
           desktop.invoke("store:remove", { key: auditStoreKey(imported.id, section) }),
         ),
       ]).catch(() => undefined);
-      discardAudit(imported.id);
+      await discardAudit(imported.id);
       throw error;
     }
+  }
+
+  async function importAuditPackage() {
+    const text = await desktop.invoke<string | null>("dialog:open-text", {
+      extension: "json",
+    });
+    if (!text) return;
+    const payload = await parseAuditPackage(text);
+    const imported = await installAuditPackage(payload, "import");
+    setActive("plan");
+    setNotice({
+      text: `${imported.project} imported with verified integrity`,
+      error: false,
+    });
+  }
+
+  async function startGuidedSample() {
+    if (seedingSample) return;
+    setSeedingSample(true);
+    setFirstRunMessage("");
+    try {
+      const sample = createGuidedSampleAuditPackage();
+      const imported = await installAuditPackage(sample, "demo");
+      setActive("plan");
+      setNotice({
+        text: `${imported.project} is ready. Start at Plan, then use Next to move through all four stages. Evidence is attached inside each finding.`,
+        error: false,
+      });
+      window.setTimeout(() => document.getElementById("audit-workspace-main")?.focus(), 0);
+    } catch (error) {
+      setFirstRunMessage(messageFromError(error, "The guided sample could not be prepared."));
+    } finally {
+      setSeedingSample(false);
+    }
+  }
+
+  function createBlankAudit() {
+    const audit = createAudit("Untitled audit");
+    setActive("plan");
+    setFirstRunMessage("");
+    setNotice({ text: `${audit.project} created`, error: false });
+  }
+
+  async function deleteDemoAudit() {
+    if (!activeAudit?.demo) return;
+    const name = activeAudit.project;
+    const removed = await discardAudit(activeAudit.id);
+    setDemoDeleteConfirm(false);
+    if (!removed) {
+      setNotice({ text: "The demo could not be removed cleanly.", error: true });
+      return;
+    }
+    setActive("plan");
+    setFirstRunMessage(`${name} and all of its local sample data were removed.`);
+    setNotice({ text: `${name} removed`, error: false });
   }
 
   function onCommandKey(event: ReactKeyboardEvent<HTMLInputElement>) {
@@ -644,14 +908,47 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
       </div>
     );
 
-  if (!activeAudit)
+  if (!activeAudit && auditWorkspaceError)
     return (
       <div className="workspace-loading">
         <img src="./logo.png" alt="" />
         <strong>The audit workspace could not be opened</strong>
-        <span>{auditWorkspaceError || "No active audit is available."}</span>
+        <span>{auditWorkspaceError}</span>
         <button className="button button-primary" onClick={retryLoad}>Try again</button>
       </div>
+    );
+
+  if (!activeAudit && standaloneCaptureLibrary)
+    return (
+      <div className="standalone-capture-shell">
+        <a className="skip-link" href="#standalone-capture-main">Skip to capture library</a>
+        <header>
+          <button type="button" className="button button-secondary" onClick={() => setStandaloneCaptureLibrary(false)}>
+            <ArrowLeft size={17} /> Back
+          </button>
+          <div><span className="section-label">No audit required</span><strong>Screenshot and annotation workspace</strong></div>
+          <span className="local-only-badge">Stored locally</span>
+        </header>
+        <main id="standalone-capture-main" tabIndex={-1}>
+          <EvidenceView />
+        </main>
+      </div>
+    );
+
+  if (!activeAudit)
+    return (
+      <FirstRunExperience
+        busy={seedingSample}
+        message={firstRunMessage}
+        onCreateBlank={createBlankAudit}
+        onImport={() => {
+          void importAuditPackage().catch((error) =>
+            setFirstRunMessage(messageFromError(error, "The audit package could not be imported.")),
+          );
+        }}
+        onOpenCaptureLibrary={() => setStandaloneCaptureLibrary(true)}
+        onStartSample={() => void startGuidedSample()}
+      />
     );
 
   const plan = auditPlanProgress(activeAudit);
@@ -659,7 +956,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
   const body =
     active === "plan" ? (
       <PlanView
-        key={activeAudit.id}
+        key={`${activeAudit.id}-${auditDataVersion}`}
         audit={activeAudit}
         onAuditChange={updateAudit}
         recordActivity={recordActivity}
@@ -675,7 +972,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
       />
     ) : active === "inspect" ? (
       <InspectView
-        key={activeAudit.id}
+        key={`${activeAudit.id}-${auditDataVersion}`}
         auditId={activeAudit.id}
         initialSession={guidedSession?.auditId === activeAudit.id ? guidedSession : null}
         onNavigate={navigate}
@@ -683,7 +980,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
       />
     ) : active === "evidence" ? (
       <EvidenceView
-        key={activeAudit.id}
+        key={`${activeAudit.id}-${auditDataVersion}`}
         auditId={activeAudit.id}
         initialTab={evidenceTab}
         onNavigate={navigate}
@@ -691,32 +988,91 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
       />
     ) : active === "review" ? (
       <ReviewView
-        key={activeAudit.id}
+        key={`${activeAudit.id}-${auditDataVersion}`}
         audit={activeAudit}
         recordActivity={recordActivity}
         onOpenFindings={openFindings}
       />
     ) : active === "share" ? (
       <ShareView
-        key={activeAudit.id}
+        key={`${activeAudit.id}-${auditDataVersion}`}
         audit={activeAudit}
         onAuditChange={updateAudit}
         recordActivity={recordActivity}
         onNavigate={navigate}
       />
+    ) : active === "program" ? (
+      <ProgramDashboard audits={audits} />
+    ) : active === "captures" ? (
+      <EvidenceView />
     ) : active === "palette" ? (
-      <PaletteView key={activeAudit.id} auditId={activeAudit.id} />
+      <PaletteView key={`${activeAudit.id}-${auditDataVersion}`} auditId={activeAudit.id} />
     ) : active === "vision" ? (
       <VisionView />
     ) : (
       <SettingsView platform={platform} />
     );
 
+  const coachId: CoachMarkId | null = activeAudit.demo
+    ? active === "inspect"
+      ? "contrast"
+      : active === "evidence"
+        ? "capture"
+        : active === "review" || active === "vision"
+          ? "vision"
+          : null
+    : null;
+  const visibleCoachId = coachId && !dismissedCoachMarks.includes(coachId)
+    ? coachId
+    : null;
+  const focusControl = (id: string) => {
+    window.setTimeout(() => document.getElementById(id)?.focus(), 0);
+  };
+  const coachMark = visibleCoachId === "contrast" ? (
+    <CoachMark
+      id="contrast"
+      title="Pick a contrast pair without leaving your task"
+      shortcut={formatShortcut(shortcuts.inspect, platform.platform)}
+      actionLabel="Focus contrast picker"
+      onAction={() => focusControl("contrast-picker-action")}
+      onDismiss={dismissCoachMark}
+    >
+      The sample already contains a saved result. Use Pick from screen when you
+      want to inspect any visible interface, then save the result as evidence.
+    </CoachMark>
+  ) : visibleCoachId === "capture" ? (
+    <CoachMark
+      id="capture"
+      title="Capture first, then annotate the evidence"
+      shortcut={formatShortcut(shortcuts.capture, platform.platform)}
+      actionLabel="Focus capture action"
+      onAction={() => focusControl("capture-annotate-action")}
+      onDismiss={dismissCoachMark}
+    >
+      The demo capture is bundled locally. For real work, capture a region and
+      open its thumbnail to add issue badges, notes, measurements, or redactions.
+    </CoachMark>
+  ) : visibleCoachId === "vision" ? (
+    <CoachMark
+      id="vision"
+      title="Keep the vision lens one shortcut away"
+      shortcut={formatShortcut(shortcuts.lens, platform.platform)}
+      actionLabel={active === "vision" ? "Focus lens action" : "Open vision lens utility"}
+      onAction={() => {
+        if (active !== "vision") navigate("vision");
+        focusControl("vision-lens-action");
+      }}
+      onDismiss={dismissCoachMark}
+    >
+      Toggle the protected lens over any application to inspect color and clarity.
+      Escape closes the lens without interrupting the audit record.
+    </CoachMark>
+  ) : null;
+
   const stageIndex = STAGES.findIndex((stage) => stage.id === active);
   const stageStats = [
     `${plan.complete}/${plan.total} ready`,
     startReadiness?.ready ? "Ready" : "Setup needed",
-    `${stats.captures} captures`,
     `${stats.reviewed} reviewed`,
     `${stats.reports} published`,
   ];
@@ -732,6 +1088,15 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
       }
     >
       <a className="skip-link" href="#audit-workspace-main">Skip to audit workspace</a>
+      {coachMark ? (
+        <a
+          className="skip-link skip-coaching"
+          href="#guided-stage-content"
+          onClick={dismissAllCoachMarks}
+        >
+          Skip demo tips
+        </a>
+      ) : null}
       <Toast message={notice} onClose={() => setNotice(null)} />
       <aside className="stage-rail" aria-label="Audit workflow">
         <button
@@ -758,6 +1123,18 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
               <small>{stageStats[Number(number) - 1]}</small>
             </button>
           ))}
+          <button
+            className="stage-link optional-records-link"
+            data-active={active === CAPTURE_LIBRARY.id}
+            aria-current={active === CAPTURE_LIBRARY.id ? "page" : undefined}
+            title="Optional findings and capture library"
+            onClick={() => navigate(CAPTURE_LIBRARY.id)}
+          >
+            <span className="stage-number">—</span>
+            <SquaresFour size={19} weight={active === CAPTURE_LIBRARY.id ? "duotone" : "regular"} />
+            <span>{CAPTURE_LIBRARY.label}</span>
+            <small>{stats.findings} findings · {stats.captures} captures</small>
+          </button>
         </nav>
         <div className="rail-utilities">
           <span>Utilities</span>
@@ -800,6 +1177,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
               <BookOpenText size={17} weight="duotone" />
             </span>
             <span className="project-name">{activeAudit.project}</span>
+            {activeAudit.demo ? <span className="demo-badge">Demo</span> : null}
             <CaretDown size={14} />
           </button>
           <button
@@ -814,6 +1192,15 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
           </button>
           <div className="command-actions">
             <StatusBadge tone="success">Stored locally</StatusBadge>
+            {activeAudit.demo ? (
+              <button
+                type="button"
+                className="demo-delete-action"
+                onClick={() => setDemoDeleteConfirm(true)}
+              >
+                <Trash size={16} /> Delete demo
+              </button>
+            ) : null}
             <IconButton
               label="Open first audit guide"
               onClick={() => void desktop.invoke("shell:open-external", { url: "https://app.thewcag.com/getting-started" })}
@@ -862,7 +1249,10 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
                 </button>
               ) : null}
             </div>
-            <div ref={taskContentRef} className="task-content">{body}</div>
+            <div ref={taskContentRef} className="task-content">
+              {coachMark}
+              <div id="guided-stage-content" tabIndex={-1}>{body}</div>
+            </div>
           </section>
           {compact && inspector ? (
             <button
@@ -906,7 +1296,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
                   {activeAudit.project.slice(0, 1).toUpperCase()}
                 </span>
                 <div>
-                  <strong>{activeAudit.project}</strong>
+                  <strong>{activeAudit.project}{activeAudit.demo ? " (Demo)" : ""}</strong>
                   <p>{activeAudit.target || "No target added"}</p>
                 </div>
               </div>
@@ -1189,6 +1579,14 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
           </button>
         </div>
       </Modal>
+      <ConfirmDialog
+        open={demoDeleteConfirm}
+        title={`Delete ${GUIDED_SAMPLE_NAME}?`}
+        description="This permanently removes the demo audit, its bundled capture, annotations, findings, review decisions, and activity from this computer. Your other audits are not affected."
+        confirmLabel="Delete demo and sample data"
+        onCancel={() => setDemoDeleteConfirm(false)}
+        onConfirm={() => void deleteDemoAudit()}
+      />
       <ConfirmDialog
         open={archiveConfirm}
         title={`Archive ${activeAudit.project}?`}

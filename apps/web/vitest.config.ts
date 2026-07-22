@@ -5,5 +5,9 @@ export default defineConfig({
   resolve: {
     alias: { "@": fileURLToPath(new URL(".", import.meta.url)) },
   },
-  test: { environment: "node" },
+  test: {
+    environment: "node",
+    passWithNoTests: false,
+    dangerouslyIgnoreUnhandledErrors: false,
+  },
 });

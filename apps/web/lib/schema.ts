@@ -74,12 +74,17 @@ export const desktopDevices = pgTable(
 );
 
 // ---- Shared reports (image blob lives in R2; metadata here) ----
+export type ReportIssueSeverity = "blocker" | "major" | "minor";
+export type ReportRemediationStatus = "open" | "retest" | "fixed" | "accepted";
+
 export interface ReportIssue {
   n: number;
   sc?: string;
   label: string;
-  severity: string;
+  severity: ReportIssueSeverity;
   note: string;
+  /** Optional for backwards compatibility with reports published before status was shared. */
+  status?: ReportRemediationStatus;
 }
 
 export const reports = pgTable(
@@ -107,6 +112,13 @@ export const reports = pgTable(
     retentionIdx: index("report_retention_idx").on(t.availabilityStatus, t.retentionDeleteAt),
   }),
 );
+
+// Aggregate-only, opt-in funnel counters. No identifiers, request metadata,
+// timestamps, audit content, URLs, screenshots, findings, or PII are stored.
+export const funnelTransitions = pgTable("funnel_transition", {
+  event: text("event").primaryKey(),
+  count: integer("count").notNull().default(1),
+});
 
 // ---- Dodo Payments normalized billing state ----
 // Dodo remains the financial source of truth. These tables contain only the

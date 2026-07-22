@@ -30,6 +30,10 @@ import { messageFromError, useTransientMessage } from "../hooks";
 import { ISSUE_TYPES, parseDoc } from "../../lib/annotate/model";
 import { renderDoc } from "../../lib/annotate/render";
 import { normalizeFindingReferences } from "../../shared/finding-references";
+import {
+  findingEvidenceCaptureIds,
+  findingHasEvidence,
+} from "../../shared/finding-evidence";
 
 type ChecklistState = Record<
   string,
@@ -145,7 +149,11 @@ export function ShareView({
         setTestRuns(nextTestRuns);
         setReports(nextReports);
         setAccount(nextAccount);
-        setCaptureId(nextCaptures[0]?.id || "");
+        const availableCaptureIds = new Set(nextCaptures.map((capture) => capture.id));
+        const linkedCaptureId = normalized.findings
+          .flatMap(findingEvidenceCaptureIds)
+          .find((id) => availableCaptureIds.has(id));
+        setCaptureId(linkedCaptureId || nextCaptures[0]?.id || "");
       })
       .catch((error) => {
         if (!cancelled) show(messageFromError(error), true);
@@ -172,8 +180,7 @@ export function ShareView({
   const includedFindings = useMemo(
     () =>
       activeFindings.filter(
-        (finding) =>
-          (!finding.captureId || finding.captureId === captureId),
+        (finding) => findingEvidenceCaptureIds(finding).includes(captureId),
       ),
     [activeFindings, captureId],
   );
@@ -220,6 +227,10 @@ export function ShareView({
         !finding.severityRationale?.trim() ||
         !finding.recommendation?.trim(),
     ).length;
+    const availableCaptureIds = new Set(captures.map((capture) => capture.id));
+    const findingsWithoutEvidence = findings.filter(
+      (finding) => !findingHasEvidence(finding, availableCaptureIds),
+    ).length;
     const recordReady =
       plan.complete === plan.total &&
       sampleComplete &&
@@ -227,7 +238,8 @@ export function ShareView({
       reviewed === applicable.length &&
       unlinkedFailures === 0 &&
       undocumentedNA === 0 &&
-      incompleteFindings === 0;
+      incompleteFindings === 0 &&
+      findingsWithoutEvidence === 0;
     const conclusionReady =
       audit.executiveSummary.trim() &&
       audit.limitations.trim() &&
@@ -243,6 +255,7 @@ export function ShareView({
       unlinkedFailures,
       undocumentedNA,
       incompleteFindings,
+      findingsWithoutEvidence,
       sampleComplete,
       sampleCount: sampleItems.length,
       testRunsComplete,
@@ -255,7 +268,7 @@ export function ShareView({
         audit.conclusion === "meets-target" && !canMeetTarget,
       fullAuditReady: recordReady && Boolean(conclusionReady),
     };
-  }, [activeFindings, audit, checklist, findings, sampleItems, testRuns]);
+  }, [activeFindings, audit, captures, checklist, findings, sampleItems, testRuns]);
   const ready = Boolean(
     selectedCapture &&
       title.trim() &&
@@ -315,6 +328,7 @@ export function ShareView({
         label: finding.title,
         severity: finding.severity,
         note: finding.note,
+        status: finding.status,
       }));
       const url = await desktop.invoke<string>("report:publish", {
         title: title.trim(),
@@ -524,6 +538,21 @@ export function ShareView({
               </small>
             </span>
           </div>
+          <div data-ready={delivery.findingsWithoutEvidence === 0}>
+            {delivery.findingsWithoutEvidence === 0 ? (
+              <CheckCircle size={18} weight="fill" />
+            ) : (
+              <WarningCircle size={18} weight="fill" />
+            )}
+            <span>
+              <strong>Finding evidence</strong>
+              <small>
+                {delivery.findingsWithoutEvidence
+                  ? `${delivery.findingsWithoutEvidence} findings need a linked capture`
+                  : "Every finding has linked local evidence"}
+              </small>
+            </span>
+          </div>
           <div data-ready={delivery.incompleteFindings === 0}>
             {delivery.incompleteFindings === 0 ? (
               <CheckCircle size={18} weight="fill" />
@@ -634,7 +663,7 @@ export function ShareView({
             <p>
               {delivery.conclusionConflict
                 ? "The recorded outcome conflicts with the current audit record. Change the outcome or resolve the incomplete coverage and unresolved failures before export."
-                : "Meeting the target remains unavailable until the plan, sample, guided test runs, criterion review, finding details, and all unresolved failures are complete."}
+                : "Meeting the target remains unavailable until the plan, sample, guided test runs, criterion review, finding details, linked evidence, and all unresolved failures are complete."}
             </p>
           </div>
         ) : null}

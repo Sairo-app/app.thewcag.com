@@ -4,24 +4,28 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { reports, users, type ReportIssue } from "@/lib/schema";
-import { SITE_URL } from "@/lib/reports";
+import { reports, users } from "@/lib/schema";
+import { SITE_URL, buildSharedReportMetadata, sanitizeReportIssues } from "@/lib/reports";
+import { reportImageAlt } from "@/lib/report-view";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { ReportViewTracker } from "@/components/ReportViewTracker";
 import { ArrowRightIcon, CalendarIcon, FlagIcon } from "@/components/icons";
 import { hasActiveProSubscription } from "@/lib/billing/entitlements";
 import { isReportAvailable } from "@/lib/billing/subscriptions";
+import { ReportExplorer } from "./ReportExplorer";
+import { a11yScanReportFixture } from "@/lib/a11y-scan-fixture";
 
 export const dynamic = "force-dynamic";
 
 // cache() dedupes the two calls per request (generateMetadata + the page).
 const getScreenshot = cache(async (slug: string) => {
+  const fixture = a11yScanReportFixture(slug);
+  if (fixture) return fixture;
   const [row] = await db
     .select({
       title: reports.title,
       description: reports.description,
       issues: reports.issues,
-      imageKey: reports.imageKey,
       createdAt: reports.createdAt,
       availabilityStatus: reports.availabilityStatus,
       graceEndsAt: reports.graceEndsAt,
@@ -52,38 +56,21 @@ export async function generateMetadata({
   const shot = await getScreenshot(slug);
   if (!shot) return { title: "Screenshot not found" };
 
-  const image = `${SITE_URL}/api/s/${slug}/image`;
-  const count = shot.issues.length;
-  const description =
-    shot.description ||
-    `${count} accessibility ${count === 1 ? "issue" : "issues"} annotated in the TheWCAG desktop app.`;
-  return {
+  return buildSharedReportMetadata({
+    slug,
     title: shot.title,
-    description,
-    robots: { index: false, follow: false },
-    openGraph: { title: shot.title, description, images: [{ url: image, width: 1400 }], type: "article" },
-    twitter: { card: "summary_large_image", title: shot.title, description, images: [image] },
-  };
+    description: shot.description,
+    issueCount: shot.issues.length,
+  });
 }
-
-// Severity chip colors chosen so white text clears WCAG AA (>= 4.5:1) on each.
-const SEVERITY_COLOR: Record<string, string> = {
-  blocker: "#B91C1C", // red-700
-  major: "#B45309", // amber-700
-  minor: "#475569", // slate-600
-};
 
 export default async function ScreenshotPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const shot = await getScreenshot(slug);
   if (!shot) notFound();
 
-  const issues = shot.issues as ReportIssue[];
-  const summary = [
-    { sev: "blocker", n: issues.filter((i) => i.severity === "blocker").length },
-    { sev: "major", n: issues.filter((i) => i.severity === "major").length },
-    { sev: "minor", n: issues.filter((i) => i.severity === "minor").length },
-  ].filter((s) => s.n > 0);
+  const issues = sanitizeReportIssues(shot.issues);
+  const imageUrl = `/api/s/${slug}/image`;
 
   // White-label: if the report owner set a brand, the page leads with their
   // logo/name/accent instead of TheWCAG's site header.
@@ -99,8 +86,6 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
   return (
     <div className="report-page flex min-h-screen flex-col">
       <ReportViewTracker slug={slug} />
-      {/* Minimal chrome: an accent strip (branded) and a slim logo-only bar.
-          No site nav. This page exists to show the screenshot. */}
       {brand?.color && <div aria-hidden="true" style={{ background: brand.color }} className="h-1 w-full" />}
       <header className="report-header border-b border-border">
         <div className="report-header__inner mx-auto flex max-w-[1600px] items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
@@ -125,109 +110,50 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
         </div>
       </header>
 
-      <main id="main" className="report-main mx-auto w-full max-w-[1600px] flex-1 px-4 py-4 sm:px-6">
-        {/* the screenshot IS the page; findings sit in a slim side panel */}
-        <div className="report-layout grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
-          <section className="report-image min-w-0">
-            <div className="report-image__frame flex min-h-[60vh] items-center justify-center rounded-xl border border-border bg-card p-2 shadow-sm lg:min-h-[calc(100vh-110px)]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`/api/s/${slug}/image`}
-                alt={`Annotated screenshot: ${shot.title}`}
-                className="max-h-[calc(100vh-130px)] w-auto max-w-full rounded-lg object-contain"
-              />
+      <main id="main" className="report-main mx-auto w-full max-w-[1440px] flex-1 px-4 sm:px-6">
+        <section id="report-overview" className="report-overview" aria-labelledby="report-title">
+          <div>
+            <p className="report-eyebrow">Shared accessibility report</p>
+            <h1 id="report-title">{shot.title}</h1>
+            {shot.description && <p className="report-overview__description">{shot.description}</p>}
+            <div className="report-overview__meta">
+              <span>
+                <FlagIcon size={16} />
+                {issues.length} {issues.length === 1 ? "finding" : "findings"}
+              </span>
+              <span>
+                <CalendarIcon size={16} />
+                Published <time dateTime={new Date(shot.createdAt).toISOString()}>{formatDate(shot.createdAt)}</time>
+              </span>
             </div>
-          </section>
+          </div>
+          <CopyLinkButton
+            url={`${SITE_URL}/s/${slug}`}
+            className="report-copy-link inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-card"
+          />
+        </section>
 
-          <aside className="report-sidebar flex max-h-[calc(100vh-110px)] flex-col">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h1 className="text-xl font-bold tracking-tight">{shot.title}</h1>
-                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
-                  <span className="inline-flex items-center gap-1">
-                    <FlagIcon size={13} />
-                    {issues.length} {issues.length === 1 ? "issue" : "issues"}
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <CalendarIcon size={13} />
-                    <time dateTime={new Date(shot.createdAt).toISOString()}>{formatDate(shot.createdAt)}</time>
-                  </span>
-                </div>
-              </div>
-              <CopyLinkButton
-                url={`${SITE_URL}/s/${slug}`}
-                className="shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-card"
-              />
-            </div>
+        <nav className="report-in-page-nav" aria-label="Report sections">
+          <a href="#report-overview">Overview</a>
+          <a href="#report-screenshot">Annotated screenshot</a>
+          <a href="#report-findings">Findings <span>{issues.length}</span></a>
+        </nav>
 
-            {shot.description && <p className="mt-2 text-sm">{shot.description}</p>}
+        <ReportExplorer title={shot.title} issues={issues} imageUrl={imageUrl} imageAlt={reportImageAlt(shot.title, issues)} />
 
-            {summary.length > 0 && (
-              <div className="report-summary mt-3 flex flex-wrap gap-1.5">
-                {summary.map((s) => (
-                  <span
-                    key={s.sev}
-                    className="rounded-md px-2 py-0.5 text-xs font-medium text-white"
-                    style={{ backgroundColor: SEVERITY_COLOR[s.sev] }}
-                  >
-                    {s.n} {s.sev}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {issues.length > 0 && (
-              <ol
-                className="report-findings mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1"
-                tabIndex={0}
-                aria-label="Findings"
-              >
-                {issues.map((issue) => (
-                  <li key={issue.n} className="report-finding flex gap-3 rounded-lg border border-border bg-card p-3">
-                    <span
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-xs font-bold text-white"
-                      style={{ backgroundColor: SEVERITY_COLOR[issue.severity] ?? SEVERITY_COLOR.major }}
-                      title={`Severity: ${issue.severity}`}
-                    >
-                      {issue.n}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
-                        {issue.sc && (
-                          <span className="rounded border border-border px-1.5 py-0.5 font-mono text-[11px] text-muted">
-                            WCAG {issue.sc}
-                          </span>
-                        )}
-                        <span className="text-[11px] font-medium uppercase tracking-wide text-muted">
-                          {issue.severity}
-                        </span>
-                        <span>{issue.label}</span>
-                      </p>
-                      {issue.note && <p className="mt-0.5 text-sm text-muted">{issue.note}</p>}
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            )}
-
-            {brand ? (
-              <p className="report-attribution mt-4 text-center text-[11px] text-muted">
-                Prepared with{" "}
-                <a href={SITE_URL} target="_blank" rel="noopener noreferrer" className="font-medium underline hover:text-foreground">
-                  TheWCAG
-                </a>
-              </p>
-            ) : (
-              <Link
-                href="/download"
-                className="report-cta mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
-              >
-                Audit with TheWCAG
-                <ArrowRightIcon size={16} />
-              </Link>
-            )}
-          </aside>
-        </div>
+        <footer className="report-footer">
+          {brand ? (
+            <p className="report-attribution">
+              Prepared with{" "}
+              <a href={SITE_URL} target="_blank" rel="noopener noreferrer">TheWCAG accessibility audit software</a>
+            </p>
+          ) : (
+            <Link href="/download" className="report-cta">
+              Audit with TheWCAG
+              <ArrowRightIcon size={16} />
+            </Link>
+          )}
+        </footer>
       </main>
     </div>
   );

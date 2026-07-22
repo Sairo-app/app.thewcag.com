@@ -81,6 +81,7 @@ export function VisionView() {
             documents, and native apps while you evaluate color and clarity.
           </p>
           <Button
+            id="vision-lens-action"
             variant="primary"
             icon={open ? EyeSlash : Eye}
             onClick={() => void toggle()}

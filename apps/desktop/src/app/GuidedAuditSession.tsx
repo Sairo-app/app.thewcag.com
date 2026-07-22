@@ -24,6 +24,7 @@ import {
 } from "./FindingEditorDialog";
 import { messageFromError, useTransientMessage } from "./hooks";
 import { nextFindingReference } from "../shared/finding-references";
+import { findingStatusHistoryAfterChange } from "../shared/finding-lifecycle";
 import { auditTestRunComplete } from "./audit-plan";
 
 const SAMPLE_STATUS_LABELS: Record<AuditSampleItem["status"], string> = {
@@ -292,7 +293,6 @@ export function GuidedAuditSession({
     if (!sample) return;
     setEditorSeed({
       location: sample.location,
-      captureId: contextCaptures[0]?.id ?? "",
       actualResult: run?.steps
         .filter((step) => step.observation.trim())
         .map((step) => `${step.label}: ${step.observation.trim()}`)
@@ -317,7 +317,8 @@ export function GuidedAuditSession({
       status: value.status,
       note: value.note.trim(),
       location: value.location.trim(),
-      captureId: value.captureId || undefined,
+      evidenceCaptureIds: value.evidenceCaptureIds,
+      captureId: value.evidenceCaptureIds[0] || value.captureId || undefined,
       beforeCaptureId: value.beforeCaptureId || undefined,
       afterCaptureId: value.afterCaptureId || undefined,
       comparisonNote: value.comparisonNote.trim(),
@@ -328,7 +329,9 @@ export function GuidedAuditSession({
       })),
       owner: value.owner.trim(),
       ticket: value.ticket.trim(),
+      ticketLink: value.ticketLink,
       dueDate: value.dueDate,
+      evidenceLink: value.evidenceLink.trim(),
       riskAcceptance: value.riskAcceptance.trim(),
       description: value.description.trim(),
       actualResult: value.actualResult.trim(),
@@ -339,6 +342,7 @@ export function GuidedAuditSession({
       recommendation: value.recommendation.trim(),
       reproductionSteps: value.reproductionSteps,
       retestNote: value.retestNote.trim(),
+      statusHistory: findingStatusHistoryAfterChange(undefined, value.status, now),
       createdAt: now,
       modifiedAt: now,
       schemaVersion: 2,
@@ -548,11 +552,11 @@ export function GuidedAuditSession({
                 <button type="button" onClick={() => onNavigate("evidence")}><Camera size={18} /><strong>{contextCaptures.length}</strong><span>captures</span></button>
                 <button type="button" onClick={() => onNavigate("evidence")}><NotePencil size={18} /><strong>{contextFindings.length}</strong><span>findings</span></button>
               </div>
-              <Button variant="primary" icon={Camera} disabled={captureBusy} onClick={() => void captureEvidence()}>
-                {captureBusy ? "Opening capture" : "Capture evidence"}
+              <Button variant="primary" icon={NotePencil} onClick={openFindingEditor}>Create finding</Button>
+              <Button icon={Camera} disabled={captureBusy} onClick={() => void captureEvidence()}>
+                {captureBusy ? "Opening capture" : "Capture only"}
               </Button>
-              <Button icon={NotePencil} onClick={openFindingEditor}>Create finding</Button>
-              <p>New records are automatically linked to <strong>{sample.label}</strong>{run ? ` and ${run.title}` : ""}.</p>
+              <p>Add evidence inside the finding editor to link it immediately. Capture only keeps an unassigned image in the local library for later use.</p>
             </aside>
           </div>
 
@@ -585,6 +589,9 @@ export function GuidedAuditSession({
         open={editorOpen}
         finding={null}
         captures={contextCaptures}
+        auditId={auditId}
+        sampleItemId={sample?.id}
+        testRunId={run?.id}
         initialValue={editorSeed}
         onClose={() => setEditorOpen(false)}
         onSave={(value) => void saveFinding(value)}

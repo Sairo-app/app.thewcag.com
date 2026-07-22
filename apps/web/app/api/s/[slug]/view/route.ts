@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { reports } from "@/lib/schema";
 import { hasActiveProSubscription } from "@/lib/billing/entitlements";
 import { isReportAvailable } from "@/lib/billing/subscriptions";
+import { a11yScanReportFixture } from "@/lib/a11y-scan-fixture";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,6 +13,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   if (!/^[A-Za-z0-9]{10}$/.test(slug)) return NextResponse.json({ counted: false }, { status: 400 });
+  if (a11yScanReportFixture(slug)) return NextResponse.json({ counted: false });
   const ua = req.headers.get("user-agent") ?? "";
   if (/bot|crawl|spider|slurp|facebookexternalhit|embed|preview|whatsapp|telegram/i.test(ua)) {
     return NextResponse.json({ counted: false });

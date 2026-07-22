@@ -53,6 +53,7 @@ const DEFAULTS: AppSettings = {
   appearance: "light",
   reduceMotion: false,
   captureHighDpi: true,
+  shareAnonymousFunnelTelemetry: false,
 };
 
 const PROVIDER_MODELS: Record<AiProviderId, string> = {
@@ -327,6 +328,34 @@ export function SettingsView({
                 void saveSettings({
                   ...settings,
                   reduceMotion: event.target.checked,
+                })
+              }
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="settings-section">
+        <div className="settings-intro">
+          <h2>Privacy</h2>
+          <p>Optional aggregate product telemetry. Off unless you enable it.</p>
+        </div>
+        <div className="setting-rows">
+          <label className="toggle-row">
+            <span>
+              <strong>Share anonymous funnel milestones</strong>
+              <small>
+                Send only the first completed Plan and first Deliver transition names. No identifiers,
+                audit content, tested URLs, screenshots, findings, account data, or device details.
+              </small>
+            </span>
+            <input
+              type="checkbox"
+              checked={settings.shareAnonymousFunnelTelemetry}
+              onChange={(event) =>
+                void saveSettings({
+                  ...settings,
+                  shareAnonymousFunnelTelemetry: event.target.checked,
                 })
               }
             />

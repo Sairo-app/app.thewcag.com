@@ -1,6 +1,27 @@
 import type { ReportIssue } from "./schema";
+import { REPORT_STATUSES } from "./report-view";
+import type { Metadata } from "next";
 
 export const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://app.thewcag.com";
+
+export function buildSharedReportMetadata(input: {
+  slug: string;
+  title: string;
+  description?: string | null;
+  issueCount: number;
+}): Metadata {
+  const image = `${SITE_URL}/api/s/${input.slug}/image`;
+  const description =
+    input.description ||
+    `${input.issueCount} accessibility ${input.issueCount === 1 ? "issue" : "issues"} annotated in the TheWCAG desktop app.`;
+  return {
+    title: input.title,
+    description,
+    robots: { index: false, follow: false },
+    openGraph: { title: input.title, description, images: [{ url: image, width: 1400 }], type: "article" },
+    twitter: { card: "summary_large_image", title: input.title, description, images: [image] },
+  };
+}
 
 const ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -79,6 +100,7 @@ export function isUniqueViolation(err: unknown): boolean {
 }
 
 const ISSUE_SEVERITIES = new Set(["blocker", "major", "minor"]);
+const ISSUE_STATUSES = new Set(REPORT_STATUSES);
 
 function cleanText(value: unknown, maxLength: number): string {
   // Report metadata is public and may originate from the extension or desktop app.
@@ -98,8 +120,12 @@ export function sanitizeReportIssues(value: unknown, maxItems = 100): ReportIssu
     const rawSc = cleanText(raw.sc, 20);
     const sc = /^\d+(?:\.\d+){1,3}$/.test(rawSc) ? rawSc : undefined;
     const rawSeverity = cleanText(raw.severity, 20).toLowerCase();
-    const severity = ISSUE_SEVERITIES.has(rawSeverity) ? rawSeverity : "major";
-    issues.push({ n: issues.length + 1, sc, label, severity, note });
+    const severity = ISSUE_SEVERITIES.has(rawSeverity) ? rawSeverity as ReportIssue["severity"] : "major";
+    const rawStatus = cleanText(raw.status, 20).toLowerCase();
+    const status = ISSUE_STATUSES.has(rawStatus as (typeof REPORT_STATUSES)[number])
+      ? rawStatus as NonNullable<ReportIssue["status"]>
+      : "open";
+    issues.push({ n: issues.length + 1, sc, label, severity, note, status });
   }
   return issues;
 }

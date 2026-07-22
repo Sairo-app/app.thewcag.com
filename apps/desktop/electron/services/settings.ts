@@ -29,6 +29,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   appearance: "light",
   reduceMotion: false,
   captureHighDpi: true,
+  shareAnonymousFunnelTelemetry: false,
 };
 
 function normalize(input: unknown): AppSettings {
@@ -61,6 +62,7 @@ function normalize(input: unknown): AppSettings {
     appearance: "light",
     reduceMotion: Boolean(value.reduceMotion),
     captureHighDpi: value.captureHighDpi !== false,
+    shareAnonymousFunnelTelemetry: value.shareAnonymousFunnelTelemetry === true,
   };
 }
 

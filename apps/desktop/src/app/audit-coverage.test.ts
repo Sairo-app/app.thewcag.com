@@ -47,6 +47,8 @@ describe("audit coverage", () => {
       severity: "major",
       status: "open",
       note: "",
+      evidenceCaptureIds: ["cap-1"],
+      captureId: "cap-1",
       createdAt: 1,
     };
     const capture = {
@@ -75,7 +77,49 @@ describe("audit coverage", () => {
     expect(coverage.rows[0].criteria).toEqual(["3.3.1"]);
     expect(coverage.rows[0].captures).toHaveLength(1);
     expect(coverage.rows[0].findings).toHaveLength(1);
+    expect(coverage.rows[0].findingsWithEvidence).toBe(1);
+    expect(coverage.rows[0].findingsWithoutEvidence).toBe(0);
     expect(coverage.complete).toBe(1);
+  });
+
+  it("does not treat a sample-scoped capture as finding evidence until it is linked", () => {
+    const capture = {
+      id: "orphan-cap",
+      sampleItemId: "checkout",
+      title: "Legacy evidence-stage capture",
+      createdAt: 1,
+      modifiedAt: 1,
+      issues: 0,
+      width: 1,
+      height: 1,
+      assetUrl: "capture://raw",
+      thumbnailUrl: null,
+    } satisfies CaptureEntry;
+    const finding: Finding = {
+      key: "finding-without-evidence",
+      sampleItemId: "checkout",
+      title: "Error is not announced",
+      wcag: "3.3.1",
+      severity: "major",
+      status: "open",
+      note: "",
+      createdAt: 1,
+    };
+    const coverage = buildAuditCoverage({
+      sampleItems: [sample("checkout", "complete")],
+      testRuns: [run("run-1", "complete", "checkout")],
+      captures: [capture],
+      findings: [finding],
+      checklist: {},
+    });
+    expect(coverage.rows[0]).toMatchObject({
+      state: "gap",
+      findingsWithEvidence: 0,
+      findingsWithoutEvidence: 1,
+    });
+    expect(coverage.rows[0].gap).toContain("finding needs linked evidence");
+    expect(coverage.rows[0].captures).toEqual([]);
+    expect(coverage.unassigned.captures).toEqual([capture]);
   });
 
   it("highlights completed samples without a trace and keeps unassigned work visible", () => {
