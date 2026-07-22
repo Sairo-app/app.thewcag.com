@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Footer, JsonLd } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { ProductLinks } from "@/components/ProductLinks";
@@ -7,6 +6,7 @@ import { CheckIcon } from "@/components/icons";
 import { breadcrumbJsonLd, createPageMetadata, SITE_URL } from "@/lib/seo";
 
 const REPOSITORY = "https://github.com/Sairo-app/app.thewcag.com/tree/main/apps/extension";
+const SETUP_GUIDE = "https://github.com/Sairo-app/app.thewcag.com#chrome-extension";
 
 export const metadata: Metadata = createPageMetadata({
   title: "Chrome Accessibility Extension for Audit Evidence",
@@ -93,6 +93,30 @@ export default function ChromeAccessibilityExtensionPage() {
           <p>The extension source and production build are available in the repository for testing. Chrome Web Store packaging, listing review, and final privacy disclosures are the remaining distribution steps.</p>
           <a href={REPOSITORY} target="_blank" rel="noreferrer">View extension source</a>
         </div>
+
+        <section aria-labelledby="install-heading">
+          <h2 id="install-heading">Test the developer build now</h2>
+          <p className="mt-3">
+            Until the public Chrome Web Store review is complete, this setup is intended for developers and internal audit teams. It does not change Chrome&apos;s normal browsing permissions.
+          </p>
+          <ol className="audit-software-workflow mt-6">
+            {[
+              ["Build the extension", "Clone the repository, install dependencies, and run pnpm build:extension."],
+              ["Load it in Chrome", "Open chrome://extensions, turn on Developer mode, choose Load unpacked, and select apps/extension/dist."],
+              ["Start with local capture", "Pin TheWCAG, open a regular HTTP or HTTPS page, and select an element or region. Capture and export work even when the desktop bridge is offline."],
+              ["Connect the full workflow", "Install and open the desktop app, then use Connect desktop app in the extension. Native pairing requires the matching extension ID described in the setup guide."],
+            ].map(([title, body], index) => (
+              <li key={title}>
+                <span aria-hidden="true">{index + 1}</span>
+                <div><h3>{title}</h3><p>{body}</p></div>
+              </li>
+            ))}
+          </ol>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <a href={SETUP_GUIDE} target="_blank" rel="noreferrer" className="button button--primary">Open the complete setup guide</a>
+            <a href={REPOSITORY} target="_blank" rel="noreferrer" className="button button--secondary">Browse extension source</a>
+          </div>
+        </section>
 
         <section aria-labelledby="capture-flow-heading">
           <h2 id="capture-flow-heading">From selected control to confirmed finding</h2>

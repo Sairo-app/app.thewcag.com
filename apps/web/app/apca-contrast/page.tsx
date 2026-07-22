@@ -129,11 +129,11 @@ export default function ApcaContrastPage() {
         <section className="mt-14 rounded-xl border border-border bg-card p-6">
           <h2 className="text-lg font-bold tracking-tight">Read both numbers from any pixel</h2>
           <p className="mt-2 text-sm text-muted">
-            TheWCAG&apos;s desktop picker reports the WCAG 2.2 ratio with its AA/AAA verdict{" "}
+            TheWCAG&apos;s desktop picker reports the WCAG 2.2 ratio with the selected AA verdict{" "}
             <em>and</em> the APCA Lc value for any two pixels on screen in any app, not just the
             browser. Also try the{" "}
             <Link href="/color-contrast-checker" className="font-medium text-primary hover:underline">
-              in-browser contrast checker
+              desktop contrast picker guide
             </Link>
             .
           </p>

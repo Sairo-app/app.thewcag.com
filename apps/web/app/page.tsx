@@ -154,6 +154,30 @@ export default function Home() {
           </div>
         </aside>
 
+        <section className="home-paths" aria-labelledby="home-paths-heading">
+          <div className="home-shell home-paths__inner">
+            <div className="home-paths__intro">
+              <span>Choose your starting point</span>
+              <h2 id="home-paths-heading">What do you need today?</h2>
+            </div>
+            <Link href="/getting-started" className="home-paths__link">
+              <strong>Run your first audit</strong>
+              <span>Follow the screenshot-led setup and five-stage workflow.</span>
+              <ArrowRightIcon size={16} />
+            </Link>
+            <Link href="/download" className="home-paths__link">
+              <strong>Start working locally</strong>
+              <span>Download the free desktop workstation for macOS or Windows.</span>
+              <ArrowRightIcon size={16} />
+            </Link>
+            <Link href="/pricing" className="home-paths__link">
+              <strong>Add hosted services</strong>
+              <span>Compare managed AI, hosted reports, analytics, and branding.</span>
+              <ArrowRightIcon size={16} />
+            </Link>
+          </div>
+        </section>
+
         <section id="purpose" className="home-purpose" aria-labelledby="purpose-heading">
           <div className="home-shell">
             <div className="section-heading">

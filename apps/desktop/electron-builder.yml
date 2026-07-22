@@ -22,7 +22,9 @@ asar: true
 asarUnpack: []
 npmRebuild: false
 electronLanguages:
-  - en
+  # Electron does not ship a generic en.pak. Keeping the exact fallback locale
+  # is required or packaged Windows renderers exit before loading the app.
+  - en-US
 generateUpdatesFilesForAllChannels: true
 afterPack: resources/after-pack.mjs
 

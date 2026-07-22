@@ -26,6 +26,7 @@ const COLUMNS: { heading: string; links: { href: string; label: string; icon: Re
       { href: "/screenshot-tool", label: "Screenshot evidence", icon: <CropIcon size={15} /> },
       { href: "/color-contrast-checker", label: "Contrast checker", icon: <ContrastIcon size={15} /> },
       { href: "/download", label: "Download the app", icon: <DownloadIcon size={15} /> },
+      { href: "/pricing", label: "Pricing", icon: <BookIcon size={15} /> },
     ],
   },
   {
@@ -34,16 +35,20 @@ const COLUMNS: { heading: string; links: { href: string; label: string; icon: Re
       { href: "/signin", label: "Sign in", icon: <LogInIcon size={15} /> },
       { href: "/screenshots", label: "My reports", icon: <ImageIcon size={15} /> },
       { href: "/brand", label: "Report branding", icon: <PaletteIcon size={15} /> },
+      { href: "/account", label: "Account and devices", icon: <LogInIcon size={15} /> },
     ],
   },
   {
     heading: "Guides",
     links: [
+      { href: "/getting-started", label: "Getting started", icon: <BookIcon size={15} /> },
       { href: "/wcag-contrast", label: "WCAG contrast", icon: <BookIcon size={15} /> },
       { href: "/wcag-checklist", label: "WCAG 2.2 checklist", icon: <BookIcon size={15} /> },
       { href: "/apca-contrast", label: "APCA vs WCAG", icon: <ContrastIcon size={15} /> },
       { href: "/alt-text-guide", label: "Alt text guide", icon: <ImageIcon size={15} /> },
       { href: "/accessibility-statement", label: "Accessibility statement", icon: <AccessibilityIcon size={15} /> },
+      { href: "/privacy", label: "Privacy policy", icon: <AccessibilityIcon size={15} /> },
+      { href: "/terms", label: "Terms of use", icon: <BookIcon size={15} /> },
     ],
   },
 ];

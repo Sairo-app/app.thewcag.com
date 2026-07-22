@@ -1,15 +1,32 @@
 {
   "name": "accessibility-build-app",
   "private": true,
-  "version": "3.0.3",
+  "version": "3.0.5",
   "scripts": {
     "dev": "pnpm --filter @accessibility-build/desktop dev",
     "build": "pnpm --filter @accessibility-build/desktop build",
     "build:extension": "pnpm --filter @accessibility-build/extension build",
     "build:web": "pnpm --filter @thewcag/web build",
+    "lint": "eslint .",
+    "smoke:desktop:packaged": "node scripts/desktop-runtime-smoke.mjs",
     "typecheck": "pnpm --filter @accessibility-build/audit-contracts typecheck && pnpm --filter @accessibility-build/extension typecheck && pnpm --filter @accessibility-build/desktop typecheck && pnpm --filter @thewcag/web typecheck",
     "test": "pnpm --filter @accessibility-build/audit-contracts test && pnpm --filter @accessibility-build/extension test && pnpm --filter @accessibility-build/a11y-core test && pnpm --filter @accessibility-build/desktop test && pnpm --filter @thewcag/web test && node --test scripts/*.test.mjs",
-    "verify": "pnpm test && pnpm typecheck && pnpm build:extension && pnpm --filter @accessibility-build/desktop build:vite && node scripts/validate-desktop-bundle.mjs && pnpm build:web"
+    "verify": "pnpm lint && pnpm test && pnpm typecheck && pnpm build:extension && pnpm --filter @accessibility-build/desktop build:vite && node scripts/validate-desktop-bundle.mjs && pnpm build:web"
   },
-  "packageManager": "pnpm@9.15.4"
+  "packageManager": "pnpm@9.15.4",
+  "pnpm": {
+    "overrides": {
+      "postcss": "^8.5.10",
+      "sharp": "^0.35.0"
+    }
+  },
+  "devDependencies": {
+    "@eslint/js": "^9",
+    "@next/eslint-plugin-next": "^15.1.3",
+    "eslint": "^9",
+    "eslint-plugin-react": "^7.37.0",
+    "eslint-plugin-react-hooks": "^5",
+    "globals": "^16",
+    "typescript-eslint": "^8"
+  }
 }

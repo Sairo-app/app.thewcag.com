@@ -2,29 +2,54 @@ import { useEffect, useRef, useState } from "react";
 import { getStored, setStored } from "./api";
 
 export function useStoredState<T>(key: string, initial: T) {
-  const [value, setValue] = useState<T>(initial);
-  const [ready, setReady] = useState(false);
-  const queue = useRef(Promise.resolve());
+  const [state, setState] = useState<{
+    key: string;
+    value: T;
+    ready: boolean;
+    dirty: boolean;
+  }>({ key, value: initial, ready: false, dirty: false });
+  const queues = useRef(new Map<string, Promise<void>>());
 
   useEffect(() => {
     let active = true;
-    void getStored(key, initial).then((saved) => {
-      if (active) setValue(saved);
-    }).finally(() => {
-      if (active) setReady(true);
-    });
+    setState({ key, value: initial, ready: false, dirty: false });
+    void getStored(key, initial)
+      .then((saved) => {
+        if (!active) return;
+        setState((current) =>
+          current.key === key && !current.dirty
+            ? { key, value: saved, ready: true, dirty: false }
+            : current.key === key
+              ? { ...current, ready: true }
+              : current,
+        );
+      })
+      .catch((error) => {
+        console.error(`Could not load stored state for ${key}`, error);
+      })
+      .finally(() => {
+        if (!active) return;
+        setState((current) =>
+          current.key === key ? { ...current, ready: true } : current,
+        );
+      });
     return () => { active = false; };
   }, [key]);
 
   function update(next: T | ((current: T) => T)) {
-    setValue((current) => {
-      const resolved = typeof next === "function" ? (next as (current: T) => T)(current) : next;
-      queue.current = queue.current.then(() => setStored(key, resolved)).catch(() => undefined);
-      return resolved;
+    setState((current) => {
+      const currentValue = current.key === key ? current.value : initial;
+      const resolved = typeof next === "function" ? (next as (current: T) => T)(currentValue) : next;
+      const previous = queues.current.get(key) ?? Promise.resolve();
+      const request = previous.then(() => setStored(key, resolved));
+      queues.current.set(key, request.catch((error) => {
+        console.error(`Could not save stored state for ${key}`, error);
+      }));
+      return { key, value: resolved, ready: current.key === key && current.ready, dirty: true };
     });
   }
 
-  return [value, update, ready] as const;
+  return [state.key === key ? state.value : initial, update, state.key === key && state.ready] as const;
 }
 export function useTransientMessage(timeout = 3000) {
   const [message, setMessage] = useState<{

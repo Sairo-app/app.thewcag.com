@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, posix, win32 } from "node:path";
 import { promisify } from "node:util";
 
 const run = promisify(execFile);
@@ -29,6 +29,28 @@ export function nativeHostManifest(executablePath: string, extensionId: string):
   };
 }
 
+export function nativeHostManifestPath(options: {
+  platform: NodeJS.Platform;
+  homePath: string;
+  userDataPath: string;
+}): string | null {
+  if (options.platform === "darwin") {
+    return posix.join(
+      options.homePath,
+      "Library",
+      "Application Support",
+      "Google",
+      "Chrome",
+      "NativeMessagingHosts",
+      `${HOST_NAME}.json`,
+    );
+  }
+  if (options.platform === "win32") {
+    return win32.join(options.userDataPath, "native-messaging", `${HOST_NAME}.json`);
+  }
+  return null;
+}
+
 async function writeAtomic(path: string, contents: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   const temporary = `${path}.${process.pid}.tmp`;
@@ -41,27 +63,18 @@ export async function registerNativeMessagingHost(options: {
   resourcesPath: string;
   executablePath: string;
   homePath: string;
+  userDataPath: string;
 }): Promise<boolean> {
   const extensionId = await configuredExtensionId(options.resourcesPath);
-  if (!extensionId || !["darwin", "win32"].includes(options.platform)) return false;
+  const manifestPath = nativeHostManifestPath(options);
+  if (!extensionId || !manifestPath) return false;
   const manifest = `${JSON.stringify(nativeHostManifest(options.executablePath, extensionId), null, 2)}\n`;
 
   if (options.platform === "darwin") {
-    const path = join(
-      options.homePath,
-      "Library",
-      "Application Support",
-      "Google",
-      "Chrome",
-      "NativeMessagingHosts",
-      `${HOST_NAME}.json`,
-    );
-    await writeAtomic(path, manifest);
+    await writeAtomic(manifestPath, manifest);
     return true;
   }
 
-  const directory = join(options.resourcesPath, "native-messaging");
-  const manifestPath = join(directory, `${HOST_NAME}.json`);
   await writeAtomic(manifestPath, manifest);
   await run("reg.exe", [
     "ADD",

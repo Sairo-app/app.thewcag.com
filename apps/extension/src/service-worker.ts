@@ -2,7 +2,7 @@ import { createEvidencePacket } from "./evidence";
 import { isProtectedBrowserPage, pageAccessMessage } from "./page-access";
 import { runIssuePicker } from "./picker";
 import { isExtensionRequest, type ExtensionResponse } from "./shared/messages";
-import { DRAFT_STORAGE_KEY, EVIDENCE_STORAGE_KEY } from "./shared/storage";
+import { CAPTURE_TAB_STORAGE_KEY, DRAFT_STORAGE_KEY, EVIDENCE_STORAGE_KEY } from "./shared/storage";
 
 void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => undefined);
 
@@ -94,9 +94,31 @@ async function capture(mode: "element" | "region"): Promise<ExtensionResponse> {
     if (!selection) return { ok: false, cancelled: true, message: "Selection cancelled." };
 
     await new Promise((resolve) => setTimeout(resolve, 50));
+    const selectedTab = await chrome.tabs.get(tab.id);
+    let selectedPageUrl = "";
+    try {
+      const selectedUrl = new URL(selectedTab.url || "");
+      selectedPageUrl = `${selectedUrl.origin}${selectedUrl.pathname}`;
+    } catch {
+      selectedPageUrl = "";
+    }
+    if (
+      !selectedTab.active ||
+      selectedTab.windowId !== tab.windowId ||
+      selectedPageUrl !== selection.page.url
+    ) {
+      return {
+        ok: false,
+        cancelled: false,
+        message: "The active tab changed before the screenshot was captured. Start the capture again on the intended page.",
+      };
+    }
     const screenshotDataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" });
     const evidence = await createEvidencePacket(selection, screenshotDataUrl);
-    await chrome.storage.local.set({ [EVIDENCE_STORAGE_KEY]: evidence });
+    await chrome.storage.local.set({
+      [EVIDENCE_STORAGE_KEY]: evidence,
+      [CAPTURE_TAB_STORAGE_KEY]: tab.id,
+    });
     await chrome.storage.local.remove(DRAFT_STORAGE_KEY);
     await markAction(tab.id, "1", "#d9480f");
     await notifyPage(tab.id, "success", "Open TheWCAG from the toolbar to review the marked capture.");

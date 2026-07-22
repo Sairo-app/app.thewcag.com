@@ -221,7 +221,7 @@ export function SettingsView({
       setBusyProvider(null);
     }
   }
-  async function useAiProvider(provider: AiProviderId) {
+  async function selectAiProvider(provider: AiProviderId) {
     setBusyProvider(provider);
     try {
       const configuration = await desktop.invoke<AiConfiguration>("ai:set-active", { provider });
@@ -468,7 +468,7 @@ export function SettingsView({
                   <Button
                     icon={Plug}
                     disabled={busyProvider !== null || !selectedStatus.configured || selectedStatus.active}
-                    onClick={() => void useAiProvider(selectedKeyProvider)}
+                    onClick={() => void selectAiProvider(selectedKeyProvider)}
                   >
                     {selectedStatus.active ? "In use" : "Use for authoring"}
                   </Button>
@@ -500,9 +500,9 @@ export function SettingsView({
             ) : (
               <div className="ai-cloud-panel">
                 <div>
-                  <strong>{account.signedIn ? "Ready with your account" : "Sign in required"}</strong>
+                  <strong>{!account.signedIn ? "Sign in required" : account.features?.managedAi.enabled ? "Ready with Pro" : "Pro is required for managed AI"}</strong>
                   <p>
-                    The managed service keeps provider setup out of the app. Evidence is sent only after the auditor reviews and approves it.
+                    The managed service keeps provider setup out of the app. Local structured drafts and AI providers using your own key remain free.
                   </p>
                 </div>
                 <div className="ai-provider-actions">
@@ -511,13 +511,17 @@ export function SettingsView({
                       Sign in
                     </Button>
                   ) : null}
-                  <Button
-                    icon={CloudCheck}
-                    disabled={busyProvider !== null || selectedStatus.active}
-                    onClick={() => void useAiProvider("thewcag")}
-                  >
-                    {selectedStatus.active ? "In use" : "Use for authoring"}
-                  </Button>
+                  {account.signedIn && !account.features?.managedAi.enabled ? (
+                    <Button icon={ArrowSquareOut} onClick={() => void desktop.invoke("shell:open-external", { url: account.actions?.upgradeUrl || "https://app.thewcag.com/pricing" })}>View Pro</Button>
+                  ) : (
+                    <Button
+                      icon={CloudCheck}
+                      disabled={busyProvider !== null || selectedStatus.active || !account.features?.managedAi.enabled}
+                      onClick={() => void selectAiProvider("thewcag")}
+                    >
+                      {selectedStatus.active ? "In use" : "Use for authoring"}
+                    </Button>
+                  )}
                 </div>
               </div>
             )}
@@ -663,7 +667,9 @@ export function SettingsView({
               </strong>
               <p>
                 {account.signedIn
-                  ? `${account.plan || "Account"} · ${account.credits ?? 0} publish credits`
+                  ? account.plan === "pro" && account.features
+                    ? `Pro · ${account.features.managedAi.used} of ${account.features.managedAi.limit} managed AI drafts · ${account.features.hostedReports.active} of ${account.features.hostedReports.limit} hosted reports`
+                    : "Free · local audits, exports, and bring-your-own-key AI"
                   : "Sign in only when you are ready to publish a shareable report."}
               </p>
             </div>
@@ -687,6 +693,21 @@ export function SettingsView({
                 Sign in
               </Button>
             )}
+          </article>
+          <article>
+            <div className="settings-card-icon">
+              <CloudCheck size={21} weight="duotone" />
+            </div>
+            <div>
+              <strong>{account.plan === "pro" ? "Pro hosted services" : "Optional hosted services"}</strong>
+              <p>{account.plan === "pro" ? `Subscription ${account.subscription?.status || "active"}. Billing and invoices open securely in your browser.` : "Managed AI and hosted client links are available with Pro; every local audit feature stays free."}</p>
+            </div>
+            <Button
+              icon={ArrowSquareOut}
+              onClick={() => void desktop.invoke("shell:open-external", { url: account.actions?.billingUrl || account.actions?.upgradeUrl || "https://app.thewcag.com/pricing" })}
+            >
+              {account.actions?.canManageBilling ? "Manage billing" : "View Pro"}
+            </Button>
           </article>
           <article>
             <div className="settings-card-icon">

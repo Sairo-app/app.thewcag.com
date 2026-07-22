@@ -3,11 +3,32 @@ import type {
   AuditActivity,
   AuditBrief,
   AuditProject,
+  AuditScopeFeature,
+  AuditScopeProfile,
+  AuditTargetType,
 } from "../shared/desktop";
 import { desktop, getStored, setStored } from "./api";
 
 const AUDITS_KEY = "audits-v2";
 const ACTIVE_AUDIT_KEY = "active-audit-v2";
+const TARGET_TYPES = new Set<AuditTargetType>([
+  "content-site",
+  "web-product",
+  "commerce-service",
+  "release-regression",
+  "desktop-product",
+  "mobile-product",
+  "document-set",
+  "component-library",
+]);
+const SCOPE_FEATURES = new Set<AuditScopeFeature>([
+  "authentication",
+  "checkout",
+  "forms",
+  "media",
+  "documents",
+  "components",
+]);
 
 export type AuditSection =
   | "findings"
@@ -51,6 +72,13 @@ export function auditStoreKey(auditId: string, section: AuditSection): string {
   return `${section}-${auditId}`;
 }
 
+export function localDateInputValue(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function createAuditProject(name = "Untitled audit"): AuditProject {
   const now = Date.now();
   return {
@@ -71,9 +99,46 @@ export function createAuditProject(name = "Untitled audit"): AuditProject {
     completedAt: "",
     standard: "WCAG 2.2 AA",
     auditor: "",
-    startedAt: new Date(now).toISOString().slice(0, 10),
+    startedAt: localDateInputValue(new Date(now)),
     updatedAt: now,
     createdAt: now,
+  };
+}
+
+function normalizeScopeProfile(value: unknown): AuditScopeProfile | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const profile = value as Partial<AuditScopeProfile>;
+  if (
+    profile.version !== 1 ||
+    !profile.targetType ||
+    !TARGET_TYPES.has(profile.targetType) ||
+    typeof profile.templateId !== "string" ||
+    !profile.templateId.trim() ||
+    profile.templateId.length > 120 ||
+    !["high", "medium", "low"].includes(profile.confidence ?? "") ||
+    !Array.isArray(profile.featureIds) ||
+    profile.featureIds.length > SCOPE_FEATURES.size ||
+    new Set(profile.featureIds).size !== profile.featureIds.length ||
+    profile.featureIds.some((feature) => !SCOPE_FEATURES.has(feature)) ||
+    !Array.isArray(profile.reasons) ||
+    profile.reasons.length > 12 ||
+    profile.reasons.some(
+      (reason) =>
+        typeof reason !== "string" ||
+        !reason.trim() ||
+        reason.length > 500,
+    ) ||
+    typeof profile.confirmedAt !== "number" ||
+    !Number.isFinite(profile.confirmedAt)
+  ) return undefined;
+  return {
+    version: 1,
+    targetType: profile.targetType,
+    featureIds: [...profile.featureIds],
+    templateId: profile.templateId.trim(),
+    confidence: profile.confidence as AuditScopeProfile["confidence"],
+    reasons: [...profile.reasons],
+    confirmedAt: profile.confirmedAt,
   };
 }
 
@@ -94,6 +159,7 @@ export function normalizeAuditProject(audit: AuditProject): AuditProject {
     limitations: audit.limitations ?? "",
     conclusion: audit.conclusion ?? "in-progress",
     completedAt: audit.completedAt ?? "",
+    scopeProfile: normalizeScopeProfile(audit.scopeProfile),
   };
 }
 
@@ -161,24 +227,37 @@ export function useAuditWorkspace() {
   const [audits, setAudits] = useState<AuditProject[]>([]);
   const [activeId, setActiveId] = useState("");
   const [ready, setReady] = useState(false);
+  const [error, setError] = useState("");
+  const [loadVersion, setLoadVersion] = useState(0);
   const auditsWriteQueue = useRef<Promise<void>>(Promise.resolve());
   const activityWriteQueue = useRef<Promise<void>>(Promise.resolve());
+
+  const reportError = useCallback((value: unknown) => {
+    const message = value instanceof Error ? value.message : String(value ?? "");
+    setError(message.trim() || "The audit workspace could not be saved.");
+  }, []);
 
   const persistAudits = useCallback((next: AuditProject[]) => {
     const request = auditsWriteQueue.current.then(() =>
       setStored(AUDITS_KEY, next),
     );
     auditsWriteQueue.current = request.catch(() => undefined);
+    void request.catch(reportError);
     return request;
-  }, []);
+  }, [reportError]);
 
   useEffect(() => {
     let mounted = true;
+    setReady(false);
+    setError("");
     void loadAudits()
       .then((value) => {
         if (!mounted) return;
         setAudits(value.audits);
         setActiveId(value.activeId);
+      })
+      .catch((loadError) => {
+        if (mounted) reportError(loadError);
       })
       .finally(() => {
         if (mounted) setReady(true);
@@ -186,7 +265,7 @@ export function useAuditWorkspace() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [loadVersion, reportError]);
 
   const activeAudit = useMemo(
     () => audits.find((audit) => audit.id === activeId) ?? audits[0] ?? null,
@@ -200,9 +279,9 @@ export function useAuditWorkspace() {
       void Promise.all([
         setStored(ACTIVE_AUDIT_KEY, id),
         desktop.invoke("audit:activate", { auditId: id }),
-      ]);
+      ]).catch(reportError);
     },
-    [audits],
+    [audits, reportError],
   );
 
   const createAudit = useCallback((name?: string) => {
@@ -225,9 +304,9 @@ export function useAuditWorkspace() {
         } satisfies AuditActivity,
       ]),
       desktop.invoke("audit:activate", { auditId: audit.id }),
-    ]);
+    ]).catch(reportError);
     return audit;
-  }, [persistAudits]);
+  }, [persistAudits, reportError]);
 
   const importAudit = useCallback((source: AuditProject) => {
     const created = createAuditProject(source.project);
@@ -249,6 +328,7 @@ export function useAuditWorkspace() {
       standard: source.standard,
       auditor: source.auditor,
       startedAt: source.startedAt,
+      scopeProfile: source.scopeProfile,
     });
     setAudits((current) => {
       const next = [audit, ...current];
@@ -259,9 +339,9 @@ export function useAuditWorkspace() {
     void Promise.all([
       setStored(ACTIVE_AUDIT_KEY, audit.id),
       desktop.invoke("audit:activate", { auditId: audit.id }),
-    ]);
+    ]).catch(reportError);
     return audit;
-  }, [persistAudits]);
+  }, [persistAudits, reportError]);
 
   const updateAudit = useCallback(
     (patch: Partial<AuditProject>) => {
@@ -296,6 +376,26 @@ export function useAuditWorkspace() {
       return true;
     },
     [activeId, audits, persistAudits, selectAudit],
+  );
+
+  const restoreAudit = useCallback(
+    (id: string) => {
+      if (!audits.some((audit) => audit.id === id && audit.archivedAt)) return false;
+      const next = audits.map((audit) =>
+        audit.id === id
+          ? { ...audit, archivedAt: undefined, updatedAt: Date.now() }
+          : audit,
+      );
+      setAudits(next);
+      setActiveId(id);
+      void Promise.all([
+        persistAudits(next),
+        setStored(ACTIVE_AUDIT_KEY, id),
+        desktop.invoke("audit:activate", { auditId: id }),
+      ]).catch(reportError);
+      return true;
+    },
+    [audits, persistAudits, reportError],
   );
 
   const discardAudit = useCallback(
@@ -341,11 +441,14 @@ export function useAuditWorkspace() {
     activeId,
     archiveAudit,
     audits,
+    error,
     createAudit,
     discardAudit,
     importAudit,
     ready,
     recordActivity,
+    restoreAudit,
+    retryLoad: () => setLoadVersion((value) => value + 1),
     selectAudit,
     updateAudit,
   };

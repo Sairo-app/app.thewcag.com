@@ -9,8 +9,8 @@ TheWCAG ships one product across three deliberately separated surfaces:
   vision lens, native shortcuts, encrypted device and AI-provider credentials,
   provider selection, and offline work.
 - The Next.js service owns browser authentication, device authorization,
-  authorized AI generation, report publishing, account administration, public
-  report links, and the platform download redirect.
+  authorized AI generation, report publishing, Dodo subscription state, account
+  administration, public report links, and the platform download redirect.
 
 The extension does not send evidence directly to the website. It connects to the
 desktop through Chrome Native Messaging. The desktop never embeds the website as
@@ -64,11 +64,13 @@ The report draft remains local until the user explicitly publishes it. Publishin
 requires a signed-in account, a selected capture, reviewed findings, and the
 sensitive-information attestation.
 
-`POST /api/device/screenshots` validates the bearer token, PNG signature, payload
-size, issue count, and storage quota before writing the image to R2 and metadata to
-Postgres. Public reports are available at `/s/[slug]`; images are streamed through
-`/api/s/[slug]/image`. Deleting reports or users also removes the associated R2
-objects.
+`POST /api/device/screenshots` resolves a current Pro entitlement before accepting
+the image body, then validates the PNG signature, payload size, report count, and
+storage quota before writing the image to private R2 and metadata to Postgres.
+Public reports are available at `/s/[slug]`; images are streamed through the
+entitlement-aware `/api/s/[slug]/image` route. Subscription grace, revocation, and
+retention state applies to both page and image access. Local report exports remain
+free and never require a website account.
 
 ## AI-assisted finding drafts
 
@@ -77,7 +79,7 @@ address that could be sent. The auditor can withhold each section independently
 and must approve the payload explicitly. The extension sends the bounded evidence
 packet to the desktop native host, which uses the provider selected in Settings:
 
-- **TheWCAG managed** adds the encrypted device credential and posts to
+- **TheWCAG managed (Pro)** adds the encrypted device credential and posts to
   `POST /api/device/ai/findings`. The service enforces account limits and records
   operational usage only, not evidence or generated content.
 - **OpenAI** calls the Responses API directly with the user's encrypted key.
@@ -89,7 +91,18 @@ levels with the versioned local catalog, and validate the complete draft against
 the shared audit contract. Withheld screenshots, element text, and page addresses
 are omitted before the request is built. The editable draft returns through the
 desktop to the extension for human review. Nothing is saved as a finding until the
-auditor confirms it.
+  auditor confirms it.
+
+## Subscription and billing
+
+Dodo Payments is the only billing provider. Auth.js continues to own TheWCAG
+identity; Dodo owns hosted checkout, payment methods, tax, invoices, and the
+customer portal. A signed Dodo webhook updates normalized Postgres subscription
+state, and a protected scheduled route reconciles missed events and report
+retention. Browser return parameters and the desktop's cached display state never
+authorize a paid action. Managed AI, hosted publishing, analytics, and hosted
+branding re-check current server entitlements on every request. See
+[BILLING-OPERATIONS.md](BILLING-OPERATIONS.md) for deployment and recovery.
 
 ## Downloads and updates
 

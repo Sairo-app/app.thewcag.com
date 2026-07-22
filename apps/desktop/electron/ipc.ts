@@ -20,6 +20,7 @@ import type { SettingsService } from "./services/settings";
 import type { JsonStore } from "./services/store";
 import type { UpdateService } from "./services/updater";
 import type { WindowManager } from "./windows";
+import { discoverWebsite } from "./services/scope-discovery";
 
 interface Services {
   ai: AiAuthoringService;
@@ -133,7 +134,8 @@ export function registerIpc(services: Services): void {
   register("window:minimize", (event) => currentWindow(event).minimize());
   register("window:toggle-maximize", (event) => {
     const window = currentWindow(event);
-    window.isMaximized() ? window.unmaximize() : window.maximize();
+    if (window.isMaximized()) window.unmaximize();
+    else window.maximize();
   });
   register("window:close", (event) => currentWindow(event).close());
 
@@ -145,13 +147,21 @@ export function registerIpc(services: Services): void {
     const request = asObject(payload);
     const mode = modeOf(request.mode);
     const auditId = typeof request.auditId === "string" ? stringField(request, "auditId", 48) : undefined;
-    return services.captureCoordinator.begin(mode, auditId);
+    const context = {
+      sampleItemId: typeof request.sampleItemId === "string" ? stringField(request, "sampleItemId", 100) : undefined,
+      testRunId: typeof request.testRunId === "string" ? stringField(request, "testRunId", 100) : undefined,
+    };
+    return services.captureCoordinator.begin(mode, auditId, context);
   });
 
   register("capture:fullscreen", (_event, payload) => {
     const value = payload ? asObject(payload) : {};
     const auditId = typeof value.auditId === "string" ? stringField(value, "auditId", 48) : undefined;
-    return services.captureCoordinator.fullscreen(auditId);
+    const context = {
+      sampleItemId: typeof value.sampleItemId === "string" ? stringField(value, "sampleItemId", 100) : undefined,
+      testRunId: typeof value.testRunId === "string" ? stringField(value, "testRunId", 100) : undefined,
+    };
+    return services.captureCoordinator.fullscreen(auditId, context);
   });
 
   register("capture:create", async (_event, payload) => {
@@ -160,6 +170,10 @@ export function registerIpc(services: Services): void {
       stringField(value, "pngDataUrl", 50 * 1024 * 1024),
       stringField(value, "title", 160),
       typeof value.auditId === "string" ? stringField(value, "auditId", 48) : undefined,
+      {
+        sampleItemId: typeof value.sampleItemId === "string" ? stringField(value, "sampleItemId", 100) : undefined,
+        testRunId: typeof value.testRunId === "string" ? stringField(value, "testRunId", 100) : undefined,
+      },
     );
     services.windows.sendToMain("capture:saved", entry);
     if (value.silent !== true) services.windows.openAnnotate(entry.id);
@@ -214,11 +228,16 @@ export function registerIpc(services: Services): void {
   });
 
   register("lens:toggle", () => services.windows.toggleLens());
+  register("lens:state", () => services.windows.lensOpen());
   register("lens:frame", async (event) => {
     const window = currentWindow(event);
     if (window !== services.windows.lensWindow()) throw new Error("Lens frames are only available to the lens window");
     return services.capture.lensFrame(window.getBounds());
   });
+
+  register("scope:discover", (_event, payload) =>
+    discoverWebsite(stringField(asObject(payload), "target", 2_048)),
+  );
 
   register("store:get", (_event, payload) => services.store.getRaw(stringField(asObject(payload), "key", 64)));
   register("store:set", async (_event, payload) => {

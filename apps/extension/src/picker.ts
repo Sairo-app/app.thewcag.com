@@ -62,11 +62,22 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
     if (labels.length) return labels.join(" ").slice(0, 500);
     const alt = cleanText(element.getAttribute("alt"), 500);
     if (alt) return alt;
-    const title = cleanText(element.getAttribute("title"), 500);
-    if (title) return title;
-    const input = element instanceof HTMLInputElement ? cleanText(element.value, 0) : "";
-    void input;
-    return cleanText(element.textContent, 500);
+    if (element instanceof HTMLInputElement) {
+      const type = (element.type || "text").toLowerCase();
+      if (["button", "submit", "reset"].includes(type)) {
+        const value = cleanText(element.value, 500);
+        if (value) return value;
+        if (type === "submit") return "Submit";
+        if (type === "reset") return "Reset";
+      }
+    }
+    const content = cleanText([
+      element.textContent,
+      ...Array.from(element.querySelectorAll("img[alt]")).map((image) => image.getAttribute("alt")),
+      ...Array.from(element.querySelectorAll("svg[aria-label]")).map((image) => image.getAttribute("aria-label")),
+    ].filter(Boolean).join(" "), 500);
+    if (content) return content;
+    return cleanText(element.getAttribute("title"), 500);
   };
 
   const cssEscape = (value: string): string => {
@@ -81,7 +92,11 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
     if (testAttribute) {
       const value = element.getAttribute(testAttribute) || "";
       const candidate = `[${testAttribute}="${value.replace(/["\\]/g, "\\$&")}"]`;
-      if (document.querySelectorAll(candidate).length === 1) return candidate;
+      try {
+        if (document.querySelectorAll(candidate).length === 1) return candidate;
+      } catch {
+        // Fall through to a structural selector for unusual attribute values.
+      }
     }
     const parts: string[] = [];
     let current: Element | null = element;
@@ -184,7 +199,7 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
     const tag = element.tagName.toLowerCase();
     const attributes = safeAttributes(element);
     const serialized = Object.entries(attributes)
-      .map(([key, value]) => `${key}="${value.replace(/[&<>\"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" })[character] || character)}"`)
+      .map(([key, value]) => `${key}="${value.replace(/[&<>"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" })[character] || character)}"`)
       .join(" ");
     const text = element.matches("input,textarea,select,[contenteditable=true]") ? "" : cleanText(element.textContent, 1_000);
     return `<${tag}${serialized ? ` ${serialized}` : ""}>${text}</${tag}>`.slice(0, 12_000);
@@ -220,7 +235,7 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
     };
   };
 
-  const page: EvidencePageV1 = {
+  const pageFor = (): EvidencePageV1 => ({
     title: cleanText(document.title, 300),
     url: (() => {
       try {
@@ -241,7 +256,7 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
       offsetLeft: visualViewport?.offsetLeft ?? 0,
       offsetTop: visualViewport?.offsetTop ?? 0,
     },
-  };
+  });
 
   return new Promise<CapturedSelection | null>((resolve) => {
     const host = document.createElement("div");
@@ -258,6 +273,16 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
     document.documentElement.append(host);
 
     let hovered: Element | null = null;
+    const keyboardCandidates = Array.from(document.querySelectorAll(
+      "a[href],button,input:not([type='hidden']),select,textarea,[tabindex]:not([tabindex='-1']),[role]",
+    )).filter((element) => {
+      const bounds = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return bounds.width > 0 && bounds.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+    });
+    let keyboardIndex = document.activeElement
+      ? keyboardCandidates.indexOf(document.activeElement)
+      : -1;
     let dragStart: { x: number; y: number } | null = null;
     let dragRect: Rect | null = null;
     const originalCursor = document.documentElement.style.cursor;
@@ -288,7 +313,20 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
     const finish = (element: Element, bounds: Rect) => {
       const target = targetFor(element, bounds, mode);
       cleanup();
-      resolve({ page, target });
+      resolve({ page: pageFor(), target });
+    };
+
+    const highlightKeyboardCandidate = (direction: 1 | -1) => {
+      if (!keyboardCandidates.length) return;
+      keyboardIndex = (keyboardIndex + direction + keyboardCandidates.length) % keyboardCandidates.length;
+      const element = keyboardCandidates[keyboardIndex];
+      element.scrollIntoView({ block: "center", inline: "nearest" });
+      hovered = element;
+      requestAnimationFrame(() => {
+        const rect = rectValue(element.getBoundingClientRect());
+        const role = element.getAttribute("role") || implicitRole(element) || element.tagName.toLowerCase();
+        placeOutline(rect, `Keyboard selection · ${element.tagName.toLowerCase()}${role ? ` · ${role}` : ""}`);
+      });
     };
 
     const onPointerMove = (event: PointerEvent) => {
@@ -354,9 +392,14 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
         resolve(null);
         return;
       }
-      if (mode === "element" && event.key === "Enter") {
-        const element = document.activeElement;
-        if (element && element !== document.body && element !== document.documentElement) {
+      if (event.key === "Tab" || event.key === "ArrowDown" || event.key === "ArrowUp") {
+        blockPageAction(event);
+        highlightKeyboardCandidate(event.shiftKey || event.key === "ArrowUp" ? -1 : 1);
+        return;
+      }
+      if (event.key === "Enter") {
+        const element = hovered || document.activeElement;
+        if (element && element !== document.body && element !== document.documentElement && element !== host) {
           blockPageAction(event);
           finish(element, rectValue(element.getBoundingClientRect()));
         }

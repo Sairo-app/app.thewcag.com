@@ -10,6 +10,8 @@ export function isValidConnectState(value: unknown): value is string {
 
 export function normalizeDeviceName(value: unknown): string {
   if (typeof value !== "string") return "Desktop";
+  // Device names cross a native/browser boundary, so C0 controls are removed.
+  // eslint-disable-next-line no-control-regex
   const clean = value.replace(/[\u0000-\u001F\u007F]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
   return clean || "Desktop";
 }

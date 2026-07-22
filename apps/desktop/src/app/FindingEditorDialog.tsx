@@ -76,8 +76,11 @@ const EMPTY: FindingEditorValue = {
   retestNote: "",
 };
 
-function valueFromFinding(finding: Finding | null): FindingEditorValue {
-  if (!finding) return EMPTY;
+function valueFromFinding(
+  finding: Finding | null,
+  initialValue?: Partial<FindingEditorValue>,
+): FindingEditorValue {
+  if (!finding) return { ...EMPTY, ...initialValue };
   return {
     title: finding.title,
     wcag: finding.wcag,
@@ -110,12 +113,14 @@ export function FindingEditorDialog({
   open,
   finding,
   captures,
+  initialValue,
   onClose,
   onSave,
 }: {
   open: boolean;
   finding: Finding | null;
   captures: CaptureEntry[];
+  initialValue?: Partial<FindingEditorValue>;
   onClose: () => void;
   onSave: (value: FindingEditorValue) => void;
 }) {
@@ -124,8 +129,8 @@ export function FindingEditorDialog({
   const [value, setValue] = useState<FindingEditorValue>(EMPTY);
 
   useEffect(() => {
-    if (open) setValue(valueFromFinding(finding));
-  }, [finding, open]);
+    if (open) setValue(valueFromFinding(finding, initialValue));
+  }, [finding, initialValue, open]);
 
   useEffect(() => {
     const dialog = ref.current;
@@ -495,7 +500,7 @@ export function FindingEditorDialog({
               rows={3}
               value={value.retestNote}
               onChange={(event) => patch("retestNote", event.target.value)}
-              placeholder="Retested in build 3.0.3 with NVDA and Chrome."
+              placeholder="Retested in build 3.0.4 with NVDA and Chrome."
             />
           </Field>
           <Field

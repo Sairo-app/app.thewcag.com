@@ -8,7 +8,7 @@ import { createPageMetadata } from "@/lib/seo";
 export const metadata: Metadata = createPageMetadata({
   title: "Color Contrast Checker for macOS & Windows",
   description:
-    "Check WCAG color contrast anywhere on your screen - not just in the browser. TheWCAG samples any two pixels and shows the exact contrast ratio, AA/AAA pass or fail, and APCA score.",
+    "Check WCAG color contrast anywhere on your screen. TheWCAG samples two pixels and shows the exact ratio, the selected WCAG AA verdict, APCA Lc, and passing color candidates.",
   path: "/color-contrast-checker",
   keywords: ["color contrast checker", "WCAG contrast checker", "screen color picker", "APCA contrast checker"],
 });
@@ -16,7 +16,7 @@ export const metadata: Metadata = createPageMetadata({
 const FAQ = [
   {
     q: "What is a good color contrast ratio?",
-    a: "WCAG 2.2 AA requires at least 4.5:1 for normal text and 3:1 for large text (18.66px bold or 24px regular) and UI components. AAA raises normal text to 7:1. TheWCAG shows the ratio and the pass/fail verdict for each level as you pick.",
+    a: "WCAG 2.2 AA requires at least 4.5:1 for normal text and 3:1 for large text and UI components. Choose the content mode in TheWCAG to see its applicable AA result; the table below also documents the enhanced AAA text thresholds.",
   },
   {
     q: "Can I check contrast outside the browser?",
@@ -24,7 +24,7 @@ const FAQ = [
   },
   {
     q: "Does it support APCA?",
-    a: "Yes. Alongside the WCAG 2.x ratio, TheWCAG reports the APCA Lc value (the contrast model proposed for WCAG 3) so you can compare both.",
+    a: "Yes. Alongside the WCAG 2.x ratio, TheWCAG reports an APCA Lc value as a separate experimental comparison. The WCAG 2.2 result remains the audit decision shown by the tool.",
   },
   {
     q: "Is it free?",
@@ -52,7 +52,7 @@ export default function ColorContrastCheckerPage() {
         <p className="mt-3 max-w-2xl text-muted">
           Check WCAG color contrast <strong>anywhere on your screen</strong> - not just inside a
           browser. Pick any foreground and background pixel and TheWCAG shows the exact contrast
-          ratio, whether it passes WCAG 2.2 AA and AAA, and the APCA Lc score.
+          ratio, whether it passes the selected WCAG 2.2 AA requirement, and the APCA Lc score.
         </p>
         <div className="mt-6">
           <Link
@@ -67,9 +67,9 @@ export default function ColorContrastCheckerPage() {
           <h2 className="text-xl font-bold tracking-tight">How it works</h2>
           <ol className="mt-4 space-y-3 text-sm text-muted">
             <li><strong className="text-foreground">1. Freeze the screen.</strong> A magnified loupe appears so you can target the exact pixel.</li>
-            <li><strong className="text-foreground">2. Click the text color, then the background.</strong> Drag across a gradient to find the worst-case pixel automatically.</li>
-            <li><strong className="text-foreground">3. Read the verdict.</strong> Ratio, AA/AAA pass or fail for normal and large text, and APCA - instantly.</li>
-            <li><strong className="text-foreground">4. Fix it.</strong> One click suggests the nearest passing color.</li>
+            <li><strong className="text-foreground">2. Click the text color, then the background.</strong> For gradients and images, sample each material color combination separately.</li>
+            <li><strong className="text-foreground">3. Read the verdict.</strong> See the ratio, the selected normal-text, large-text, or UI-component AA result, and APCA Lc.</li>
+            <li><strong className="text-foreground">4. Explore a fix.</strong> Review candidate colors that reach the selected WCAG threshold, then verify the final design in context.</li>
           </ol>
         </section>
 

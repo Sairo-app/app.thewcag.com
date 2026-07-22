@@ -32,7 +32,7 @@ export function BrandForm({
     const f = e.target.files?.[0];
     if (!f) return;
     if (!BRAND_LOGO_TYPES[f.type]) {
-      setFileError("Choose a PNG, JPG, WEBP, or SVG logo.");
+      setFileError("Choose a PNG, JPG, or WEBP logo.");
       e.target.value = "";
       return;
     }
@@ -58,7 +58,8 @@ export function BrandForm({
   }
 
   const showLogo = logoPreview && !removeLogo;
-  const safeColor = HEX.test(color) ? color : DEFAULT_COLOR;
+  const colorValid = HEX.test(color);
+  const safeColor = colorValid ? color : DEFAULT_COLOR;
 
   return (
     <form action={formAction} className="mt-8 space-y-8">
@@ -82,7 +83,6 @@ export function BrandForm({
             placeholder="Acme Design"
             className="mt-1.5 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
-          {fileError && <span role="alert" className="text-xs text-red-700">{fileError}</span>}
         </label>
 
         <label className="block">
@@ -90,19 +90,26 @@ export function BrandForm({
           <div className="mt-1.5 flex items-center gap-2">
             <input
               type="color"
-              name="color"
-              value={color}
+              value={safeColor}
               onChange={(e) => setColor(e.target.value)}
               aria-label="Accent color"
               className="h-9 w-12 shrink-0 cursor-pointer rounded-md border border-border bg-card"
             />
             <input
+              name="color"
               value={color}
               onChange={(e) => setColor(e.target.value)}
               aria-label="Accent color hex"
+              aria-invalid={!colorValid}
+              aria-describedby={!colorValid ? "brand-color-error" : undefined}
               className="w-28 rounded-lg border border-border bg-card px-3 py-2 font-mono text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
+          {!colorValid && (
+            <span id="brand-color-error" role="alert" className="mt-1.5 block text-xs text-red-700">
+              Enter a six-digit hex color such as #b83b12.
+            </span>
+          )}
         </label>
       </div>
 
@@ -111,7 +118,7 @@ export function BrandForm({
           Logo
         </label>
         <p id="brand-logo-hint" className="mt-0.5 text-xs text-muted">
-          PNG, JPG, WEBP, or SVG. Up to 1 MB. Transparent backgrounds work best.
+          PNG, JPG, or WEBP. Up to 1 MB. Transparent backgrounds work best.
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <input
@@ -119,11 +126,12 @@ export function BrandForm({
             id="brand-logo"
             type="file"
             name="logo"
-            accept="image/png,image/jpeg,image/webp,image/svg+xml"
-            aria-describedby="brand-logo-hint"
+            accept="image/png,image/jpeg,image/webp"
+            aria-describedby={`brand-logo-hint${fileError ? " brand-logo-error" : ""}`}
             onChange={onFile}
             className="block text-sm file:mr-3 file:rounded-lg file:border file:border-border file:bg-card file:px-3 file:py-1.5 file:text-sm file:font-medium hover:file:bg-muted"
           />
+          {fileError && <span id="brand-logo-error" role="alert" className="text-xs text-red-700">{fileError}</span>}
           {showLogo && (
             <button
               type="button"
@@ -141,7 +149,7 @@ export function BrandForm({
       <div className="flex items-center gap-3">
         <button
           type="submit"
-          disabled={pending || Boolean(fileError)}
+          disabled={pending || Boolean(fileError) || !colorValid}
           className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60"
         >
           {pending ? "Saving…" : "Save branding"}

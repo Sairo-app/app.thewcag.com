@@ -67,7 +67,10 @@ corepack enable
 pnpm install --frozen-lockfile
 pnpm verify
 pnpm --filter @accessibility-build/desktop run pack
+pnpm smoke:desktop:packaged
 ```
+
+The automated Windows smoke test launches the real packaged renderer with an isolated temporary profile, skips registry and update side effects, and fails when the React root is blank or shows startup recovery.
 
 5. Smoke-test the unpacked app on the current platform: launch, screen permission, contrast pair, region and full-screen capture, annotation save/reopen, lens, checklist persistence, sign-in, report publishing, and update check.
 6. Load the release-candidate extension, connect it to the packaged desktop app,
@@ -77,8 +80,8 @@ pnpm --filter @accessibility-build/desktop run pack
 8. Create and push an annotated tag that exactly matches `apps/desktop/package.json`:
 
 ```sh
-git tag -a v3.0.3 -m "TheWCAG v3.0.3"
-git push origin v3.0.3
+git tag -a v3.0.5 -m "TheWCAG v3.0.5"
+git push origin v3.0.5
 ```
 
 The workflow runs the repository quality gate, builds macOS and Windows in parallel, uploads the signed macOS and unsigned Windows artifacts, and creates one GitHub Release. Release artifacts are treated as immutable by policy: fixes ship under a new patch version.

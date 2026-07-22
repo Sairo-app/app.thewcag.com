@@ -5,7 +5,7 @@ import type {
   CaptureEntry,
   Finding,
 } from "../shared/desktop";
-import { auditPlanProgress } from "./audit-plan";
+import { auditPlanProgress, auditTestRunComplete } from "./audit-plan";
 import { WCAG_CRITERIA } from "./data/wcag";
 
 export interface ChecklistExportEntry {
@@ -71,7 +71,7 @@ export function buildAuditMarkdown(input: {
     "",
     `- Evaluation plan: ${plan.complete} of ${plan.total} core fields complete`,
     `- Representative sample: ${sampleItems.filter((item) => item.status === "complete").length} of ${sampleItems.length} items tested`,
-    `- Guided test runs: ${testRuns.filter((run) => run.status === "complete").length} of ${testRuns.length} complete`,
+    `- Guided test runs: ${testRuns.filter(auditTestRunComplete).length} of ${testRuns.length} complete`,
     `- WCAG review: ${applicableCriteria.length - counts.untested} of ${applicableCriteria.length} applicable criteria recorded`,
     `- Findings: ${findings.length} total, ${statuses.open} open, ${statuses.retest} ready for retest, ${statuses.fixed} verified fixed, ${statuses.accepted} risk accepted`,
     `- Evidence captures: ${captures.length}`,
@@ -140,12 +140,12 @@ export function buildAuditMarkdown(input: {
         "",
         `- Category: ${run.category}`,
         `- Status: ${run.status}`,
-        `- Steps recorded: ${run.steps.filter((step) => step.complete).length} of ${run.steps.length}`,
+        `- Steps recorded: ${run.steps.filter((step) => step.complete && step.observation.trim()).length} of ${run.steps.length}`,
         "",
       );
       run.steps.forEach((step) => {
         lines.push(
-          `- [${step.complete ? "x" : " "}] ${step.label}${step.observation ? `: ${step.observation}` : ""}`,
+          `- [${step.complete && step.observation.trim() ? "x" : " "}] ${step.label}${step.observation ? `: ${step.observation}` : ""}`,
         );
       });
       if (run.notes.trim()) lines.push("", run.notes.trim());
@@ -161,7 +161,7 @@ export function buildAuditMarkdown(input: {
           plan.complete !== plan.total ||
           !sampleItems.length ||
           sampleItems.some((item) => item.status !== "complete") ||
-          testRuns.some((run) => run.status !== "complete") ||
+          testRuns.some((run) => !auditTestRunComplete(run)) ||
           counts.fail ||
           counts.untested ||
           undocumentedNA ||
@@ -353,7 +353,7 @@ export function buildAuditHtml(input: {
           plan.complete !== plan.total ||
           sampleItems.length === 0 ||
           sampleItems.some((item) => item.status !== "complete") ||
-          testRuns.some((run) => run.status !== "complete") ||
+          testRuns.some((run) => !auditTestRunComplete(run)) ||
           applicable.some((criterion) => checklist[criterion.sc]?.result === "fail") ||
           undocumentedNA ||
           activeFindings.length ||
@@ -455,10 +455,10 @@ export function buildAuditHtml(input: {
             <header>
               <span class="finding-number">${escapeHtml(run.category, "")}</span>
               <h3>${escapeHtml(run.title, "")}</h3>
-              <div class="finding-tags"><span class="tag">${escapeHtml(run.status, "")}</span><span class="tag">${run.steps.filter((step) => step.complete).length}/${run.steps.length} steps</span></div>
+              <div class="finding-tags"><span class="tag">${escapeHtml(run.status, "")}</span><span class="tag">${run.steps.filter((step) => step.complete && step.observation.trim()).length}/${run.steps.length} steps</span></div>
             </header>
             <div class="finding-body"><section><h4>Recorded steps</h4><ol>${run.steps
-              .map((step) => `<li>${step.complete ? "Completed" : "Not completed"}: ${escapeHtml(step.label, "")}${step.observation ? `<br><span class="meta">${escapeHtml(step.observation, "")}</span>` : ""}</li>`)
+              .map((step) => `<li>${step.complete && step.observation.trim() ? "Completed" : "Not completed"}: ${escapeHtml(step.label, "")}${step.observation ? `<br><span class="meta">${escapeHtml(step.observation, "")}</span>` : ""}</li>`)
               .join("")}</ol></section><section><h4>Run notes</h4>${paragraphs(run.notes)}</section></div>
           </article>`,
         )
@@ -554,7 +554,7 @@ export function buildAuditHtml(input: {
       <div><strong>${activeFindings.length}</strong><span>unresolved</span></div>
       <div><strong>${captures.length}</strong><span>evidence captures</span></div>
       <div><strong>${sampleItems.filter((item) => item.status === "complete").length}/${sampleItems.length}</strong><span>sample tested</span></div>
-      <div><strong>${testRuns.filter((run) => run.status === "complete").length}/${testRuns.length}</strong><span>test runs complete</span></div>
+      <div><strong>${testRuns.filter(auditTestRunComplete).length}/${testRuns.length}</strong><span>test runs complete</span></div>
     </div>
   </header>
   <main id="main">

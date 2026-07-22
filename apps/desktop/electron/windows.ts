@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { BrowserWindow, app, screen, type Display } from "electron";
+import { BrowserWindow, app, dialog, screen, type Display } from "electron";
 import type { AppView, OverlaySession, ScreenFrame, WorkspaceTool } from "../src/shared/desktop";
 import { hardenWebContents } from "./security";
 
@@ -16,8 +16,9 @@ export class WindowManager {
   private overlays = new Map<number, BrowserWindow>();
   private overlaySessions = new Map<number, OverlaySession>();
   private quitting = false;
+  private mainFailureReported = false;
 
-  constructor() {
+  constructor(private readonly reportError: (error: Error) => void = () => undefined) {
     app.on("before-quit", () => { this.quitting = true; });
   }
 
@@ -40,8 +41,8 @@ export class WindowManager {
       webPreferences: this.webPreferences(),
     });
     if (isMac) window.setWindowButtonVisibility(true);
-    this.secure(window);
-    this.load(window, "main");
+    this.secure(window, "main");
+    void this.load(window, "main").catch((error) => this.reportLoadFailure("main", error));
     window.once("ready-to-show", () => window.show());
     window.on("close", (event) => {
       if (!this.quitting && process.platform === "darwin") {
@@ -102,8 +103,8 @@ export class WindowManager {
       titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
       webPreferences: this.webPreferences(),
     });
-    this.secure(window);
-    this.load(window, "annotate", { capture: captureId });
+    this.secure(window, "annotate");
+    void this.load(window, "annotate", { capture: captureId }).catch((error) => this.reportLoadFailure("annotate", error));
     window.once("ready-to-show", () => window.show());
     window.on("closed", () => { if (this.annotate === window) this.annotate = null; });
     this.annotate = window;
@@ -114,6 +115,7 @@ export class WindowManager {
     if (this.lens && !this.lens.isDestroyed()) {
       this.lens.destroy();
       this.lens = null;
+      this.broadcast("lens:changed", false);
       return false;
     }
     const window = new BrowserWindow({
@@ -134,12 +136,22 @@ export class WindowManager {
     window.setAlwaysOnTop(true, "floating");
     window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     window.setContentProtection(true);
-    this.secure(window);
-    this.load(window, "lens");
+    this.secure(window, "lens");
+    void this.load(window, "lens").catch((error) => this.reportLoadFailure("lens", error));
     window.once("ready-to-show", () => window.show());
-    window.on("closed", () => { if (this.lens === window) this.lens = null; });
+    window.on("closed", () => {
+      if (this.lens === window) {
+        this.lens = null;
+        this.broadcast("lens:changed", false);
+      }
+    });
     this.lens = window;
+    this.broadcast("lens:changed", true);
     return true;
+  }
+
+  lensOpen(): boolean {
+    return Boolean(this.lens && !this.lens.isDestroyed());
   }
 
   lensWindow(): BrowserWindow | null {
@@ -181,7 +193,7 @@ export class WindowManager {
     });
     window.setAlwaysOnTop(true, "screen-saver");
     window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-    this.secure(window);
+    this.secure(window, "overlay");
     const contentsId = window.webContents.id;
     window.on("closed", () => {
       this.overlays.delete(window.id);
@@ -203,8 +215,33 @@ export class WindowManager {
     };
   }
 
-  private secure(window: BrowserWindow): void {
+  private secure(window: BrowserWindow, view: AppView): void {
     hardenWebContents(window.webContents);
+    window.webContents.on("did-fail-load", (_event, code, description, url, isMainFrame) => {
+      if (isMainFrame && code !== -3) {
+        this.reportRendererFailure(view, new Error(`Renderer failed to load ${url} (${code}: ${description})`));
+      }
+    });
+    window.webContents.on("render-process-gone", (_event, details) => {
+      if (details.reason !== "clean-exit") {
+        this.reportRendererFailure(view, new Error(`Renderer process ended (${details.reason}, exit code ${details.exitCode})`));
+      }
+    });
+  }
+
+  private reportLoadFailure(view: AppView, error: unknown): void {
+    const detail = error instanceof Error ? error.message : String(error);
+    this.reportRendererFailure(view, new Error(`Unable to open the ${view} renderer: ${detail}`));
+  }
+
+  private reportRendererFailure(view: AppView, error: Error): void {
+    this.reportError(error);
+    if (view !== "main" || this.mainFailureReported || this.quitting) return;
+    this.mainFailureReported = true;
+    dialog.showErrorBox(
+      "TheWCAG could not open",
+      `The application window failed to load. Restart TheWCAG or reinstall the latest version.\n\n${error.message}`,
+    );
   }
 
   private async load(window: BrowserWindow, view: AppView, extra: Record<string, string> = {}): Promise<void> {

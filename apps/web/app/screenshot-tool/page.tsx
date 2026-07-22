@@ -16,11 +16,11 @@ export const metadata: Metadata = createPageMetadata({
 const STEPS: { title: string; body: string }[] = [
   {
     title: "Capture a region",
-    body: "Press the Capture shortcut (default ⌥⌘S on macOS, Ctrl+Alt+S on Windows). The screen freezes with a magnified loupe. Drag a box around the area you want, or press Space to capture the whole screen. The capture opens in the annotation window.",
+    body: "Press the Capture shortcut (default ⌥⌘S on macOS, Ctrl+Alt+S on Windows) and drag a box around the required evidence. Use the app menu or tray action when you need a full-screen capture. The result opens in the annotation window.",
   },
   {
     title: "Flag an issue",
-    body: "Press I and click where the problem is to drop a numbered issue marker. Each marker becomes a row in the findings panel. Add as many as you need - they stay anchored to the image as you zoom and pan.",
+    body: "Choose the issue-marker tool and click where the problem appears. Add the WCAG criterion, severity, and note for each marker, then use Add findings to create structured finding rows in the selected audit.",
   },
   {
     title: "Describe it against WCAG",
@@ -28,7 +28,7 @@ const STEPS: { title: string; body: string }[] = [
   },
   {
     title: "Measure & probe",
-    body: "Use the ruler to measure any element - targets under 24×24px are flagged for WCAG 2.5.8. Use the contrast probe to click two points in the capture and read the exact ratio, attaching it to a finding.",
+    body: "Use the ruler to record an element's dimensions and review the result against WCAG 2.5.8 and its exceptions. Use the contrast probe to click two points in the capture and record their exact ratio.",
   },
   {
     title: "Redact anything sensitive",
@@ -36,7 +36,7 @@ const STEPS: { title: string; body: string }[] = [
   },
   {
     title: "Save or publish",
-    body: "Export the annotated image as PNG, or the findings as Markdown, for a ticket or doc. Or publish to a shareable app.thewcag.com link that anyone can open in a browser - no account required to view.",
+    body: "Export or copy the annotated image as PNG. Add markers to the audit to include their structured findings in Markdown or printable HTML audit exports, or publish the reviewed capture to an unlisted app.thewcag.com link.",
   },
 ];
 
@@ -44,8 +44,6 @@ const SHORTCUTS: [string, string, string][] = [
   ["Pick color pair", "⌥⌘P", "Ctrl+Alt+P"],
   ["Capture region", "⌥⌘S", "Ctrl+Alt+S"],
   ["Toggle color-blindness lens", "⌥⌘L", "Ctrl+Alt+L"],
-  ["Drop an issue marker", "I, then click", "I, then click"],
-  ["Pan / zoom the capture", "Scroll / ⌘-scroll", "Scroll / Ctrl-scroll"],
 ];
 
 const FAQ = [

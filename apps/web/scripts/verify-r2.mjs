@@ -1,12 +1,14 @@
 // Real Cloudflare R2 acceptance test. Run:
 //   cd apps/web && node --env-file=.env.production.local scripts/verify-r2.mjs
 // Ensures the bucket exists, then exercises the production path:
-// write (S3) -> [public read via CDN if R2_PUBLIC_URL set] -> delete.
+// write (S3) -> authenticated read -> delete. The bucket must remain private;
+// report and branding routes enforce subscription lifecycle before streaming.
 import {
   CreateBucketCommand,
   DeleteObjectCommand,
   HeadBucketCommand,
   HeadObjectCommand,
+  GetObjectCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -19,7 +21,6 @@ if (missing.length) {
 }
 
 const Bucket = process.env.R2_BUCKET;
-const PUBLIC = process.env.R2_PUBLIC_URL?.replace(/\/+$/, "") || null;
 const s3 = new S3Client({
   region: "auto",
   endpoint: process.env.R2_ENDPOINT,
@@ -50,20 +51,15 @@ try {
     step("bucket created", true, Bucket);
   }
 
-  await s3.send(new PutObjectCommand({ Bucket, Key: key, Body: png, ContentType: "image/png", CacheControl: "public, max-age=31536000, immutable" }));
+  await s3.send(new PutObjectCommand({ Bucket, Key: key, Body: png, ContentType: "image/png", CacheControl: "private, no-store" }));
   step("write object (S3 PutObject)", true, key);
 
   const head = await s3.send(new HeadObjectCommand({ Bucket, Key: key }));
   step("object exists (S3 HeadObject)", head.ContentType === "image/png", `type=${head.ContentType}`);
 
-  if (PUBLIC) {
-    const url = `${PUBLIC}/${key}`;
-    const res = await fetch(url);
-    const type = res.headers.get("content-type") || "";
-    step("public read (CDN GET)", res.ok && type.includes("image/png"), `${res.status} ${type}`);
-  } else {
-    console.log("SKIP  public read - set R2_PUBLIC_URL after enabling public access on the bucket");
-  }
+  const read = await s3.send(new GetObjectCommand({ Bucket, Key: key }));
+  const bytes = await read.Body.transformToByteArray();
+  step("authenticated read", bytes.length === png.length && read.ContentType === "image/png", `${bytes.length} bytes`);
 
   await s3.send(new DeleteObjectCommand({ Bucket, Key: key }));
   let deleted = false;
@@ -77,5 +73,5 @@ try {
   step("R2 request", false, String(e?.message || e));
 }
 
-console.log(ok ? "\nR2 storage is working." + (PUBLIC ? " Fully ready." : " Enable public access + set R2_PUBLIC_URL to finish.") : "\nR2 test failed - see above.");
+console.log(ok ? "\nPrivate R2 storage is working." : "\nR2 test failed - see above.");
 process.exit(ok ? 0 : 1);

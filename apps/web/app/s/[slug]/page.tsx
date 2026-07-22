@@ -2,15 +2,15 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { headers } from "next/headers";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { reports, users, type ReportIssue } from "@/lib/schema";
 import { SITE_URL } from "@/lib/reports";
-import { publicImageUrl } from "@/lib/r2";
-import { auth } from "@/auth";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
+import { ReportViewTracker } from "@/components/ReportViewTracker";
 import { ArrowRightIcon, CalendarIcon, FlagIcon } from "@/components/icons";
+import { hasActiveProSubscription } from "@/lib/billing/entitlements";
+import { isReportAvailable } from "@/lib/billing/subscriptions";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +23,8 @@ const getScreenshot = cache(async (slug: string) => {
       issues: reports.issues,
       imageKey: reports.imageKey,
       createdAt: reports.createdAt,
+      availabilityStatus: reports.availabilityStatus,
+      graceEndsAt: reports.graceEndsAt,
       userId: reports.userId,
       brandName: users.brandName,
       brandColor: users.brandColor,
@@ -32,7 +34,9 @@ const getScreenshot = cache(async (slug: string) => {
     .leftJoin(users, eq(users.id, reports.userId))
     .where(eq(reports.slug, slug))
     .limit(1);
-  return row ?? null;
+  if (!row || !isReportAvailable(row.availabilityStatus, row.graceEndsAt)) return null;
+  const whiteLabelEnabled = await hasActiveProSubscription(row.userId);
+  return { ...row, whiteLabelEnabled };
 });
 
 function formatDate(d: Date): string {
@@ -48,9 +52,7 @@ export async function generateMetadata({
   const shot = await getScreenshot(slug);
   if (!shot) return { title: "Screenshot not found" };
 
-  // Prefer the R2 CDN URL directly for og:image (most crawler-friendly);
-  // fall back to the stable app route when no public bucket is configured.
-  const image = publicImageUrl(shot.imageKey) ?? `${SITE_URL}/api/s/${slug}/image`;
+  const image = `${SITE_URL}/api/s/${slug}/image`;
   const count = shot.issues.length;
   const description =
     shot.description ||
@@ -76,20 +78,6 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
   const shot = await getScreenshot(slug);
   if (!shot) notFound();
 
-  // Don't inflate the view count with OG crawlers (Slack/Teams/etc. fetch the
-  // page to unfurl the link) or the owner's own visits.
-  const ua = (await headers()).get("user-agent") ?? "";
-  const isBot = /bot|crawl|spider|slurp|facebookexternalhit|embed|preview|whatsapp|telegram/i.test(ua);
-  const session = await auth();
-  const isOwner = Boolean(session?.user?.id && session.user.id === shot.userId);
-  if (!isBot && !isOwner) {
-    await db
-      .update(reports)
-      .set({ viewCount: sql`${reports.viewCount} + 1` })
-      .where(eq(reports.slug, slug))
-      .catch(() => {});
-  }
-
   const issues = shot.issues as ReportIssue[];
   const summary = [
     { sev: "blocker", n: issues.filter((i) => i.severity === "blocker").length },
@@ -100,18 +88,17 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
   // White-label: if the report owner set a brand, the page leads with their
   // logo/name/accent instead of TheWCAG's site header.
   const brand =
-    shot.brandName || shot.brandLogoKey
+    shot.whiteLabelEnabled && (shot.brandName || shot.brandLogoKey)
       ? {
           name: shot.brandName,
           color: /^#[0-9a-fA-F]{6}$/.test(shot.brandColor ?? "") ? shot.brandColor! : null,
-          logoUrl: shot.brandLogoKey
-            ? publicImageUrl(shot.brandLogoKey) ?? `/api/brand/${shot.userId}/logo`
-            : null,
+          logoUrl: shot.brandLogoKey ? `/api/brand/${shot.userId}/logo` : null,
         }
       : null;
 
   return (
     <div className="report-page flex min-h-screen flex-col">
+      <ReportViewTracker slug={slug} />
       {/* Minimal chrome: an accent strip (branded) and a slim logo-only bar.
           No site nav. This page exists to show the screenshot. */}
       {brand?.color && <div aria-hidden="true" style={{ background: brand.color }} className="h-1 w-full" />}

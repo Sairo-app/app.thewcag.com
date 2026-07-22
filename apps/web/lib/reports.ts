@@ -14,6 +14,43 @@ export function generateSlug(len = 10): string {
 }
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const MAX_PNG_DIMENSION = 20_000;
+const MAX_PNG_PIXELS = 100_000_000;
+
+function structurallyValidPng(buffer: Buffer): boolean {
+  if (buffer.length < 45 || !buffer.subarray(0, 8).equals(PNG_SIGNATURE)) return false;
+  let offset = 8;
+  let chunks = 0;
+  let sawHeader = false;
+  let sawEnd = false;
+  while (offset + 12 <= buffer.length && chunks < 10_000) {
+    const length = buffer.readUInt32BE(offset);
+    const type = buffer.subarray(offset + 4, offset + 8).toString("ascii");
+    const next = offset + 12 + length;
+    if (next > buffer.length) return false;
+    if (!sawHeader) {
+      if (type !== "IHDR" || length !== 13 || offset !== 8) return false;
+      const width = buffer.readUInt32BE(offset + 8);
+      const height = buffer.readUInt32BE(offset + 12);
+      if (
+        width < 1 ||
+        height < 1 ||
+        width > MAX_PNG_DIMENSION ||
+        height > MAX_PNG_DIMENSION ||
+        width * height > MAX_PNG_PIXELS
+      ) return false;
+      sawHeader = true;
+    }
+    offset = next;
+    chunks += 1;
+    if (type === "IEND") {
+      if (length !== 0 || offset !== buffer.length) return false;
+      sawEnd = true;
+      break;
+    }
+  }
+  return sawHeader && sawEnd;
+}
 
 /** Validate a base64 string decodes to a PNG within a size cap; return bytes. */
 export function decodePngBase64(
@@ -21,13 +58,16 @@ export function decodePngBase64(
   maxBytes = 4_000_000,
 ): { ok: true; buffer: Buffer } | { ok: false; error: string } {
   if (!base64) return { ok: false, error: "missing image" };
+  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64)) {
+    return { ok: false, error: "invalid base64" };
+  }
   let buffer: Buffer;
   try {
     buffer = Buffer.from(base64, "base64");
   } catch {
     return { ok: false, error: "invalid base64" };
   }
-  if (buffer.length < 8 || !buffer.subarray(0, 8).equals(PNG_SIGNATURE)) {
+  if (!structurallyValidPng(buffer)) {
     return { ok: false, error: "not a PNG image" };
   }
   if (buffer.length > maxBytes) return { ok: false, error: "image too large" };
@@ -41,6 +81,8 @@ export function isUniqueViolation(err: unknown): boolean {
 const ISSUE_SEVERITIES = new Set(["blocker", "major", "minor"]);
 
 function cleanText(value: unknown, maxLength: number): string {
+  // Report metadata is public and may originate from the extension or desktop app.
+  // eslint-disable-next-line no-control-regex
   return typeof value === "string" ? value.replace(/[\u0000-\u001F\u007F]/g, " ").trim().slice(0, maxLength) : "";
 }
 

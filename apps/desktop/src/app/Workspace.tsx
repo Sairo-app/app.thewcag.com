@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -50,7 +51,8 @@ import {
   type AuditPackagePayload,
 } from "./audit-package";
 import { normalizeFindingReferences } from "../shared/finding-references";
-import { auditPlanProgress } from "./audit-plan";
+import { auditPlanProgress, auditStartReadiness } from "./audit-plan";
+import type { AuditSessionSelection } from "./audit-coverage";
 import { messageFromError } from "./hooks";
 import {
   ConfirmDialog,
@@ -208,6 +210,14 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     reviewed: 0,
     reports: 0,
   });
+  const [planSections, setPlanSections] = useState<{
+    auditId: string;
+    sampleItems: AuditSampleItem[];
+    testRuns: AuditTestRun[];
+  }>({ auditId: "", sampleItems: [], testRuns: [] });
+  const [guidedSession, setGuidedSession] = useState<
+    (AuditSessionSelection & { auditId: string }) | null
+  >(null);
   const auditWorkspace = useAuditWorkspace();
   const navigationSize = usePersistedPanelSize(
     "layout-navigation-width-v1",
@@ -228,13 +238,50 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     audits,
     createAudit,
     discardAudit,
+    error: auditWorkspaceError,
     importAudit,
     ready,
-    recordActivity,
+    recordActivity: persistActivity,
+    restoreAudit,
+    retryLoad,
     selectAudit,
     updateAudit,
   } = auditWorkspace;
+  useEffect(() => {
+    if (auditWorkspaceError) {
+      setNotice({ text: auditWorkspaceError, error: true, title: "Audit storage problem" });
+    }
+  }, [auditWorkspaceError]);
+  const activeAuditIdRef = useRef(activeAudit?.id ?? "");
+  useEffect(() => {
+    activeAuditIdRef.current = activeAudit?.id ?? "";
+  }, [activeAudit?.id]);
+  const recordActivity = useCallback(
+    async (entry: Omit<AuditActivity, "id" | "auditId" | "createdAt">) => {
+      const auditId = activeAudit?.id;
+      if (!auditId) return;
+      await persistActivity(entry);
+      const next = await getStored<AuditActivity[]>(
+        auditStoreKey(auditId, "activity"),
+        [],
+      );
+      if (activeAuditIdRef.current === auditId) setActivity(next);
+    },
+    [activeAudit?.id, persistActivity],
+  );
   const title = TITLES[active];
+  const activePlanSections = planSections.auditId === activeAudit?.id
+    ? planSections
+    : { auditId: activeAudit?.id ?? "", sampleItems: [], testRuns: [] };
+  const startReadiness = activeAudit
+    ? auditStartReadiness(activeAudit, activePlanSections.sampleItems, activePlanSections.testRuns)
+    : null;
+  const updatePlanSections = useCallback(
+    (sampleItems: AuditSampleItem[], testRuns: AuditTestRun[]) => {
+      setPlanSections({ auditId: activeAudit?.id ?? "", sampleItems, testRuns });
+    },
+    [activeAudit?.id],
+  );
 
   const commands = useMemo(
     () =>
@@ -247,9 +294,9 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
   useEffect(
     () =>
       desktop.on<WorkspaceTool>("navigation:tool", (tool) =>
-        setActive(normalizeRoute(tool)),
+        navigate(normalizeRoute(tool)),
       ),
-    [],
+    [startReadiness?.ready, startReadiness?.blockers[0]],
   );
   useEffect(
     () =>
@@ -272,14 +319,15 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
       }
       if ((event.metaKey || event.ctrlKey) && /^[1-5]$/.test(event.key)) {
         event.preventDefault();
-        setActive(STAGES[Number(event.key) - 1].id);
+        navigate(STAGES[Number(event.key) - 1].id);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [startReadiness?.ready, startReadiness?.blockers[0]]);
   useEffect(() => {
     if (!activeAudit) return;
+    let cancelled = false;
     void Promise.all([
       listCaptures(activeAudit.id),
       getStored<Finding[]>(auditStoreKey(activeAudit.id, "findings"), []),
@@ -289,7 +337,10 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
       ),
       getStored<unknown[]>(auditStoreKey(activeAudit.id, "reports"), []),
       getStored<AuditActivity[]>(auditStoreKey(activeAudit.id, "activity"), []),
-    ]).then(([captures, findings, checklist, reports, nextActivity]) => {
+      getStored<AuditSampleItem[]>(auditStoreKey(activeAudit.id, "sampleItems"), []),
+      getStored<AuditTestRun[]>(auditStoreKey(activeAudit.id, "testRuns"), []),
+    ]).then(([captures, findings, checklist, reports, nextActivity, sampleItems, testRuns]) => {
+      if (cancelled) return;
       const applicableCriteria = WCAG_CRITERIA.filter(
         (criterion) => activeAudit.standard === "WCAG 2.2 AA" || criterion.level === "A",
       );
@@ -303,8 +354,16 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
         reports: reports.length,
       });
       setActivity(nextActivity);
+      setPlanSections({ auditId: activeAudit.id, sampleItems, testRuns });
+    }).catch((error) => {
+      if (!cancelled) {
+        setNotice({ text: messageFromError(error), error: true, title: "Audit data could not be loaded" });
+      }
     });
-  }, [active, activeId, activityOpen, activeAudit]);
+    return () => {
+      cancelled = true;
+    };
+  }, [active, activeId, activityOpen, activeAudit?.standard]);
   useEffect(() => {
     const media = window.matchMedia(COMPACT_LAYOUT_QUERY);
     const onChange = () => {
@@ -336,6 +395,20 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
   }, [commands.length]);
 
   function navigate(route: Route) {
+    if (
+      route !== "plan" &&
+      STAGES.some((stage) => stage.id === route) &&
+      startReadiness &&
+      !startReadiness.ready
+    ) {
+      setActive("plan");
+      setNotice({
+        text: startReadiness.blockers[0] || "Complete the audit setup before starting inspection.",
+        error: true,
+        title: "Finish audit setup",
+      });
+      return;
+    }
     if (route === "evidence") setEvidenceTab("captures");
     setActive(route);
     setCommandOpen(false);
@@ -393,6 +466,8 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
       packagedCaptures.push({
         id: capture.id,
         title: capture.title,
+        sampleItemId: capture.sampleItemId,
+        testRunId: capture.testRunId,
         rawPngDataUrl,
         thumbnailPngDataUrl: thumbnailPngDataUrl || undefined,
         document: document || undefined,
@@ -454,6 +529,8 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
           pngDataUrl: capture.rawPngDataUrl,
           title: capture.title,
           auditId: imported.id,
+          sampleItemId: capture.sampleItemId,
+          testRunId: capture.testRunId,
           silent: true,
         });
         createdCaptureIds.push(entry.id);
@@ -559,11 +636,21 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     }
   }
 
-  if (!ready || !activeAudit)
+  if (!ready)
     return (
       <div className="workspace-loading">
-        <img src="/logo.png" alt="" />
+        <img src="./logo.png" alt="" />
         <span>Preparing your audits</span>
+      </div>
+    );
+
+  if (!activeAudit)
+    return (
+      <div className="workspace-loading">
+        <img src="./logo.png" alt="" />
+        <strong>The audit workspace could not be opened</strong>
+        <span>{auditWorkspaceError || "No active audit is available."}</span>
+        <button className="button button-primary" onClick={retryLoad}>Try again</button>
       </div>
     );
 
@@ -572,21 +659,31 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
   const body =
     active === "plan" ? (
       <PlanView
+        key={activeAudit.id}
         audit={activeAudit}
         onAuditChange={updateAudit}
         recordActivity={recordActivity}
         onNavigate={navigate}
         onExportPackage={exportAuditPackage}
         onImportPackage={importAuditPackage}
+        onPlanSectionsChange={updatePlanSections}
+        onOpenFindings={openFindings}
+        onStartGuidedSession={(selection) => {
+          setGuidedSession({ ...selection, auditId: activeAudit.id });
+          navigate("inspect");
+        }}
       />
     ) : active === "inspect" ? (
       <InspectView
+        key={activeAudit.id}
         auditId={activeAudit.id}
+        initialSession={guidedSession?.auditId === activeAudit.id ? guidedSession : null}
         onNavigate={navigate}
         recordActivity={recordActivity}
       />
     ) : active === "evidence" ? (
       <EvidenceView
+        key={activeAudit.id}
         auditId={activeAudit.id}
         initialTab={evidenceTab}
         onNavigate={navigate}
@@ -594,19 +691,21 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
       />
     ) : active === "review" ? (
       <ReviewView
+        key={activeAudit.id}
         audit={activeAudit}
         recordActivity={recordActivity}
         onOpenFindings={openFindings}
       />
     ) : active === "share" ? (
       <ShareView
+        key={activeAudit.id}
         audit={activeAudit}
         onAuditChange={updateAudit}
         recordActivity={recordActivity}
         onNavigate={navigate}
       />
     ) : active === "palette" ? (
-      <PaletteView auditId={activeAudit.id} />
+      <PaletteView key={activeAudit.id} auditId={activeAudit.id} />
     ) : active === "vision" ? (
       <VisionView />
     ) : (
@@ -616,7 +715,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
   const stageIndex = STAGES.findIndex((stage) => stage.id === active);
   const stageStats = [
     `${plan.complete}/${plan.total} ready`,
-    "Ready",
+    startReadiness?.ready ? "Ready" : "Setup needed",
     `${stats.captures} captures`,
     `${stats.reviewed} reviewed`,
     `${stats.reports} published`,
@@ -632,6 +731,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
         } as CSSProperties
       }
     >
+      <a className="skip-link" href="#audit-workspace-main">Skip to audit workspace</a>
       <Toast message={notice} onClose={() => setNotice(null)} />
       <aside className="stage-rail" aria-label="Audit workflow">
         <button
@@ -639,7 +739,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
           aria-label="Go to Plan"
           onClick={() => navigate("plan")}
         >
-          <img src="/logo.png" alt="TheWCAG" draggable={false} />
+          <img src="./logo.png" alt="TheWCAG" draggable={false} />
         </button>
         <div className="rail-audit-label">Audit workflow</div>
         <nav>
@@ -715,6 +815,12 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
           <div className="command-actions">
             <StatusBadge tone="success">Stored locally</StatusBadge>
             <IconButton
+              label="Open first audit guide"
+              onClick={() => void desktop.invoke("shell:open-external", { url: "https://app.thewcag.com/getting-started" })}
+            >
+              <BookOpenText size={18} />
+            </IconButton>
+            <IconButton
               label={inspector ? "Hide audit panel" : "Show audit panel"}
               className="inspector-toggle"
               ariaExpanded={inspector}
@@ -732,7 +838,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
           </div>
         </header>
 
-        <main className={`workstage ${inspector ? "with-inspector" : ""}`}>
+        <main id="audit-workspace-main" tabIndex={-1} className={`workstage ${inspector ? "with-inspector" : ""}`}>
           <section className="task-column">
             <div className="task-heading">
               <div>
@@ -749,6 +855,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
               {stageIndex >= 0 && stageIndex < STAGES.length - 1 ? (
                 <button
                   className="next-stage"
+                  disabled={stageIndex === 0 && !startReadiness?.ready}
                   onClick={() => navigate(STAGES[stageIndex + 1].id)}
                 >
                   Next: {STAGES[stageIndex + 1].label}
@@ -848,9 +955,9 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
                 </div>
                 <progress value={plan.complete} max={plan.total}>{plan.percent}%</progress>
                 <p className="inspector-copy">
-                  {plan.missing.length
-                    ? `Still needed: ${plan.missing.slice(0, 3).join(", ")}${plan.missing.length > 3 ? ` and ${plan.missing.length - 3} more` : ""}.`
-                    : "Scope, sample, environment, and ownership are documented."}
+                  {startReadiness?.blockers.length
+                    ? startReadiness.blockers[0]
+                    : `Ready to start with ${activePlanSections.sampleItems.length} sample items and ${activePlanSections.testRuns.length} guided test runs.`}
                 </p>
               </div>
               <div className="inspector-callout">
@@ -1017,6 +1124,32 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
                 {audit.id === activeId ? (
                   <Check size={18} weight="bold" />
                 ) : null}
+              </button>
+            ))}
+          {audits.some((audit) => audit.archivedAt) ? (
+            <div className="audit-list-section-label">Archived audits</div>
+          ) : null}
+          {audits
+            .filter((audit) => audit.archivedAt)
+            .map((audit) => (
+              <button
+                key={audit.id}
+                data-archived="true"
+                title={`Restore ${audit.project}`}
+                onClick={() => {
+                  restoreAudit(audit.id);
+                  setSwitcherOpen(false);
+                  setNotice({ text: `${audit.project} restored`, error: false });
+                }}
+              >
+                <span className="project-avatar">
+                  {audit.project.slice(0, 1).toUpperCase()}
+                </span>
+                <span>
+                  <strong>{audit.project}</strong>
+                  <small>Archived · select to restore</small>
+                </span>
+                <Archive size={17} />
               </button>
             ))}
         </div>

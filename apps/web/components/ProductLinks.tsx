@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRightIcon, ContrastIcon, CropIcon, DownloadIcon } from "./icons";
+import { ArrowRightIcon, BookIcon, ContrastIcon, CropIcon, DownloadIcon } from "./icons";
 
 export function ProductLinks({
   heading = "Continue through the complete audit workflow",
@@ -15,6 +15,11 @@ export function ProductLinks({
         <p>{description}</p>
       </div>
       <nav aria-label="Explore TheWCAG products">
+        <Link href="/getting-started">
+          <BookIcon size={18} />
+          <span><strong>First-time guide</strong><small>Follow a complete audit with real app screenshots</small></span>
+          <ArrowRightIcon size={16} />
+        </Link>
         <Link href="/accessibility-audit-software">
           <ContrastIcon size={18} />
           <span><strong>Audit workstation</strong><small>Plan, test, document, retest, and deliver</small></span>

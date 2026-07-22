@@ -13,6 +13,8 @@ export const AUDIT_PACKAGE_VERSION = 1;
 export interface AuditPackageCapture {
   id: string;
   title: string;
+  sampleItemId?: string;
+  testRunId?: string;
   rawPngDataUrl: string;
   thumbnailPngDataUrl?: string;
   document?: string;
@@ -103,6 +105,8 @@ function validateStructuredSections(sections: Record<string, unknown>): void {
         ) ||
         !finiteNumber(run.createdAt) ||
         !finiteNumber(run.modifiedAt) ||
+        (run.sampleItemId !== undefined &&
+          (typeof run.sampleItemId !== "string" || run.sampleItemId.length > 100)) ||
         !Array.isArray(run.steps) ||
         run.steps.length > 100 ||
         run.steps.some(
@@ -125,6 +129,10 @@ function validateStructuredSections(sections: Record<string, unknown>): void {
         !["blocker", "major", "minor"].includes(String(finding.severity)) ||
         !["open", "retest", "fixed", "accepted"].includes(String(finding.status)) ||
         !finiteNumber(finding.createdAt) ||
+        (finding.sampleItemId !== undefined &&
+          (typeof finding.sampleItemId !== "string" || finding.sampleItemId.length > 100)) ||
+        (finding.testRunId !== undefined &&
+          (typeof finding.testRunId !== "string" || finding.testRunId.length > 100)) ||
         (finding.occurrences !== undefined &&
           (!Array.isArray(finding.occurrences) ||
             finding.occurrences.length > 2_000 ||
@@ -237,6 +245,44 @@ function validatePayload(payload: unknown): asserts payload is AuditPackagePaylo
   ) {
     throw new Error("The audit package has invalid project metadata.");
   }
+  if (payload.audit.scopeProfile !== undefined) {
+    const profile = payload.audit.scopeProfile;
+    const targetTypes = [
+      "content-site",
+      "web-product",
+      "commerce-service",
+      "release-regression",
+      "desktop-product",
+      "mobile-product",
+      "document-set",
+      "component-library",
+    ];
+    const features = ["authentication", "checkout", "forms", "media", "documents", "components"];
+    if (
+      !object(profile) ||
+      profile.version !== 1 ||
+      !targetTypes.includes(String(profile.targetType)) ||
+      typeof profile.templateId !== "string" ||
+      !profile.templateId.trim() ||
+      profile.templateId.length > 120 ||
+      !["high", "medium", "low"].includes(String(profile.confidence)) ||
+      !Array.isArray(profile.featureIds) ||
+      profile.featureIds.length > features.length ||
+      new Set(profile.featureIds).size !== profile.featureIds.length ||
+      profile.featureIds.some((feature) => !features.includes(String(feature))) ||
+      !Array.isArray(profile.reasons) ||
+      profile.reasons.length > 12 ||
+      profile.reasons.some(
+        (reason) =>
+          typeof reason !== "string" ||
+          !reason.trim() ||
+          reason.length > 500,
+      ) ||
+      !finiteNumber(profile.confirmedAt)
+    ) {
+      throw new Error("The audit package has an invalid scope profile.");
+    }
+  }
   const sections = payload.sections;
   const limits: Array<[string, number]> = [
     ["sampleItems", 2_000],
@@ -270,6 +316,14 @@ function validatePayload(payload: unknown): asserts payload is AuditPackagePaylo
       capture.rawPngDataUrl.length > 55 * 1024 * 1024
     ) {
       throw new Error("The audit package contains an invalid capture.");
+    }
+    if (
+      (capture.sampleItemId !== undefined &&
+        (typeof capture.sampleItemId !== "string" || capture.sampleItemId.length > 100)) ||
+      (capture.testRunId !== undefined &&
+        (typeof capture.testRunId !== "string" || capture.testRunId.length > 100))
+    ) {
+      throw new Error("The audit package contains invalid capture context.");
     }
     if (
       capture.thumbnailPngDataUrl !== undefined &&

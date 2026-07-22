@@ -25,7 +25,9 @@ const INVOKE_CHANNELS = new Set<InvokeChannel>([
   "overlay:ready",
   "overlay:cancel",
   "lens:toggle",
+  "lens:state",
   "lens:frame",
+  "scope:discover",
   "store:get",
   "store:set",
   "store:remove",
@@ -65,6 +67,7 @@ const EVENT_CHANNELS = new Set<DesktopEvent>([
   "shortcut:failed",
   "notification",
   "navigation:tool",
+  "lens:changed",
 ]);
 
 const bridge: DesktopBridge = Object.freeze({
