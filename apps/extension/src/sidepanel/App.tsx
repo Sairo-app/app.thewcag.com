@@ -42,6 +42,7 @@ import {
   generateDesktopDraft,
   hasDesktopPermission,
   listDesktopAudits,
+  NativeConnectorError,
   pingDesktop,
   queueDesktopFinding,
   requestDesktopPermission,
@@ -85,10 +86,21 @@ function chromeMessage<T>(message: ExtensionRequest): Promise<T> {
 }
 
 function displayError(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  if (/native messaging host.*not found|Specified native messaging host/i.test(message)) {
-    return "The desktop connector is not installed yet. You can continue locally.";
+  if (error instanceof NativeConnectorError) {
+    if (error.failure === "not-registered") {
+      return "Chrome cannot find the desktop connector. Open TheWCAG once, then try Connect desktop again.";
+    }
+    if (error.failure === "extension-not-allowed") {
+      return "This extension is not paired with the installed TheWCAG app. Install matching extension and desktop versions.";
+    }
+    if (error.failure === "host-exited") {
+      return "The desktop connector started but closed before responding. Restart TheWCAG, then try again.";
+    }
+    if (error.failure === "protocol-error") {
+      return "The extension and desktop connector could not complete a secure handshake. Update both and try again.";
+    }
   }
+  const message = error instanceof Error ? error.message : String(error);
   if (/permission/i.test(message)) return "Desktop permission was not granted.";
   return message || "Something went wrong. Try again.";
 }

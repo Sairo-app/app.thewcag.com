@@ -23,14 +23,15 @@ import { WindowManager } from "./windows";
 import { createTray, installApplicationMenu } from "./menu";
 import { registerIpc } from "./ipc";
 import { migrateLegacyDesktopData } from "./migration";
-import { nativeOriginFromArgs, runNativeHost } from "./native-host";
+import { nativeOriginFromArgs, nativePipeNameFromArgs, runNativeHost } from "./native-host";
 import { registerNativeMessagingHost } from "./native-host-registration";
 
 const nativeOrigin = nativeOriginFromArgs(process.argv);
+const nativePipeName = nativePipeNameFromArgs(process.argv);
 const packagedSmokeTest = process.argv.includes("--thewcag-smoke-test");
 
 if (nativeOrigin) {
-  void runNativeHost(nativeOrigin);
+  void runNativeHost(nativeOrigin, nativePipeName);
 } else {
 protocol.registerSchemesAsPrivileged([{
   scheme: "thewcag-asset",

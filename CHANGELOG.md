@@ -1,5 +1,15 @@
 # Changelog
 
+## v3.0.7 - 2026-07-22
+
+**Windows Chrome connector**
+
+- Replaced direct Chrome-to-Electron stdio with a purpose-built binary-mode Windows native host and a private one-time named-pipe relay.
+- Isolated Electron runtime output and temporary profile data from Chrome's strict native-messaging frames while preserving the per-user audit repository and extension-origin allowlist.
+- Added a release-blocking packaged Windows handshake that sends a real framed ping through the installed helper before any installer can be published.
+- Replaced the misleading “connector is not installed” fallback with distinct registration, extension-pairing, process-exit, permission, and protocol guidance.
+- Updated the desktop release to `3.0.7` and the paired Evidence Capture extension to `0.3.0`.
+
 ## v3.0.6 - 2026-07-22
 
 **Faster website navigation**

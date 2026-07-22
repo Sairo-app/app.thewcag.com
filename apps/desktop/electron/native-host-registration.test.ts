@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { nativeHostManifest, nativeHostManifestPath } from "./native-host-registration";
+import {
+  nativeHostExecutablePath,
+  nativeHostManifest,
+  nativeHostManifestPath,
+} from "./native-host-registration";
 
 describe("native host registration", () => {
   it("pins the exact extension origin and executable", () => {
@@ -23,6 +27,22 @@ describe("native host registration", () => {
       homePath: "C:\\Users\\auditor",
       userDataPath: "C:\\Users\\auditor\\AppData\\Roaming\\TheWCAG",
     })).toBe("C:\\Users\\auditor\\AppData\\Roaming\\TheWCAG\\native-messaging\\com.thewcag.app.json");
+  });
+
+  it("registers the packaged binary-safe helper on Windows", () => {
+    expect(nativeHostExecutablePath({
+      platform: "win32",
+      resourcesPath: "C:\\Program Files\\TheWCAG\\resources",
+      executablePath: "C:\\Program Files\\TheWCAG\\TheWCAG.exe",
+    })).toBe("C:\\Program Files\\TheWCAG\\resources\\native-messaging\\TheWCAG.NativeHost.exe");
+  });
+
+  it("keeps the application executable as the native host on macOS", () => {
+    expect(nativeHostExecutablePath({
+      platform: "darwin",
+      resourcesPath: "/Applications/TheWCAG.app/Contents/Resources",
+      executablePath: "/Applications/TheWCAG.app/Contents/MacOS/TheWCAG",
+    })).toBe("/Applications/TheWCAG.app/Contents/MacOS/TheWCAG");
   });
 
   it("stores the macOS manifest in Chrome's per-user host directory", () => {

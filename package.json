@@ -1,7 +1,7 @@
 {
   "name": "accessibility-build-app",
   "private": true,
-  "version": "3.0.6",
+  "version": "3.0.7",
   "scripts": {
     "dev": "pnpm --filter @accessibility-build/desktop dev",
     "build": "pnpm --filter @accessibility-build/desktop build",

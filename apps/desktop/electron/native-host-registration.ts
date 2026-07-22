@@ -1,11 +1,12 @@
 import { execFile } from "node:child_process";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join, posix, win32 } from "node:path";
 import { promisify } from "node:util";
 
 const run = promisify(execFile);
 const EXTENSION_ID = /^[a-p]{32}$/;
 const HOST_NAME = "com.thewcag.app";
+const WINDOWS_HOST_EXECUTABLE = "TheWCAG.NativeHost.exe";
 
 export async function configuredExtensionId(resourcesPath: string): Promise<string | null> {
   const fromEnvironment = process.env.THEWCAG_EXTENSION_ID?.trim();
@@ -27,6 +28,16 @@ export function nativeHostManifest(executablePath: string, extensionId: string):
     type: "stdio",
     allowed_origins: [`chrome-extension://${extensionId}/`],
   };
+}
+
+export function nativeHostExecutablePath(options: {
+  platform: NodeJS.Platform;
+  resourcesPath: string;
+  executablePath: string;
+}): string {
+  return options.platform === "win32"
+    ? win32.join(options.resourcesPath, "native-messaging", WINDOWS_HOST_EXECUTABLE)
+    : options.executablePath;
 }
 
 export function nativeHostManifestPath(options: {
@@ -68,7 +79,11 @@ export async function registerNativeMessagingHost(options: {
   const extensionId = await configuredExtensionId(options.resourcesPath);
   const manifestPath = nativeHostManifestPath(options);
   if (!extensionId || !manifestPath) return false;
-  const manifest = `${JSON.stringify(nativeHostManifest(options.executablePath, extensionId), null, 2)}\n`;
+  const hostExecutablePath = nativeHostExecutablePath(options);
+  if (options.platform === "win32") {
+    await access(hostExecutablePath);
+  }
+  const manifest = `${JSON.stringify(nativeHostManifest(hostExecutablePath, extensionId), null, 2)}\n`;
 
   if (options.platform === "darwin") {
     await writeAtomic(manifestPath, manifest);

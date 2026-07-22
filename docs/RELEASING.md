@@ -80,8 +80,8 @@ The automated Windows smoke test launches the real packaged renderer with an iso
 8. Create and push an annotated tag that exactly matches `apps/desktop/package.json`:
 
 ```sh
-git tag -a v3.0.6 -m "TheWCAG v3.0.6"
-git push origin v3.0.6
+git tag -a v3.0.7 -m "TheWCAG v3.0.7"
+git push origin v3.0.7
 ```
 
 The workflow runs the repository quality gate, builds macOS and Windows in parallel, uploads the signed macOS and unsigned Windows artifacts, and creates one GitHub Release. Release artifacts are treated as immutable by policy: fixes ship under a new patch version.
@@ -137,6 +137,9 @@ For Windows, run `dist:win` on a Windows host. No signing environment variables 
 - The custom `thewcag://` protocol must remain registered for browser-mediated desktop sign-in.
 - The native messaging manifest must name `com.thewcag.app` and allow only the
   configured Chrome extension origin; wildcard origins are forbidden.
+- Windows packages must register `TheWCAG.NativeHost.exe`, the binary-mode
+  bridge shipped in `resources/native-messaging`. The release workflow performs
+  a real framed ping through that packaged executable before publishing.
 - macOS hardened runtime and the committed entitlements must remain enabled.
 - Windows update manifests must retain their SHA-512 integrity values and come from the canonical GitHub Release.
 - `latest-mac.yml`, `latest.yml`, installer files, and blockmaps must come from the same build and version.

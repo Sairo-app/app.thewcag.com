@@ -107,6 +107,8 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
           THEWCAG_EXTENSION_ID: ${{ vars.THEWCAG_EXTENSION_ID }}
         run: pnpm build && pnpm exec electron-builder --win --x64 --publish never
+      - name: Verify packaged Chrome connector handshake
+        run: node scripts/windows-native-host-smoke.mjs apps/desktop/release/win-unpacked
       - name: Upload Windows installer and updater metadata
         uses: actions/upload-artifact@v7
         with:

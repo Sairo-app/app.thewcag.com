@@ -9,16 +9,50 @@ import {
 
 export const NATIVE_HOST = "com.thewcag.app";
 
+export type NativeConnectorFailure =
+  | "not-registered"
+  | "extension-not-allowed"
+  | "host-exited"
+  | "protocol-error"
+  | "unknown";
+
+export class NativeConnectorError extends Error {
+  constructor(
+    public readonly failure: NativeConnectorFailure,
+    message: string,
+  ) {
+    super(message);
+    this.name = "NativeConnectorError";
+  }
+}
+
+export function classifyNativeConnectorFailure(message: string): NativeConnectorFailure {
+  if (/native messaging host.*not found|Specified native messaging host not found|host name is not registered/i.test(message)) {
+    return "not-registered";
+  }
+  if (/access to .* native messaging host .* forbidden|not allowed to connect/i.test(message)) {
+    return "extension-not-allowed";
+  }
+  if (/native host has exited|native messaging host has exited|pipe .* broken|closed before/i.test(message)) {
+    return "host-exited";
+  }
+  if (/error when communicating|invalid response|protocol|message.*size/i.test(message)) {
+    return "protocol-error";
+  }
+  return "unknown";
+}
+
 function sendNative(request: NativeRequestV1): Promise<NativeResponseV1> {
   return new Promise((resolve, reject) => {
     chrome.runtime.sendNativeMessage(NATIVE_HOST, request, (response: NativeResponseV1 | undefined) => {
       const error = chrome.runtime.lastError;
       if (error) {
-        reject(new Error(error.message || "TheWCAG desktop did not respond."));
+        const message = error.message || "TheWCAG desktop did not respond.";
+        reject(new NativeConnectorError(classifyNativeConnectorFailure(message), message));
         return;
       }
       if (!response || response.protocolVersion !== NATIVE_PROTOCOL_VERSION || response.requestId !== request.requestId) {
-        reject(new Error("TheWCAG desktop returned an invalid response."));
+        reject(new NativeConnectorError("protocol-error", "TheWCAG desktop returned an invalid response."));
         return;
       }
       resolve(response);

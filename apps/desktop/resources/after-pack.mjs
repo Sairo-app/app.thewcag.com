@@ -4,6 +4,45 @@ import { promisify } from "node:util";
 import { join } from "node:path";
 
 const run = promisify(execFile);
+const WINDOWS_NATIVE_HOST = "TheWCAG.NativeHost.exe";
+
+export function windowsNativeHostPath(appOutDir) {
+  return join(appOutDir, "resources", "native-messaging", WINDOWS_NATIVE_HOST);
+}
+
+function windowsCSharpCompiler() {
+  const windows = process.env.WINDIR || process.env.SystemRoot || "C:\\Windows";
+  return [
+    join(windows, "Microsoft.NET", "Framework64", "v4.0.30319", "csc.exe"),
+    join(windows, "Microsoft.NET", "Framework", "v4.0.30319", "csc.exe"),
+  ];
+}
+
+export async function compileWindowsNativeHost(context) {
+  if (context.electronPlatformName !== "win32") return null;
+  const output = windowsNativeHostPath(context.appOutDir);
+  const directory = join(context.appOutDir, "resources", "native-messaging");
+  const source = join(context.packager.projectDir, "resources", "native-host", "WindowsNativeHost.cs");
+  await mkdir(directory, { recursive: true });
+
+  let compiler = null;
+  for (const candidate of windowsCSharpCompiler()) {
+    if (await stat(candidate).then((details) => details.isFile()).catch(() => false)) {
+      compiler = candidate;
+      break;
+    }
+  }
+  if (!compiler) throw new Error("Windows package requires the .NET Framework C# compiler");
+
+  await run(compiler, [
+    "/nologo",
+    "/optimize+",
+    "/target:exe",
+    `/out:${output}`,
+    source,
+  ], { windowsHide: true });
+  return output;
+}
 
 export async function validatePackagedRuntime(context) {
   if (context.electronPlatformName !== "win32") return;
@@ -15,6 +54,10 @@ export async function validatePackagedRuntime(context) {
     {
       path: join(context.appOutDir, "resources", "app.asar"),
       description: "the packaged application archive",
+    },
+    {
+      path: windowsNativeHostPath(context.appOutDir),
+      description: "the binary-safe Chrome native messaging host",
     },
   ];
   for (const required of requiredFiles) {
@@ -34,6 +77,7 @@ export async function validatePackagedRuntime(context) {
  * declarations before signing and make App Transport Security explicit.
  */
 export default async function afterPack(context) {
+  await compileWindowsNativeHost(context);
   await validatePackagedRuntime(context);
 
   const extensionId = (process.env.THEWCAG_EXTENSION_ID || "").trim();

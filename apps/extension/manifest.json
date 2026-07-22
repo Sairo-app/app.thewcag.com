@@ -3,7 +3,7 @@
   "name": "TheWCAG Evidence Capture",
   "short_name": "TheWCAG",
   "description": "Mark accessibility barriers on a webpage and turn exact evidence into reviewable findings.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "minimum_chrome_version": "116",
   "permissions": ["activeTab", "scripting", "sidePanel", "storage"],
   "optional_permissions": ["nativeMessaging"],
