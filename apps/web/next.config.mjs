@@ -15,6 +15,11 @@ const nextConfig = {
   // output. Linux production and Docker builds still emit standalone/apps/web.
   output: standaloneOutput ? 'standalone' : undefined,
   outputFileTracingRoot: path.join(__dirname, '../../'),
+  // migrate.mjs runs before the standalone server and is not part of Next's
+  // route graph, so its database driver must be included explicitly.
+  outputFileTracingIncludes: {
+    '/*': ['node_modules/postgres/**/*'],
+  },
   transpilePackages: ['@accessibility-build/audit-contracts'],
   reactStrictMode: true,
   poweredByHeader: false,
