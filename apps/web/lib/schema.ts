@@ -67,19 +67,25 @@ export const desktopDevices = pgTable(
     deviceName: text("device_name"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     lastSeenAt: timestamp("last_seen_at"),
+    expiresAt: timestamp("expires_at"),
     revokedAt: timestamp("revoked_at"),
   },
   (t) => ({ userIdx: index("desktop_device_user_idx").on(t.userId) }),
 );
 
 // ---- Shared reports (image blob lives in R2; metadata here) ----
+export type ReportIssueSeverity = "blocker" | "major" | "minor";
+export type ReportRemediationStatus = "open" | "retest" | "fixed" | "accepted";
+
 export interface ReportIssue {
   id: string;
   n: number;
   sc?: string;
   label: string;
-  severity: string;
+  severity: ReportIssueSeverity;
   note: string;
+  /** Optional for backwards compatibility with reports published before status was shared. */
+  status?: ReportRemediationStatus;
 }
 
 export const reports = pgTable(
@@ -95,9 +101,105 @@ export const reports = pgTable(
     imageContentType: text("image_content_type").notNull().default("image/png"),
     sizeBytes: integer("size_bytes").notNull().default(0),
     viewCount: integer("view_count").notNull().default(0),
+    availabilityStatus: text("availability_status").notNull().default("active"),
+    graceEndsAt: timestamp("grace_ends_at", { mode: "date" }),
+    retentionDeleteAt: timestamp("retention_delete_at", { mode: "date" }),
+    disabledAt: timestamp("disabled_at", { mode: "date" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (t) => ({ userIdx: index("report_user_idx").on(t.userId) }),
+  (t) => ({
+    userIdx: index("report_user_idx").on(t.userId),
+    availabilityIdx: index("report_availability_idx").on(t.availabilityStatus, t.graceEndsAt),
+    retentionIdx: index("report_retention_idx").on(t.availabilityStatus, t.retentionDeleteAt),
+  }),
+);
+
+// Aggregate-only, opt-in funnel counters. No identifiers, request metadata,
+// timestamps, audit content, URLs, screenshots, findings, or PII are stored.
+export const funnelTransitions = pgTable("funnel_transition", {
+  event: text("event").primaryKey(),
+  count: integer("count").notNull().default(1),
+});
+
+// ---- Dodo Payments normalized billing state ----
+// Dodo remains the financial source of truth. These tables contain only the
+// minimum state required for fast service authorization and webhook recovery.
+export const billingCustomers = pgTable("billing_customer", {
+  userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  dodoCustomerId: text("dodo_customer_id").notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const billingSubscriptions = pgTable(
+  "billing_subscription",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    dodoSubscriptionId: text("dodo_subscription_id").notNull().unique(),
+    dodoCustomerId: text("dodo_customer_id").notNull(),
+    productId: text("product_id").notNull(),
+    planKey: text("plan_key").notNull(),
+    billingInterval: text("billing_interval").notNull(),
+    status: text("status").notNull(),
+    cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+    currentPeriodStart: timestamp("current_period_start", { mode: "date" }),
+    currentPeriodEnd: timestamp("current_period_end", { mode: "date" }),
+    graceEndsAt: timestamp("grace_ends_at", { mode: "date" }),
+    latestEventAt: timestamp("latest_event_at", { mode: "date" }).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    userIdx: index("billing_subscription_user_idx").on(t.userId, t.updatedAt),
+    customerIdx: index("billing_subscription_customer_idx").on(t.dodoCustomerId),
+    statusIdx: index("billing_subscription_status_idx").on(t.status, t.updatedAt),
+  }),
+);
+
+export const billingWebhookEvents = pgTable(
+  "billing_webhook_event",
+  {
+    webhookId: text("webhook_id").primaryKey(),
+    eventType: text("event_type").notNull(),
+    remoteObjectId: text("remote_object_id"),
+    occurredAt: timestamp("occurred_at", { mode: "date" }).notNull(),
+    payloadHash: text("payload_hash").notNull(),
+    status: text("status").notNull(),
+    errorCode: text("error_code"),
+    processedAt: timestamp("processed_at", { mode: "date" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({ statusIdx: index("billing_webhook_event_status_idx").on(t.status, t.createdAt) }),
+);
+
+export const billingSessionAttempts = pgTable(
+  "billing_session_attempt",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    planChoice: text("plan_choice"),
+    status: text("status").notNull(),
+    remoteSessionId: text("remote_session_id"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    userCreatedIdx: index("billing_session_attempt_user_created_idx").on(t.userId, t.kind, t.createdAt),
+    createdIdx: index("billing_session_attempt_created_idx").on(t.createdAt),
+  }),
+);
+
+export const billingTombstones = pgTable(
+  "billing_tombstone",
+  {
+    idHash: text("id_hash").primaryKey(),
+    kind: text("kind").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({ expiresIdx: index("billing_tombstone_expires_idx").on(t.expiresAt) }),
 );
 
 // Append-only global registry. Report deletion never releases a finding ID.
@@ -128,9 +230,11 @@ export const aiGenerations = pgTable(
   }),
 );
 
-// silence unused import if boolean not referenced elsewhere
-void boolean;
-
 export type Report = typeof reports.$inferSelect;
 export type DesktopDevice = typeof desktopDevices.$inferSelect;
 export type AiGeneration = typeof aiGenerations.$inferSelect;
+export type BillingCustomer = typeof billingCustomers.$inferSelect;
+export type BillingSubscription = typeof billingSubscriptions.$inferSelect;
+export type BillingWebhookEvent = typeof billingWebhookEvents.$inferSelect;
+export type BillingSessionAttempt = typeof billingSessionAttempts.$inferSelect;
+export type BillingTombstone = typeof billingTombstones.$inferSelect;

@@ -1,21 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { hasValidBrandLogoSignature, isSafeBrandSvg, validateBrandLogoMeta } from "./brand";
+import { hasValidBrandLogoSignature, validateBrandLogoMeta } from "./brand";
 
 describe("brand logo validation", () => {
   it("accepts supported image metadata within the cap", () => {
     expect(validateBrandLogoMeta("image/png", 100)).toBeNull();
-    expect(validateBrandLogoMeta("image/svg+xml", 1_000_000)).toBeNull();
+    expect(validateBrandLogoMeta("image/svg+xml", 1_000_000)).toMatch(/PNG/);
     expect(validateBrandLogoMeta("image/gif", 100)).toMatch(/PNG/);
     expect(validateBrandLogoMeta("image/png", 1_000_001)).toMatch(/under 1 MB/);
-  });
-
-  it("allows static SVG while blocking active and externally loaded content", () => {
-    const bytes = (value: string) => new TextEncoder().encode(value);
-    expect(isSafeBrandSvg(bytes('<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0" /></svg>'))).toBe(true);
-    expect(isSafeBrandSvg(bytes('<svg><script>alert(1)</script></svg>'))).toBe(false);
-    expect(isSafeBrandSvg(bytes('<svg><image href="https://example.com/a.png" /></svg>'))).toBe(false);
-    expect(isSafeBrandSvg(bytes('<svg><a href="javascript:alert(1)">x</a></svg>'))).toBe(false);
-    expect(isSafeBrandSvg(bytes('<svg><path onload="alert(1)" /></svg>'))).toBe(false);
   });
 
   it("verifies raster signatures instead of trusting the browser MIME type", () => {

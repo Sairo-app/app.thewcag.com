@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { MenuIcon } from "./icons";
 
@@ -13,9 +13,11 @@ import { MenuIcon } from "./icons";
 export function SiteMenu({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDetailsElement>(null);
   const pathname = usePathname();
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     ref.current?.removeAttribute("open");
+    setOpen(false);
   }, [pathname]);
 
   useEffect(() => {
@@ -25,12 +27,14 @@ export function SiteMenu({ children }: { children: ReactNode }) {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape" || !details!.open) return;
       details!.removeAttribute("open");
+      setOpen(false);
       details!.querySelector("summary")?.focus();
     }
 
     function onPointerDown(event: PointerEvent) {
       if (details!.open && !details!.contains(event.target as Node)) {
         details!.removeAttribute("open");
+        setOpen(false);
       }
     }
 
@@ -43,8 +47,12 @@ export function SiteMenu({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <details ref={ref} className="site-menu">
-      <summary aria-label="Open navigation menu" className="site-menu__trigger">
+    <details
+      ref={ref}
+      className="site-menu"
+      onToggle={() => setOpen(Boolean(ref.current?.open))}
+    >
+      <summary aria-label={open ? "Close navigation menu" : "Open navigation menu"} className="site-menu__trigger">
         <MenuIcon size={16} />
         <span>Menu</span>
       </summary>

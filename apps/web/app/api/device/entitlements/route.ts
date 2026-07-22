@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
 import { verifyDeviceToken } from "@/lib/device-auth";
-import { STORAGE_QUOTA_BYTES, userStorageBytes } from "@/lib/quota";
+import { resolveEntitlements } from "@/lib/billing/entitlements";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,18 +13,19 @@ export async function GET(req: NextRequest) {
   const ctx = await verifyDeviceToken(req.headers.get("authorization"));
   if (!ctx) return NextResponse.json({ signedIn: false }, { status: 401 });
 
-  const [[user], usedBytes] = await Promise.all([
+  const [[user], entitlements] = await Promise.all([
     db.select({ email: users.email }).from(users).where(eq(users.id, ctx.userId)).limit(1),
-    userStorageBytes(ctx.userId),
+    resolveEntitlements(ctx.userId),
   ]);
 
   return NextResponse.json({
     signedIn: true,
     email: user?.email ?? "",
+    ...entitlements,
     features: {
-      publishReports: true,
-      aiFindingDrafts: Boolean(process.env.OPENAI_API_KEY),
+      ...entitlements.features,
+      publishReports: entitlements.features.hostedReports.enabled,
+      aiFindingDrafts: entitlements.features.managedAi.enabled && Boolean(process.env.OPENAI_API_KEY),
     },
-    storage: { usedBytes, quotaBytes: STORAGE_QUOTA_BYTES },
-  });
+  }, { headers: { "Cache-Control": "no-store" } });
 }

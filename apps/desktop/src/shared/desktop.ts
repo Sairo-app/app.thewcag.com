@@ -7,7 +7,7 @@ import type {
 
 export type AppView = "main" | "overlay" | "annotate" | "lens";
 export type WorkspaceStage = "plan" | "inspect" | "evidence" | "review" | "share";
-export type WorkspaceUtility = "screenshot" | "vision" | "palette" | "settings";
+export type WorkspaceUtility = "screenshot" | "program" | "captures" | "vision" | "palette" | "settings";
 export type WorkspaceTool = WorkspaceStage | WorkspaceUtility | "capture" | "checklist";
 export type OverlayMode = "pair" | "foreground" | "background" | "capture" | "measure";
 
@@ -63,6 +63,8 @@ export type OverlayResult =
 export interface CaptureEntry {
   id: string;
   auditId?: string;
+  sampleItemId?: string;
+  testRunId?: string;
   title: string;
   createdAt: number;
   modifiedAt: number;
@@ -95,6 +97,55 @@ export interface AuditBrief {
   auditor: string;
   startedAt: string;
   updatedAt: number;
+  scopeProfile?: AuditScopeProfile;
+}
+
+export type AuditTargetType =
+  | "content-site"
+  | "web-product"
+  | "commerce-service"
+  | "release-regression"
+  | "desktop-product"
+  | "mobile-product"
+  | "document-set"
+  | "component-library";
+
+export type AuditScopeFeature =
+  | "authentication"
+  | "checkout"
+  | "forms"
+  | "media"
+  | "documents"
+  | "components";
+
+export interface AuditScopeProfile {
+  version: 1;
+  targetType: AuditTargetType;
+  featureIds: AuditScopeFeature[];
+  templateId: string;
+  confidence: "high" | "medium" | "low";
+  reasons: string[];
+  confirmedAt: number;
+}
+
+export interface AuditScopeDiscoveryPage {
+  url: string;
+  title: string;
+  templateKey: string;
+  signals: string[];
+}
+
+export interface AuditScopeDiscovery {
+  requestedUrl: string;
+  finalUrl: string;
+  title: string;
+  targetType: Extract<AuditTargetType, "content-site" | "web-product" | "commerce-service">;
+  featureIds: AuditScopeFeature[];
+  pages: AuditScopeDiscoveryPage[];
+  discoveredUrlCount: number;
+  templateCount: number;
+  warnings: string[];
+  discoveredAt: number;
 }
 
 export interface AuditSampleItem {
@@ -118,6 +169,7 @@ export interface AuditTestStepResult {
 export interface AuditTestRun {
   id: string;
   scriptId: string;
+  sampleItemId?: string;
   title: string;
   category: "authentication" | "checkout" | "forms" | "media" | "documents" | "components";
   status: "planned" | "in-progress" | "complete" | "blocked";
@@ -142,6 +194,8 @@ export interface AuditTemplate {
   standard: AuditBrief["standard"];
   sampleItems: Array<Pick<AuditSampleItem, "kind" | "label" | "location" | "notes">>;
   testScriptIds: string[];
+  targetType?: AuditTargetType;
+  featureIds?: AuditScopeFeature[];
   createdAt?: number;
 }
 
@@ -149,6 +203,8 @@ export interface AuditProject extends AuditBrief {
   id: string;
   createdAt: number;
   archivedAt?: number;
+  /** Bundled training data. Never inferred for a user's real audit. */
+  demo?: boolean;
 }
 
 export interface AuditActivity {
@@ -171,23 +227,96 @@ export interface PublishedReport {
   createdAt: number;
 }
 
+export type TicketConnectorId = "jira" | "linear" | "github";
+export type TicketSourceField =
+  | "title"
+  | "description"
+  | "actualResult"
+  | "expectedResult"
+  | "userImpact"
+  | "wcagMapping"
+  | "severity"
+  | "evidenceLink"
+  | "owner"
+  | "targetDate";
+export type TicketFieldMapping = Record<TicketSourceField, string>;
+export type TicketFieldValues = Record<TicketSourceField, string>;
+
+export interface TicketExternalSnapshot {
+  fields: Partial<TicketFieldValues>;
+  status: string;
+  fetchedAt: number;
+}
+
+export interface TicketSyncConflict {
+  field: TicketSourceField | "status";
+  kind: "external-change" | "diverged";
+  baselineValue: string;
+  localValue: string;
+  externalValue: string;
+}
+
+export interface FindingTicketLink {
+  connector: TicketConnectorId;
+  externalId: string;
+  key: string;
+  url: string;
+  externalStatus: string;
+  syncState: "in-sync" | "review" | "error";
+  baseline: TicketExternalSnapshot;
+  pendingExternal?: TicketExternalSnapshot;
+  conflicts: TicketSyncConflict[];
+  createdAt: number;
+  lastSyncedAt: number;
+  lastError?: string;
+}
+
+export interface TicketConnectorPublicConfig {
+  id: TicketConnectorId;
+  label: string;
+  configured: boolean;
+  credentialHint?: string;
+  mapping: TicketFieldMapping;
+  baseUrl?: string;
+  email?: string;
+  projectKey?: string;
+  issueType?: string;
+  teamId?: string;
+  repository?: string;
+}
+
+export interface TicketConnectorConfiguration {
+  secureStorageAvailable: boolean;
+  connectors: TicketConnectorPublicConfig[];
+}
+
 export interface Finding {
   /** Immutable, globally unique platform identity. Never use the audit reference as identity. */
   id: string;
   key: string;
   reference?: string;
+  sampleItemId?: string;
+  testRunId?: string;
   title: string;
   wcag: string;
   severity: "blocker" | "major" | "minor";
   status: "open" | "retest" | "fixed" | "accepted";
+  /** Extension and automated intakes remain pending until an auditor opens and saves them. */
+  reviewState?: "pending" | "reviewed";
   note: string;
   location?: string;
   owner?: string;
   ticket?: string;
+  ticketLink?: FindingTicketLink;
   dueDate?: string;
+  evidenceLink?: string;
   riskAcceptance?: string;
   retestNote?: string;
   retestedAt?: number;
+  /** Local auditor-authored remediation transitions used for longitudinal metrics. */
+  statusHistory?: FindingStatusTransition[];
+  /** Ordered, finding-owned evidence. `captureId` remains as a legacy primary pointer. */
+  evidenceCaptureIds?: string[];
   captureId?: string;
   beforeCaptureId?: string;
   afterCaptureId?: string;
@@ -223,6 +352,11 @@ export interface Finding {
   modifiedAt?: number;
 }
 
+export interface FindingStatusTransition {
+  status: Finding["status"];
+  changedAt: number;
+}
+
 export interface FindingOccurrence {
   id: string;
   location: string;
@@ -256,6 +390,14 @@ export interface ChecklistShortcutSettings {
   expand: string;
 }
 
+export const FUNNEL_TELEMETRY_EVENTS = [
+  "guide_to_download",
+  "download_to_first_plan",
+  "first_plan_to_first_deliver",
+] as const;
+
+export type FunnelTelemetryEvent = (typeof FUNNEL_TELEMETRY_EVENTS)[number];
+
 export interface AppSettings {
   shortcuts: ShortcutSettings;
   checklistShortcuts: ChecklistShortcutSettings;
@@ -263,13 +405,30 @@ export interface AppSettings {
   appearance: "light";
   reduceMotion: boolean;
   captureHighDpi: boolean;
+  shareAnonymousFunnelTelemetry: boolean;
 }
 
 export interface Account {
   signedIn: boolean;
   email?: string;
-  credits?: number;
-  plan?: string;
+  plan?: "free" | "pro";
+  subscription?: {
+    status: "none" | "pending" | "active" | "on_hold" | "cancelled" | "failed" | "expired" | "revoked";
+    renewsAt?: string;
+    endsAt?: string;
+    graceEndsAt?: string;
+    cancelAtPeriodEnd: boolean;
+  };
+  features?: {
+    managedAi: { enabled: boolean; used: number; limit: number; resetsAt?: string };
+    hostedReports: { enabled: boolean; active: number; limit: number };
+    whiteLabelReports: boolean;
+    reportAnalytics: boolean;
+    publishReports: boolean;
+    aiFindingDrafts: boolean;
+  };
+  storage?: { usedBytes: number; quotaBytes: number };
+  actions?: { canUpgrade: boolean; canManageBilling: boolean; upgradeUrl: string; billingUrl?: string };
 }
 
 export type AiProviderId = "thewcag" | "openai" | "anthropic" | "openrouter";
@@ -313,7 +472,8 @@ export type DesktopEvent =
   | "shortcut:failed"
   | "notification"
   | "navigation:tool"
-  | "screenshot:share";
+  | "screenshot:share"
+  | "lens:changed";
 
 export type InvokeChannel =
   | "app:platform"
@@ -339,7 +499,9 @@ export type InvokeChannel =
   | "overlay:ready"
   | "overlay:cancel"
   | "lens:toggle"
+  | "lens:state"
   | "lens:frame"
+  | "scope:discover"
   | "store:get"
   | "store:set"
   | "store:remove"
@@ -349,6 +511,7 @@ export type InvokeChannel =
   | "settings:get"
   | "settings:save"
   | "settings:reset"
+  | "telemetry:emit"
   | "auth:sign-in"
   | "auth:sign-out"
   | "auth:account"
@@ -357,8 +520,14 @@ export type InvokeChannel =
   | "ai:test-provider"
   | "ai:remove-provider"
   | "ai:set-active"
+  | "ticket:configuration"
+  | "ticket:save-connector"
+  | "ticket:remove-connector"
+  | "ticket:create"
+  | "ticket:sync"
   | "report:publish"
   | "dialog:save-image"
+  | "dialog:save-pdf"
   | "dialog:save-text"
   | "dialog:open-text"
   | "clipboard:write-text"

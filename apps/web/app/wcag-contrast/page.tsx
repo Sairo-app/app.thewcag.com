@@ -104,8 +104,9 @@ export default function WcagContrastPage() {
         <section className="mt-12 rounded-xl border border-border bg-card p-6">
           <h2 className="text-lg font-bold tracking-tight">Check any pixel on your screen</h2>
           <p className="mt-2 text-sm text-muted">
-            TheWCAG computes all of the above live as you pick colors from any app - with the
-            worst-case pixel across gradients, AA/AAA verdicts, and APCA.
+            TheWCAG computes the exact ratio as you pick two colors from any app, shows the
+            selected WCAG AA target, and provides APCA as a separate comparison. Sample every
+            material foreground/background pair when gradients or imagery are involved.
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <Link

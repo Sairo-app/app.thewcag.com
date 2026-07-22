@@ -1,15 +1,31 @@
 import NextAuth from "next-auth";
 import Resend from "next-auth/providers/resend";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
+import { and, gt, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { accounts, sessions, users, verificationTokens } from "@/lib/schema";
 
 const hasResend = Boolean(process.env.AUTH_RESEND_KEY);
 const FROM = process.env.AUTH_EMAIL_FROM ?? "TheWCAG <noreply@updates.onchange.app>";
+const isProduction = process.env.NODE_ENV === "production";
+const trustsForwardedHost = process.env.AUTH_TRUST_HOST === "true";
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character] ?? character);
+}
 
 /** Clean, professional magic-link email. `url` is used verbatim so the link
  * always works; a plain-text copy is included for accessibility + fallback. */
 function magicLinkEmail(url: string): { subject: string; html: string; text: string } {
+  const parsed = new URL(url);
+  if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error("Invalid sign-in URL");
+  const safeUrl = escapeHtml(parsed.toString());
   const subject = "Sign in to TheWCAG";
   const font = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
   const html = `<!doctype html>
@@ -27,11 +43,11 @@ function magicLinkEmail(url: string): { subject: string; html: string; text: str
           <p style="margin:10px 0 0;font:400 14px/1.6 ${font};color:#57534e;">Click the button below to finish signing in. This link expires in 24 hours and can be used once.</p>
         </td></tr>
         <tr><td style="padding:22px 32px 0;">
-          <a href="${url}" style="display:inline-block;background:#c2410c;color:#ffffff;text-decoration:none;font:600 14px ${font};padding:12px 24px;border-radius:10px;">Sign in</a>
+          <a href="${safeUrl}" style="display:inline-block;background:#c2410c;color:#ffffff;text-decoration:none;font:600 14px ${font};padding:12px 24px;border-radius:10px;">Sign in</a>
         </td></tr>
         <tr><td style="padding:20px 32px 0;">
           <p style="margin:0;font:400 13px/1.5 ${font};color:#78716c;">Or paste this link into your browser:</p>
-          <p style="margin:6px 0 0;font:400 12px/1.5 ${font};word-break:break-all;"><a href="${url}" style="color:#c2410c;text-decoration:underline;">${url}</a></p>
+          <p style="margin:6px 0 0;font:400 12px/1.5 ${font};word-break:break-all;"><a href="${safeUrl}" style="color:#c2410c;text-decoration:underline;">${safeUrl}</a></p>
         </td></tr>
         <tr><td style="padding:24px 32px 28px;">
           <div style="border-top:1px solid #e7e5e4;margin:0 0 16px;"></div>
@@ -53,7 +69,7 @@ If you didn't request this, you can safely ignore this email.`;
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  trustHost: true,
+  trustHost: !isProduction || Boolean(process.env.AUTH_URL) || trustsForwardedHost,
   adapter: DrizzleAdapter(db, {
     usersTable: users,
     accountsTable: accounts,
@@ -68,8 +84,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // server console instead of emailed, so local sign-in needs no email setup.
       sendVerificationRequest: async ({ identifier, url }) => {
         if (!hasResend) {
+          if (isProduction) {
+            throw new Error("Email sign-in is unavailable because AUTH_RESEND_KEY is not configured.");
+          }
           console.log(`\n\n==== DEV MAGIC LINK (${identifier}) ====\n${url}\n========================================\n\n`);
           return;
+        }
+        const [rate] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(verificationTokens)
+          .where(and(
+            sql`lower(${verificationTokens.identifier}) = ${identifier.toLowerCase()}`,
+            gt(verificationTokens.expires, new Date()),
+          ));
+        if (Number(rate?.count ?? 0) > 5) {
+          throw new Error("Too many active sign-in links. Use the newest email or wait for the existing links to expire.");
         }
         const { subject, html, text } = magicLinkEmail(url);
         const res = await fetch("https://api.resend.com/emails", {
@@ -89,4 +118,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   session: { strategy: "database" },
   pages: { signIn: "/signin", verifyRequest: "/signin/check" },
+  callbacks: {
+    redirect({ url, baseUrl }) {
+      const canonical = new URL(process.env.AUTH_URL || baseUrl);
+      try {
+        const destination = new URL(url, canonical);
+        return destination.origin === canonical.origin ? destination.toString() : canonical.toString();
+      } catch {
+        return canonical.toString();
+      }
+    },
+  },
 });

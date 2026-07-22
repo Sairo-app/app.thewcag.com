@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
+  ArrowCounterClockwise,
   ArrowRight,
   CheckCircle,
   ClipboardText,
   DownloadSimple,
   FloppyDisk,
+  MagicWand,
   Plus,
   Trash,
   UploadSimple,
@@ -13,12 +15,27 @@ import {
 import type {
   AuditProject,
   AuditSampleItem,
+  AuditScopeDiscovery,
+  AuditScopeFeature,
   AuditTemplate,
+  AuditTargetType,
   AuditTestRun,
+  CaptureEntry,
+  Finding,
   WorkspaceStage,
 } from "../../shared/desktop";
-import { getStored, setStored } from "../api";
-import { auditPlanProgress } from "../audit-plan";
+import { desktop, getStored, listCaptures, setStored } from "../api";
+import {
+  auditPlanProgress,
+  auditStartReadiness,
+  auditTestRunComplete,
+} from "../audit-plan";
+import {
+  buildAuditCoverage,
+  type AuditChecklistEntry,
+  type AuditSessionSelection,
+} from "../audit-coverage";
+import { AuditCoverageMap } from "../AuditCoverageMap";
 import { auditStoreKey, type RecordAuditActivity } from "../audits";
 import { Button, ConfirmDialog, Field, Toast } from "../components";
 import { messageFromError, useTransientMessage } from "../hooks";
@@ -27,6 +44,15 @@ import {
   BUILT_IN_AUDIT_TEMPLATES,
   createTestRun,
 } from "../audit-templates";
+import {
+  AUDIT_SCOPE_FEATURE_OPTIONS,
+  AUDIT_TARGET_TYPE_OPTIONS,
+  auditPatchInvalidatesScopeProfile,
+  incorporateScopeDiscovery,
+  recommendAuditScope,
+  scopeProfileFromRecommendation,
+  type AuditScopeRecommendation,
+} from "../audit-scoper";
 
 const PERSONAL_TEMPLATES_KEY = "audit-templates-v1";
 
@@ -52,6 +78,9 @@ export function PlanView({
   onNavigate,
   onExportPackage,
   onImportPackage,
+  onPlanSectionsChange,
+  onOpenFindings,
+  onStartGuidedSession,
 }: {
   audit: AuditProject;
   onAuditChange: (patch: Partial<AuditProject>) => void;
@@ -59,13 +88,27 @@ export function PlanView({
   onNavigate: (stage: WorkspaceStage) => void;
   onExportPackage: () => Promise<void>;
   onImportPackage: () => Promise<void>;
+  onPlanSectionsChange: (items: AuditSampleItem[], runs: AuditTestRun[]) => void;
+  onOpenFindings: () => void;
+  onStartGuidedSession: (selection: AuditSessionSelection) => void;
 }) {
   const [items, setItems] = useState<AuditSampleItem[]>([]);
   const [testRuns, setTestRuns] = useState<AuditTestRun[]>([]);
+  const [coverageRecords, setCoverageRecords] = useState<{
+    captures: CaptureEntry[];
+    findings: Finding[];
+    checklist: Record<string, AuditChecklistEntry>;
+  }>({ captures: [], findings: [], checklist: {} });
+  const [loadedAuditId, setLoadedAuditId] = useState("");
   const [personalTemplates, setPersonalTemplates] = useState<AuditTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState(BUILT_IN_AUDIT_TEMPLATES[0].id);
   const [templateName, setTemplateName] = useState("");
   const [selectedScriptId, setSelectedScriptId] = useState(AUDIT_TEST_SCRIPTS[0].id);
+  const [scoperTargetType, setScoperTargetType] = useState<AuditTargetType | "auto">("auto");
+  const [scoperFeatures, setScoperFeatures] = useState<AuditScopeFeature[] | null>(null);
+  const [discovery, setDiscovery] = useState<AuditScopeDiscovery | null>(null);
+  const [discoveryBusy, setDiscoveryBusy] = useState(false);
+  const [pendingRecommendation, setPendingRecommendation] = useState<AuditScopeRecommendation | null>(null);
   const [pendingTemplate, setPendingTemplate] = useState<AuditTemplate | null>(null);
   const [templateToDelete, setTemplateToDelete] = useState<AuditTemplate | null>(null);
   const [testRunToDelete, setTestRunToDelete] = useState<AuditTestRun | null>(null);
@@ -80,6 +123,33 @@ export function PlanView({
   const sampleKey = auditStoreKey(audit.id, "sampleItems");
   const testRunsKey = auditStoreKey(audit.id, "testRuns");
   const plan = auditPlanProgress(audit);
+  const recommendation = useMemo(() => {
+    const detectedType = scoperTargetType === "auto" && discovery
+      ? discovery.targetType
+      : scoperTargetType;
+    const detectedFeatures = scoperFeatures ?? discovery?.featureIds;
+    const base = recommendAuditScope({
+      target: audit.target,
+      project: audit.project,
+      goal: audit.goal,
+      targetType: detectedType,
+      featureIds: detectedFeatures,
+      targetTypeOrigin: scoperTargetType === "auto" && discovery ? "discovery" : undefined,
+      featureOrigin: scoperFeatures === null && discovery ? "discovery" : undefined,
+    });
+    return discovery ? incorporateScopeDiscovery(base, discovery) : base;
+  }, [audit.goal, audit.project, audit.target, discovery, scoperFeatures, scoperTargetType]);
+  const readiness = auditStartReadiness(audit, items, testRuns);
+  const coverage = useMemo(
+    () => buildAuditCoverage({
+      sampleItems: items,
+      testRuns,
+      captures: coverageRecords.captures,
+      findings: coverageRecords.findings,
+      checklist: coverageRecords.checklist,
+    }),
+    [coverageRecords, items, testRuns],
+  );
 
   function persistSample(next: AuditSampleItem[]) {
     const key = sampleKey;
@@ -96,20 +166,49 @@ export function PlanView({
   }
 
   useEffect(() => {
+    let cancelled = false;
+    setLoadedAuditId("");
+    setItems([]);
+    setTestRuns([]);
+    setCoverageRecords({ captures: [], findings: [], checklist: {} });
     void Promise.all([
       getStored<AuditSampleItem[]>(sampleKey, []),
       getStored<AuditTestRun[]>(testRunsKey, []),
       getStored<AuditTemplate[]>(PERSONAL_TEMPLATES_KEY, []),
+      listCaptures(audit.id),
+      getStored<Finding[]>(auditStoreKey(audit.id, "findings"), []),
+      getStored<Record<string, AuditChecklistEntry>>(
+        auditStoreKey(audit.id, "checklist"),
+        {},
+      ),
     ])
-      .then(([nextItems, nextTestRuns, nextTemplates]) => {
+      .then(([nextItems, nextTestRuns, nextTemplates, captures, findings, checklist]) => {
+        if (cancelled) return;
         setItems(nextItems);
         setTestRuns(nextTestRuns);
         setPersonalTemplates(
           nextTemplates.filter((template) => template.source === "personal"),
         );
+        setCoverageRecords({ captures, findings, checklist });
+        setLoadedAuditId(audit.id);
       })
-      .catch((error) => show(messageFromError(error), true));
-  }, [sampleKey, testRunsKey]);
+      .catch((error) => {
+        if (!cancelled) show(messageFromError(error), true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [audit.id, sampleKey, testRunsKey]);
+
+  useEffect(() => {
+    setScoperTargetType("auto");
+    setScoperFeatures(null);
+    setDiscovery(null);
+  }, [audit.id]);
+
+  useEffect(() => {
+    if (loadedAuditId === audit.id) onPlanSectionsChange(items, testRuns);
+  }, [audit.id, items, loadedAuditId, testRuns, onPlanSectionsChange]);
 
   const sample = useMemo(() => {
     const complete = items.filter((item) => item.status === "complete").length;
@@ -122,18 +221,16 @@ export function PlanView({
     };
   }, [items]);
 
-  const nextAction = plan.missing.length
-    ? `Complete ${plan.missing[0].toLowerCase()}`
-    : !items.length
-      ? "Add the first sample item"
-      : sample.remaining
-        ? `Test ${sample.remaining} remaining sample ${sample.remaining === 1 ? "item" : "items"}`
-        : testRuns.some((run) => run.status !== "complete")
-          ? `Complete ${testRuns.filter((run) => run.status !== "complete").length} guided test ${testRuns.filter((run) => run.status !== "complete").length === 1 ? "run" : "runs"}`
-          : "Begin criterion review";
+  const nextAction = readiness.blockers[0]
+    ? readiness.blockers[0].replace(/\.$/, "")
+    : "Ready to start inspection";
 
   function patchAudit(patch: Partial<AuditProject>) {
-    onAuditChange(patch);
+    onAuditChange(
+      audit.scopeProfile && auditPatchInvalidatesScopeProfile(patch)
+        ? { ...patch, scopeProfile: undefined }
+        : patch,
+    );
   }
 
   async function addSample(event: FormEvent) {
@@ -207,10 +304,16 @@ export function PlanView({
 
   const templates = [...BUILT_IN_AUDIT_TEMPLATES, ...personalTemplates];
 
-  async function applyTemplate() {
-    if (!pendingTemplate) return;
+  async function applyScopePlan(options: {
+    template: AuditTemplate;
+    sampleItems: AuditTemplate["sampleItems"];
+    testScriptIds: string[];
+    auditPatch?: Partial<AuditProject>;
+    activityTitle: string;
+    activityDetail: string;
+  }): Promise<boolean> {
     const now = Date.now();
-    const nextItems: AuditSampleItem[] = pendingTemplate.sampleItems.map(
+    const nextItems: AuditSampleItem[] = options.sampleItems.map(
       (item) => ({
         ...item,
         id: crypto.randomUUID(),
@@ -219,36 +322,104 @@ export function PlanView({
         modifiedAt: now,
       }),
     );
-    const nextRuns = pendingTemplate.testScriptIds
+    const nextRuns = options.testScriptIds
       .map((id) => AUDIT_TEST_SCRIPTS.find((script) => script.id === id))
       .filter((script): script is NonNullable<typeof script> => Boolean(script))
       .map(createTestRun);
-    try {
-      onAuditChange({
-        goal: pendingTemplate.goal,
-        scope: pendingTemplate.scope,
-        sample: pendingTemplate.sample,
-        excludedScope: pendingTemplate.excludedScope,
-        environment: pendingTemplate.environment,
-        assistiveTechnology: pendingTemplate.assistiveTechnology,
-        methodology: pendingTemplate.methodology,
-        standard: pendingTemplate.standard,
-      });
-      await Promise.all([
-        persistSample(nextItems),
-        persistTestRuns(nextRuns),
-        recordActivity({
-          kind: "updated",
-          title: "Audit template applied",
-          detail: pendingTemplate.name,
-        }),
+    const writes = await Promise.allSettled([
+      persistSample(nextItems),
+      persistTestRuns(nextRuns),
+    ]);
+    if (writes.some((result) => result.status === "rejected")) {
+      await Promise.allSettled([
+        persistSample(items),
+        persistTestRuns(testRuns),
       ]);
-      setItems(nextItems);
-      setTestRuns(nextRuns);
-      setPendingTemplate(null);
-      show(`${pendingTemplate.name} applied`);
+      const rejected = writes.find((result) => result.status === "rejected");
+      show(
+        messageFromError(
+          rejected?.status === "rejected"
+            ? rejected.reason
+            : new Error("The audit plan could not be saved."),
+        ),
+        true,
+      );
+      return false;
+    }
+
+    onAuditChange({
+      goal: options.template.goal,
+      scope: options.template.scope,
+      sample: options.template.sample,
+      excludedScope: options.template.excludedScope,
+      environment: options.template.environment,
+      assistiveTechnology: options.template.assistiveTechnology,
+      methodology: options.template.methodology,
+      standard: options.template.standard,
+      ...options.auditPatch,
+      conclusion: "in-progress",
+      completedAt: "",
+    });
+    setItems(nextItems);
+    setTestRuns(nextRuns);
+    try {
+      await recordActivity({
+        kind: "updated",
+        title: options.activityTitle,
+        detail: options.activityDetail,
+      });
     } catch (error) {
-      show(messageFromError(error), true);
+      show(`${options.template.name} was applied, but the activity entry could not be saved: ${messageFromError(error)}`, true);
+      return true;
+    }
+    show(`${options.template.name} applied`);
+    return true;
+  }
+
+  async function applyTemplate() {
+    if (!pendingTemplate) return;
+    const scopeProfile = pendingTemplate.targetType
+      ? {
+          version: 1 as const,
+          targetType: pendingTemplate.targetType,
+          featureIds: [...(pendingTemplate.featureIds ?? [])],
+          templateId: pendingTemplate.id,
+          confidence: "high" as const,
+          reasons: [`${pendingTemplate.name} was selected by the auditor.`],
+          confirmedAt: Date.now(),
+        }
+      : undefined;
+    const applied = await applyScopePlan({
+      template: pendingTemplate,
+      sampleItems: pendingTemplate.sampleItems,
+      testScriptIds: pendingTemplate.testScriptIds,
+      auditPatch: { scopeProfile },
+      activityTitle: "Audit template applied",
+      activityDetail: pendingTemplate.name,
+    });
+    if (applied) setPendingTemplate(null);
+  }
+
+  async function applyRecommendation() {
+    if (!pendingRecommendation) return;
+    const featureLabels = pendingRecommendation.featureIds.map(
+      (id) => AUDIT_SCOPE_FEATURE_OPTIONS.find((feature) => feature.id === id)?.label,
+    ).filter(Boolean);
+    const applied = await applyScopePlan({
+      template: pendingRecommendation.template,
+      sampleItems: pendingRecommendation.sampleItems,
+      testScriptIds: pendingRecommendation.testScriptIds,
+      auditPatch: {
+        scope: `${pendingRecommendation.template.scope}\n\nPlanned feature coverage: ${featureLabels.join(", ") || "general WCAG review"}.`,
+        sample: `${pendingRecommendation.template.sample} Refine every generated location before its test begins.`,
+        scopeProfile: scopeProfileFromRecommendation(pendingRecommendation),
+      },
+      activityTitle: "Built-in scoper applied",
+      activityDetail: `${pendingRecommendation.template.name} (${pendingRecommendation.confidence} confidence)`,
+    });
+    if (applied) {
+      setSelectedTemplateId(pendingRecommendation.template.id);
+      setPendingRecommendation(null);
     }
   }
 
@@ -276,6 +447,8 @@ export function PlanView({
         notes,
       })),
       testScriptIds: [...new Set(testRuns.map((run) => run.scriptId))],
+      targetType: audit.scopeProfile?.targetType,
+      featureIds: audit.scopeProfile ? [...audit.scopeProfile.featureIds] : undefined,
       createdAt: Date.now(),
     };
     const next = [...personalTemplates, template];
@@ -328,12 +501,23 @@ export function PlanView({
   }
 
   function patchTestRun(id: string, patch: Partial<AuditTestRun>) {
+    const currentRun = testRuns.find((run) => run.id === id);
+    if (
+      patch.status === "complete" &&
+      currentRun &&
+      !currentRun.steps.every((step) => step.complete && step.observation.trim())
+    ) {
+      show("Complete every step and add its observation before closing this run.", true);
+      return;
+    }
     setTestRuns((current) => {
       const next = current.map((run) => {
         if (run.id !== id) return run;
         const updated = { ...run, ...patch, modifiedAt: Date.now() };
         if (patch.steps && updated.status !== "blocked") {
-          const complete = patch.steps.every((step) => step.complete);
+          const complete = patch.steps.every(
+            (step) => step.complete && step.observation.trim(),
+          );
           const started = patch.steps.some(
             (step) => step.complete || step.observation.trim(),
           );
@@ -376,9 +560,171 @@ export function PlanView({
     }
   }
 
+  function toggleScopeFeature(feature: AuditScopeFeature) {
+    const current = scoperFeatures ?? recommendation.featureIds;
+    setScoperFeatures(
+      current.includes(feature)
+        ? current.filter((item) => item !== feature)
+        : [...current, feature],
+    );
+  }
+
+  async function inspectWebsite() {
+    setDiscoveryBusy(true);
+    try {
+      const result = await desktop.invoke<AuditScopeDiscovery>("scope:discover", {
+        target: audit.target,
+      });
+      setDiscovery(result);
+      setScoperFeatures(null);
+      show(`Inspected ${result.pages.length} public pages across ${result.templateCount} detected templates`);
+    } catch (error) {
+      setDiscovery(null);
+      show(messageFromError(error), true);
+    } finally {
+      setDiscoveryBusy(false);
+    }
+  }
+
   return (
     <div className="audit-plan-view">
       <Toast message={message} />
+      <section className="audit-scoper" aria-labelledby="audit-scoper-title">
+        <div className="audit-scoper-heading">
+          <div className="audit-scoper-icon"><MagicWand size={22} weight="duotone" /></div>
+          <div>
+            <span className="section-label">Built-in scoper</span>
+            <h2 id="audit-scoper-title">Build an audit-ready scope</h2>
+            <p>
+              Inspect a bounded set of public same-origin pages, detect representative
+              templates and feature signals, then confirm the resulting audit plan.
+              Discovery never makes a conformance decision.
+            </p>
+          </div>
+        </div>
+        <div className="audit-scoper-body">
+          <div className="audit-scoper-inputs">
+            <Field
+              label="Target URL or application"
+              hint="Add a URL, application name, document collection, or release description."
+            >
+              <input
+                value={audit.target}
+                onChange={(event) => {
+                  patchAudit({ target: event.target.value });
+                  setDiscovery(null);
+                }}
+                placeholder="https://example.com, Checkout release, or Desktop app"
+              />
+            </Field>
+            <Field label="Product type">
+              <select
+                value={scoperTargetType}
+                onChange={(event) => {
+                  setScoperTargetType(event.target.value as AuditTargetType | "auto");
+                  setScoperFeatures(null);
+                }}
+              >
+                <option value="auto">Detect from audit context</option>
+                {AUDIT_TARGET_TYPE_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>{option.label}</option>
+                ))}
+              </select>
+            </Field>
+            <div className="audit-discovery-action">
+              <Button
+                icon={MagicWand}
+                disabled={audit.demo || discoveryBusy || !audit.target.trim() || loadedAuditId !== audit.id}
+                onClick={() => void inspectWebsite()}
+              >
+                {audit.demo ? "Bundled sample" : discoveryBusy ? "Inspecting public pages…" : discovery ? "Inspect website again" : "Inspect website"}
+              </Button>
+              <small>
+                {audit.demo
+                  ? "The guided sample uses bundled evidence and never requests a website."
+                  : "Reads at most 9 public HTML pages (1 MB each), stays on the final origin, and does not sign in or submit forms."}
+              </small>
+            </div>
+          </div>
+          {discovery ? (
+            <div className="audit-discovery-result" role="status">
+              <div>
+                <strong>{discovery.title}</strong>
+                <span>{discovery.pages.length} inspected · {discovery.discoveredUrlCount} URLs found · {discovery.templateCount} template groups</span>
+              </div>
+              <details>
+                <summary>Review detected pages and limitations</summary>
+                <ul className="audit-discovery-pages">
+                  {discovery.pages.map((page) => (
+                    <li key={page.url}>
+                      <strong>{page.title}</strong>
+                      <code>{page.url}</code>
+                      <span>{page.signals.length ? page.signals.join(", ") : "No feature signal detected"} · {page.templateKey}</span>
+                    </li>
+                  ))}
+                </ul>
+                <ul className="audit-discovery-warnings">
+                  {discovery.warnings.map((warning) => <li key={warning}>{warning}</li>)}
+                </ul>
+              </details>
+            </div>
+          ) : null}
+          <fieldset className="audit-scoper-features">
+            <legend>Content and task coverage</legend>
+            <p>Select everything materially present in the target. Public-page detection is only a starting recommendation.</p>
+            <div className="audit-scoper-feature-grid">
+              {AUDIT_SCOPE_FEATURE_OPTIONS.map((feature) => (
+                <label key={feature.id}>
+                  <input
+                    type="checkbox"
+                    checked={recommendation.featureIds.includes(feature.id)}
+                    onChange={() => toggleScopeFeature(feature.id)}
+                  />
+                  <span>
+                    <strong>{feature.label}</strong>
+                    <small>{feature.description}</small>
+                  </span>
+                </label>
+              ))}
+            </div>
+            {scoperFeatures !== null ? (
+              <button
+                type="button"
+                className="text-action audit-scoper-reset"
+                onClick={() => setScoperFeatures(null)}
+              >
+                <ArrowCounterClockwise size={14} /> Reset feature detection
+              </button>
+            ) : null}
+          </fieldset>
+          <div className="audit-scope-recommendation" data-confidence={recommendation.confidence}>
+            <div className="audit-scope-recommendation-heading">
+              <div>
+                <span>{recommendation.confidence} confidence recommendation</span>
+                <h3>{recommendation.template.name}</h3>
+              </div>
+              <span className="audit-scope-confidence">{recommendation.confidence}</span>
+            </div>
+            <p>{recommendation.template.description}</p>
+            <ul>
+              {recommendation.reasons.map((reason) => <li key={reason}>{reason}</li>)}
+            </ul>
+            <div className="audit-scope-output" aria-label="Recommended plan contents">
+              <span><strong>{recommendation.sampleItems.length}</strong> sample items</span>
+              <span><strong>{recommendation.testScriptIds.length}</strong> guided test runs</span>
+              <span><strong>{recommendation.featureIds.length}</strong> feature areas</span>
+            </div>
+            <Button
+              variant="primary"
+              icon={MagicWand}
+              disabled={!audit.target.trim() || loadedAuditId !== audit.id}
+              onClick={() => setPendingRecommendation(recommendation)}
+            >
+              Use recommended scope
+            </Button>
+          </div>
+        </div>
+      </section>
       <section className="planning-library" aria-labelledby="planning-library-title">
         <div className="planning-library-heading">
           <div>
@@ -479,7 +825,7 @@ export function PlanView({
       </section>
       <section className="plan-status" aria-labelledby="plan-status-title">
         <div className="plan-status-icon">
-          {plan.complete === plan.total && items.length && !sample.remaining ? (
+          {readiness.ready ? (
             <CheckCircle size={24} weight="fill" />
           ) : (
             <ClipboardText size={24} weight="duotone" />
@@ -489,8 +835,13 @@ export function PlanView({
           <span className="section-label">Next required action</span>
           <h2 id="plan-status-title">{nextAction}</h2>
           <p>
-            {plan.complete} of {plan.total} planning fields are complete. {sample.complete} of {items.length} representative sample items are tested.
+            {readiness.ready
+              ? `${plan.complete} planning fields, ${items.length} sample items, and ${testRuns.length} guided test runs are prepared.`
+              : `${plan.complete} of ${plan.total} planning fields are complete. ${items.length} representative sample items are defined.`}
           </p>
+          {readiness.ready && readiness.warnings.length ? (
+            <small className="plan-status-warning">Before each test: {readiness.warnings[0]}</small>
+          ) : null}
         </div>
         <div className="plan-status-progress" aria-label="Audit plan readiness">
           <div>
@@ -499,13 +850,17 @@ export function PlanView({
           </div>
           <progress value={plan.complete} max={plan.total}>{plan.percent}%</progress>
           <div>
-            <span>Sample coverage</span>
-            <strong>{sample.percent}%</strong>
+            <span>Sample locations</span>
+            <strong>{readiness.sampleDefinitionPercent}%</strong>
           </div>
-          <progress value={sample.complete} max={Math.max(1, items.length)}>{sample.percent}%</progress>
+          <progress value={readiness.definedSampleItems} max={Math.max(1, items.length)}>{readiness.sampleDefinitionPercent}%</progress>
         </div>
-        <Button icon={ArrowRight} onClick={() => onNavigate("inspect")}>
-          Continue to inspection
+        <Button
+          icon={ArrowRight}
+          disabled={!readiness.ready}
+          onClick={() => onNavigate("inspect")}
+        >
+          Start inspection
         </Button>
       </section>
 
@@ -745,6 +1100,13 @@ export function PlanView({
         )}
       </section>
 
+      <AuditCoverageMap
+        coverage={coverage}
+        onOpenSession={onStartGuidedSession}
+        onNavigate={onNavigate}
+        onOpenFindings={onOpenFindings}
+      />
+
       <section className="test-script-section" aria-labelledby="test-script-title">
         <div className="sample-heading">
           <div>
@@ -755,8 +1117,8 @@ export function PlanView({
             </p>
           </div>
           <div className="sample-totals" aria-label="Test run status">
-            <span><strong>{testRuns.filter((run) => run.status === "complete").length}</strong> complete</span>
-            <span><strong>{testRuns.filter((run) => run.status !== "complete").length}</strong> remaining</span>
+            <span><strong>{testRuns.filter(auditTestRunComplete).length}</strong> complete</span>
+            <span><strong>{testRuns.filter((run) => !auditTestRunComplete(run)).length}</strong> remaining</span>
           </div>
         </div>
         <div className="test-script-add">
@@ -782,7 +1144,9 @@ export function PlanView({
         {testRuns.length ? (
           <div className="test-run-list">
             {testRuns.map((run) => {
-              const completedSteps = run.steps.filter((step) => step.complete).length;
+              const completedSteps = run.steps.filter(
+                (step) => step.complete && step.observation.trim(),
+              ).length;
               return (
                 <details className="test-run" key={run.id}>
                   <summary>
@@ -891,10 +1255,18 @@ export function PlanView({
       <ConfirmDialog
         open={Boolean(pendingTemplate)}
         title={`Apply ${pendingTemplate?.name || "audit template"}?`}
-        description="This replaces the current evaluation context, representative sample, and guided test runs. The project name, target, captures, findings, and checklist decisions stay unchanged."
+        description="This replaces the current evaluation context, representative sample, and guided test runs, and resets any final conclusion to in progress. The project name, target, captures, findings, and checklist decisions stay unchanged."
         confirmLabel="Apply template"
         onCancel={() => setPendingTemplate(null)}
         onConfirm={() => void applyTemplate()}
+      />
+      <ConfirmDialog
+        open={Boolean(pendingRecommendation)}
+        title={`Use ${pendingRecommendation?.template.name || "the recommended scope"}?`}
+        description={`This replaces the current evaluation context, representative sample, and guided test runs with the scoper's ${pendingRecommendation?.sampleItems.length ?? 0}-item sample and ${pendingRecommendation?.testScriptIds.length ?? 0}-run test matrix, and resets any final conclusion to in progress. The project name, target, auditor, captures, findings, and checklist decisions stay unchanged.`}
+        confirmLabel="Use recommended scope"
+        onCancel={() => setPendingRecommendation(null)}
+        onConfirm={() => void applyRecommendation()}
       />
       <ConfirmDialog
         open={Boolean(templateToDelete)}

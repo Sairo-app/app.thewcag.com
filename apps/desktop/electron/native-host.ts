@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { NATIVE_PROTOCOL_VERSION, type NativeResponseV1 } from "@accessibility-build/audit-contracts";
 import { AuthService } from "./services/auth";
 import { AiAuthoringService } from "./services/ai-authoring";
+import { CaptureRepository } from "./services/captures";
 import { JsonStore } from "./services/store";
 import { handleNativeRequest } from "./services/native-protocol";
 import { configuredExtensionId } from "./native-host-registration";
@@ -49,7 +50,9 @@ function rawRequestId(value: unknown): string {
 export async function runNativeHost(origin: string): Promise<void> {
   app.name = "TheWCAG";
   app.setName("TheWCAG");
-  app.setPath("userData", join(app.getPath("appData"), "TheWCAG"));
+  if (!app.commandLine.hasSwitch("user-data-dir")) {
+    app.setPath("userData", join(app.getPath("appData"), "TheWCAG"));
+  }
   await app.whenReady();
   app.dock?.hide();
 
@@ -76,7 +79,14 @@ export async function runNativeHost(origin: string): Promise<void> {
     await store.initialize();
     const auth = new AuthService(userData, store);
     const ai = new AiAuthoringService(userData, auth);
-    const response = await handleNativeRequest(raw, { store, ai, appVersion: app.getVersion() });
+    const captures = new CaptureRepository(userData);
+    await captures.initialize();
+    const response = await handleNativeRequest(raw, {
+      store,
+      ai,
+      captures,
+      appVersion: app.getVersion(),
+    });
     await writeNativeMessage(response);
     app.exit(response.ok ? 0 : 1);
   } catch (error) {

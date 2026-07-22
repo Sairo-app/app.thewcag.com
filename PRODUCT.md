@@ -30,6 +30,8 @@ TheWCAG inspects the rendered experience anywhere on screen, then keeps the barr
 - Traceability promise: every captured issue and finding gets one immutable global ID at creation; short audit sequence numbers remain display references only.
 - The line to remember: Audit what people see.
 - Belief ladder: accessibility barriers happen beyond source code; TheWCAG can inspect any rendered interface; it keeps evidence connected to findings; captures remain local until the auditor publishes; the application supports both macOS and Windows.
+- Desktop workflow: Plan → Inspect → Review → Deliver. Evidence is authored and attached inside findings; the all-captures view is optional and preserves unassigned legacy work.
+- Screenshot-only use is a first-class local path: capture, annotate, copy, or export PNG/Markdown without creating an audit or finding.
 - Proof on hand: the working desktop tools, documented WCAG 2.2 capabilities, signed release pipeline, public report format, source repository, and product behavior described in the repository. No invented customer logos, usage numbers, certifications, or testimonials.
 
 ## Brand Personality

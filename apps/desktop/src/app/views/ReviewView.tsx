@@ -15,7 +15,16 @@ import type {
 } from "../../shared/desktop";
 import { desktop, getStored, listCaptures, setStored } from "../api";
 import { normalizeFindingReferences } from "../../shared/finding-references";
-import { buildAuditHtml, buildAuditMarkdown } from "../audit-export";
+import {
+  DEFAULT_REPORT_SECTIONS,
+  REPORT_AUDIENCE_PRESETS,
+  buildAuditHtml,
+  buildAuditMarkdown,
+  type ReportAudience,
+  type ReportSectionOptions,
+  type VpatConformanceResponse,
+  type VpatResponseMap,
+} from "../audit-export";
 import { auditStoreKey, type RecordAuditActivity } from "../audits";
 import { Button, Toast } from "../components";
 import { messageFromError, useTransientMessage } from "../hooks";
@@ -45,27 +54,52 @@ export function ReviewView({
   const [captures, setCaptures] = useState<CaptureEntry[]>([]);
   const [sampleItems, setSampleItems] = useState<AuditSampleItem[]>([]);
   const [testRuns, setTestRuns] = useState<AuditTestRun[]>([]);
-  const [exportFormat, setExportFormat] = useState<"md" | "html">("html");
+  const [exportFormat, setExportFormat] = useState<"md" | "html" | "pdf">("html");
+  const [reportAudience, setReportAudience] = useState<ReportAudience | "custom">("complete");
+  const [reportSections, setReportSections] = useState<ReportSectionOptions>({ ...DEFAULT_REPORT_SECTIONS });
+  const [vpatResponses, setVpatResponses] = useState<VpatResponseMap>({});
   const [message, show] = useTransientMessage();
 
   useEffect(() => {
+    let cancelled = false;
+    setFindings([]);
+    setChecklist({});
+    setCaptures([]);
+    setSampleItems([]);
+    setTestRuns([]);
+    setVpatResponses({});
     void Promise.all([
       getStored<Finding[]>(auditStoreKey(audit.id, "findings"), []),
       getStored<ChecklistState>(auditStoreKey(audit.id, "checklist"), {}),
       listCaptures(audit.id),
       getStored<AuditSampleItem[]>(auditStoreKey(audit.id, "sampleItems"), []),
       getStored<AuditTestRun[]>(auditStoreKey(audit.id, "testRuns"), []),
-    ]).then(([nextFindings, nextChecklist, nextCaptures, nextSampleItems, nextTestRuns]) => {
-      const normalized = normalizeFindingReferences(nextFindings);
-      setFindings(normalized.findings);
-      if (normalized.changed) {
-        void setStored(auditStoreKey(audit.id, "findings"), normalized.findings);
-      }
-      setChecklist(nextChecklist);
-      setCaptures(nextCaptures);
-      setSampleItems(nextSampleItems);
-      setTestRuns(nextTestRuns);
-    });
+      getStored<VpatResponseMap>(auditStoreKey(audit.id, "vpatResponses"), {}),
+    ])
+      .then(([nextFindings, nextChecklist, nextCaptures, nextSampleItems, nextTestRuns, nextVpatResponses]) => {
+        if (cancelled) return;
+        const normalized = normalizeFindingReferences(nextFindings);
+        setFindings(normalized.findings);
+        if (normalized.changed) {
+          void setStored(auditStoreKey(audit.id, "findings"), normalized.findings)
+            .catch((error) => show(messageFromError(error), true));
+        }
+        setChecklist(nextChecklist);
+        setCaptures(nextCaptures);
+        setSampleItems(nextSampleItems);
+        setTestRuns(nextTestRuns);
+        setVpatResponses(
+          nextVpatResponses && typeof nextVpatResponses === "object" && !Array.isArray(nextVpatResponses)
+            ? nextVpatResponses
+            : {},
+        );
+      })
+      .catch((error) => {
+        if (!cancelled) show(messageFromError(error), true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [audit.id]);
 
   async function exportAudit() {
@@ -77,15 +111,20 @@ export function ReviewView({
         captures,
         sampleItems,
         testRuns,
+        vpatResponses,
+        sections: reportSections,
       };
       const text =
-        exportFormat === "html"
+        exportFormat === "html" || exportFormat === "pdf"
           ? buildAuditHtml(exportInput)
           : buildAuditMarkdown(exportInput);
-      const path = await desktop.invoke<string | null>("dialog:save-text", {
+      const path = await desktop.invoke<string | null>(
+        exportFormat === "pdf" ? "dialog:save-pdf" : "dialog:save-text",
+        {
         name: `${audit.project.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "accessibility-audit"}-full-audit.${exportFormat}`,
-        text,
-      });
+          [exportFormat === "pdf" ? "html" : "text"]: text,
+        },
+      );
       if (!path) return;
       await recordActivity({
         kind: "exported",
@@ -93,13 +132,46 @@ export function ReviewView({
         detail: `${exportFormat.toUpperCase()}, ${findings.length} findings, ${summary.reviewed} reviewed criteria`,
       });
       show(
-        exportFormat === "html"
+        exportFormat === "pdf"
+          ? "Tagged PDF audit exported"
+          : exportFormat === "html"
           ? "Printable HTML audit exported"
           : "Portable Markdown audit exported",
       );
     } catch (error) {
       show(messageFromError(error), true);
     }
+  }
+
+  function chooseReportAudience(audience: ReportAudience) {
+    setReportAudience(audience);
+    setReportSections({ ...REPORT_AUDIENCE_PRESETS[audience] });
+  }
+
+  function toggleReportSection(section: keyof ReportSectionOptions) {
+    setReportAudience("custom");
+    setReportSections((current) => ({ ...current, [section]: !current[section] }));
+  }
+
+  function updateVpatResponse(
+    criterion: string,
+    patch: Partial<{ response: VpatConformanceResponse; remarks: string }>,
+  ) {
+    setVpatResponses((current) => {
+      const prior = current[criterion];
+      const next: VpatResponseMap = {
+        ...current,
+        [criterion]: {
+          response: patch.response ?? prior?.response ?? "",
+          remarks: patch.remarks ?? prior?.remarks ?? "",
+          source: "auditor",
+          updatedAt: Date.now(),
+        },
+      };
+      void setStored(auditStoreKey(audit.id, "vpatResponses"), next)
+        .catch((error) => show(messageFromError(error), true));
+      return next;
+    });
   }
 
   const summary = useMemo(() => {
@@ -135,8 +207,13 @@ export function ReviewView({
         const entry = checklist[criterion.sc];
         return entry?.result === "na" && !entry.note.trim();
       }).length,
+      applicableCriteria: applicable,
+      vpatCompleted: applicable.filter((criterion) => {
+        const entry = vpatResponses[criterion.sc];
+        return entry?.source === "auditor" && Boolean(entry.response);
+      }).length,
     };
-  }, [audit.standard, checklist, findings]);
+  }, [audit.standard, checklist, findings, vpatResponses]);
 
   return (
     <div className="review-view">
@@ -147,23 +224,57 @@ export function ReviewView({
           <p>
             Export the evaluation plan, findings, evidence inventory, retest
             records, conclusion, and every applicable checklist decision as
-            printable HTML or portable Markdown.
+            tagged PDF, accessible HTML, or portable Markdown.
           </p>
         </div>
-        <div className="review-export-actions">
-          <select
-            value={exportFormat}
-            onChange={(event) =>
-              setExportFormat(event.target.value as typeof exportFormat)
-            }
-            aria-label="Audit export format"
-          >
-            <option value="html">Printable HTML</option>
-            <option value="md">Portable Markdown</option>
-          </select>
-          <Button icon={DownloadSimple} onClick={() => void exportAudit()}>
-            Export audit
-          </Button>
+        <div className="review-export-panel">
+          <div className="review-export-actions">
+            <select
+              value={reportAudience}
+              onChange={(event) => {
+                if (event.target.value !== "custom") {
+                  chooseReportAudience(event.target.value as ReportAudience);
+                }
+              }}
+              aria-label="Report audience"
+            >
+              <option value="complete">Complete audit</option>
+              <option value="executive">Executive audience</option>
+              <option value="delivery">Delivery team</option>
+              {reportAudience === "custom" ? <option value="custom">Custom sections</option> : null}
+            </select>
+            <select
+              value={exportFormat}
+              onChange={(event) =>
+                setExportFormat(event.target.value as typeof exportFormat)
+              }
+              aria-label="Audit export format"
+            >
+              <option value="pdf">Tagged PDF</option>
+              <option value="html">Accessible HTML</option>
+              <option value="md">Portable Markdown</option>
+            </select>
+            <Button icon={DownloadSimple} onClick={() => void exportAudit()}>
+              Export report
+            </Button>
+          </div>
+          <fieldset className="report-section-toggles">
+            <legend>Audience sections</legend>
+            {([
+              ["executiveSummary", "Executive summary"],
+              ["limitations", "Limitations"],
+              ["prioritizedActionPlan", "Prioritized action plan"],
+            ] as const).map(([section, label]) => (
+              <label key={section}>
+                <input
+                  type="checkbox"
+                  checked={reportSections[section]}
+                  onChange={() => toggleReportSection(section)}
+                />
+                {label}
+              </label>
+            ))}
+          </fieldset>
         </div>
       </section>
       <section className="review-summary" aria-label="Review summary">
@@ -224,6 +335,80 @@ export function ReviewView({
           </div>
         </section>
       ) : null}
+      <section className="vpat-authoring" aria-labelledby="vpat-authoring-title">
+        <div className="vpat-authoring-heading">
+          <div>
+            <h2 id="vpat-authoring-title">VPAT / Accessibility Conformance Report</h2>
+            <p>
+              Author a conformance response for each criterion. Audit checklist
+              results remain supporting evidence and are never converted into a
+              response automatically.
+            </p>
+          </div>
+          <strong>{summary.vpatCompleted}/{summary.applicableCriteria.length} human responses</strong>
+        </div>
+        <div className="vpat-human-only" role="note">
+          Only values selected here are exported as conformance responses. Empty
+          rows remain “Auditor response required.”
+        </div>
+        <details>
+          <summary>Author criterion responses</summary>
+          <div className="vpat-table-wrap">
+            <table className="vpat-authoring-table">
+              <caption>Human-authored WCAG 2.2 conformance responses</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Criterion</th>
+                  <th scope="col">Conformance response</th>
+                  <th scope="col">Remarks and explanations</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summary.applicableCriteria.map((criterion) => {
+                  const entry = vpatResponses[criterion.sc];
+                  const label = `${criterion.sc} ${criterion.name}`;
+                  return (
+                    <tr key={criterion.sc}>
+                      <th scope="row">
+                        <span>{criterion.sc} · Level {criterion.level}</span>
+                        <strong>{criterion.name}</strong>
+                      </th>
+                      <td>
+                        <select
+                          aria-label={`Conformance response for ${label}`}
+                          value={entry?.source === "auditor" ? entry.response : ""}
+                          onChange={(event) => updateVpatResponse(
+                            criterion.sc,
+                            { response: event.target.value as VpatConformanceResponse },
+                          )}
+                        >
+                          <option value="">Auditor response required</option>
+                          <option value="supports">Supports</option>
+                          <option value="partially-supports">Partially supports</option>
+                          <option value="does-not-support">Does not support</option>
+                          <option value="not-applicable">Not applicable</option>
+                        </select>
+                      </td>
+                      <td>
+                        <textarea
+                          rows={2}
+                          aria-label={`Remarks and explanations for ${label}`}
+                          value={entry?.source === "auditor" ? entry.remarks : ""}
+                          onChange={(event) => updateVpatResponse(
+                            criterion.sc,
+                            { remarks: event.target.value },
+                          )}
+                          placeholder="Describe evaluated behavior, evidence, and exceptions."
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </section>
       <ChecklistView
         audit={audit}
         recordActivity={recordActivity}

@@ -10,6 +10,7 @@ The canonical monorepo setup, architecture, environment, quality, deployment, an
 - Auth.js v5 with the Drizzle adapter and Resend magic links
 - Drizzle ORM and Postgres 16
 - Cloudflare R2 through its S3-compatible API
+- Dodo Payments hosted checkout, portal, signed webhooks, and subscription reconciliation
 - Tailwind CSS 4
 - Standalone Docker output for Coolify
 
@@ -34,12 +35,17 @@ The canonical monorepo setup, architecture, environment, quality, deployment, an
 | `/connect` | Signed-in browser user | Authorize a desktop device and return to the app through `thewcag://auth`. |
 | `/screenshots` | Signed-in owner | List, copy, and delete published screenshots. |
 | `/brand` | Signed-in owner | Configure report logo, organization name, and accent color. |
+| `/pricing`, `/billing/return` | Public / signed-in | Compare Free and Pro, start hosted checkout, and confirm webhook activation. |
 | `/s/[slug]` | Public, unlisted | View a published accessibility report. |
 | `/admin`, `/admin/users`, `/admin/reports` | `ADMIN_EMAILS` only | Platform metrics and destructive administration. |
-| `GET /api/device/entitlements` | Desktop bearer token | Return device identity, publish feature status, and storage use/quota. |
-| `POST /api/device/screenshots` | Desktop bearer token | Validate and publish a PNG report to R2 and Postgres. |
-| `GET /api/s/[slug]/image` | Public | Redirect to the R2 CDN or stream the report image. |
-| `GET /api/brand/[id]/logo` | Public | Redirect to or stream the report owner's logo. |
+| `GET /api/device/entitlements` | Desktop bearer token | Return the versioned Free/Pro feature, allowance, and storage contract. |
+| `POST /api/device/screenshots` | Pro desktop bearer token | Validate and publish a PNG report to private R2 and Postgres. |
+| `POST /api/billing/checkout` | Signed-in browser user | Create an allowlisted Dodo hosted checkout session. |
+| `GET /api/billing/portal` | Signed-in browser user | Create and open the owner's Dodo customer portal. |
+| `POST /api/billing/webhooks` | Signed Dodo request | Apply idempotent, ordered subscription events. |
+| `GET/POST /api/internal/billing/reconcile` | Operations bearer secret | Reconcile Dodo state and perform report retention cleanup. |
+| `GET /api/s/[slug]/image` | Active or grace report | Stream the private report image after lifecycle authorization. |
+| `GET /api/brand/[id]/logo` | Active Pro branding | Stream the report owner's private logo. |
 | `GET /api/desktop/download` | Public | Redirect to the latest macOS or Windows GitHub release asset. |
 | `/api/auth/[...nextauth]` | Auth.js | Auth.js request handling. |
 
@@ -49,7 +55,7 @@ Public report pages are marked `noindex`. The sitemap contains only indexable ma
 
 Copy `.env.example` to `.env.local`. Required variables and local service values are documented in the [root README](../../README.md#environment-variables).
 
-In development, an absent `AUTH_RESEND_KEY` causes the magic link to be printed to the server console. R2 configuration is validated on first object operation. `R2_PUBLIC_URL` is optional: when configured, image routes redirect to the CDN; otherwise they stream from the S3-compatible service.
+In development, an absent `AUTH_RESEND_KEY` causes the magic link to be printed to the server console. R2 configuration is validated on first object operation. Keep R2/MinIO private: entitlement-aware image routes stream objects after checking report state.
 
 ## Local services
 
@@ -84,7 +90,7 @@ The active development and production startup path runs the embedded idempotent 
 - Users, Auth.js records, device-token hashes, report metadata, branding, byte counts, and views are Postgres rows.
 - Published images must be valid PNG data and no larger than 4 MB.
 - A report accepts up to 100 issue objects, a 140-character title, and a 500-character description.
-- Each user has a 1 GiB report-image quota.
+- Pro defaults to 100 active hosted reports and a 1 GiB report-image quota; both are server-configurable.
 - Brand logos accept PNG, JPEG, WEBP, or SVG and must be under 1 MB.
 - Owner/admin deletion removes both metadata and the corresponding R2 object.
 

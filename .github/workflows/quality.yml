@@ -12,6 +12,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -20,4 +21,40 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm verify
+      - name: Critical web authorization and idempotency tests
+        run: pnpm test:critical-web
+      - name: Full repository verification
+        run: pnpm verify
+
+  web-accessibility-signals:
+    name: Automated accessibility signals (not conformance)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chromium for the accessibility scan
+        run: pnpm --filter @thewcag/web exec playwright install --with-deps chromium
+      - name: Build the public Next.js site
+        run: pnpm build:web
+        env:
+          ACCESSIBILITY_SCAN_FIXTURE: "1"
+          NEXT_PUBLIC_APP_URL: https://app.thewcag.com
+      - name: Scan public routes for untriaged WCAG A/AA signals
+        run: pnpm a11y:web
+        env:
+          ACCESSIBILITY_SCAN_FIXTURE: "1"
+          NEXT_PUBLIC_APP_URL: https://app.thewcag.com
+      - name: Upload accessibility scan diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-accessibility-signal-report
+          path: apps/web/playwright-a11y-report/
+          if-no-files-found: ignore
+          retention-days: 14

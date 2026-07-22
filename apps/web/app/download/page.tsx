@@ -9,7 +9,7 @@ import { createPageMetadata } from "@/lib/seo";
 export const metadata: Metadata = createPageMetadata({
   title: "Download Free Accessibility Audit Software",
   description:
-    "Download TheWCAG free for macOS or Windows. No account is required for local WCAG audits, evidence capture, findings, retesting, and exports.",
+    "Download TheWCAG free for macOS or Windows. Run local WCAG 2.2 audits, capture standalone screenshots, manage finding-owned evidence, retest fixes, and export accessible reports.",
   path: "/download",
   keywords: ["download accessibility audit software", "macOS WCAG tool", "Windows accessibility testing app", "TheWCAG download"],
 });
@@ -46,7 +46,7 @@ export default function DownloadPage() {
           operatingSystem: "macOS, Windows",
           offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
           description:
-            "Local-first accessibility audit workstation with planning, guided testing, browser and desktop evidence, WCAG 2.2 findings, retesting, and report delivery.",
+            "Local-first accessibility audit workstation with guided testing, finding-owned evidence, remediation tickets, WCAG 2.2 review, accessible reports, and retesting.",
         }}
       />
       <main id="main" className="download-page">
@@ -112,9 +112,9 @@ export default function DownloadPage() {
               ["Audit planning", "Define evaluation goals, scope, exclusions, representative samples, environments, assistive technologies, and reusable audit templates."],
               ["Guided manual testing", "Run repeatable scripts for authentication, checkout, forms, media, documents, components, and regression work."],
               ["Screen-wide inspection", "Check contrast, target size, palettes, color-vision deficiencies, low acuity, and temporary interface states across any application."],
-              ["Editable evidence", "Capture high-DPI regions or screens and add issue markers, arrows, measurements, focus order, contrast probes, text, crop, and redaction."],
-              ["Findings and WCAG decisions", "Track stable references, affected users, severity rationale, owners, dates, repeated occurrences, accepted risk, failed criteria, and retests."],
-              ["Portable delivery", "Export Markdown or printable HTML, move integrity-checked audit packages between computers, or publish a selected unlisted report."],
+              ["Finding-owned evidence", "Capture and annotate directly inside a finding, attach multiple images, and retain explicit before-and-after remediation evidence."],
+              ["Findings, tickets, and WCAG decisions", "Track stable references, affected users, Jira/Linear/GitHub tickets, ownership, dates, accepted risk, criterion decisions, and retests."],
+              ["Accessible delivery", "Export branded accessible HTML, PDF, or Markdown, author VPAT responses manually, move integrity-checked packages, or publish an unlisted report."],
             ].map(([t, d]) => (
               <div key={t}>
                 <dt>{t}</dt>

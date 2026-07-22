@@ -37,4 +37,22 @@ describe("capture identifiers", () => {
       await rm(directory, { recursive: true, force: true });
     }
   });
+
+  it("preserves the guided session context with a capture", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "thewcag-captures-"));
+    try {
+      const captures = new CaptureRepository(directory);
+      const created = await captures.create(PNG, "Checkout error", "aud-a1234567", {
+        sampleItemId: "sample-checkout",
+        testRunId: "run-forms",
+      });
+      const restored = await captures.describe(created.id);
+      expect(restored).toMatchObject({
+        sampleItemId: "sample-checkout",
+        testRunId: "run-forms",
+      });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
 });

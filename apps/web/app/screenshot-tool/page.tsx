@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer, JsonLd } from "@/components/Footer";
@@ -8,35 +9,35 @@ import { createPageMetadata } from "@/lib/seo";
 export const metadata: Metadata = createPageMetadata({
   title: "Standalone Accessibility Screenshot Tool",
   description:
-    "Capture, annotate, copy, export, and share accessibility screenshots without creating an audit or replacing your existing workflow.",
+    "Capture, annotate, copy, export, and share accessibility screenshots without creating an audit, or attach multiple captures directly to a finding when you choose.",
   path: "/screenshot-tool",
   keywords: ["accessibility screenshot tool", "WCAG annotation tool", "accessibility evidence capture", "annotated accessibility report"],
 });
 
 const STEPS: { title: string; body: string }[] = [
   {
-    title: "Capture a region",
-    body: "Open Screenshot tool from Utilities, or press the Capture shortcut (default ⌥⌘S on macOS, Ctrl+Alt+S on Windows). Drag around the area you want or capture the full display. The image opens in the annotation window and stays outside every audit.",
+    title: "Open Screenshot tool",
+    body: "Choose Screenshot tool, use the tray action, or press the Capture shortcut (default ⌥⌘S on macOS, Ctrl+Alt+S on Windows). You do not need an audit, a finding, or an account.",
   },
   {
-    title: "Flag an issue",
-    body: "Press I and click where the problem is to drop a numbered issue marker. Add as many as you need. They remain anchored to the image and are included as structured notes when you create a share link.",
+    title: "Capture the necessary context",
+    body: "Drag around the affected region or choose a full-screen capture when the surrounding application state matters. The most recent 100 local captures remain available in the library.",
   },
   {
-    title: "Describe it against WCAG",
-    body: "For each marker, choose the issue type, set a severity, and write a note. Use WCAG references when they help, or keep the screenshot independent when your team uses another audit or ticketing process.",
+    title: "Annotate the evidence",
+    body: "Add issue markers, arrows, boxes, text, measurements, focus-order labels, contrast probes, crops, and irreversible solid redactions. Marker notes can reference a WCAG criterion without making an automatic conformance decision.",
   },
   {
-    title: "Measure & probe",
-    body: "Use the ruler to measure any element - targets under 24×24px are flagged for WCAG 2.5.8. Use the contrast probe to click two points in the capture and read the exact ratio, attaching it to a finding.",
+    title: "Copy or export locally",
+    body: "Copy or export the annotated image as PNG, or copy Markdown that describes the capture and its annotations. This remains a screenshot-only workflow unless you choose to connect the capture to an audit.",
   },
   {
-    title: "Redact anything sensitive",
-    body: "Draw a solid block over private data before sharing. Prefer solid redaction over pixelation - pixelation can sometimes be reversed on text.",
+    title: "Attach evidence while writing a finding",
+    body: "Inside finding authoring, choose Add evidence to run the same capture and annotation flow and return the result directly to that finding. Attach multiple images or select existing captures from the local library.",
   },
   {
-    title: "Save or publish",
-    body: "Copy the annotated image, export it as PNG, or create an unlisted app.thewcag.com link that anyone can open in a browser. An account is needed only to create a link, not for local capture or export.",
+    title: "Share only when you decide",
+    body: "Local export never requires an account. If you publish reviewed evidence, TheWCAG creates an unlisted app.thewcag.com link and keeps every audit and other local capture private.",
   },
 ];
 
@@ -44,11 +45,13 @@ const SHORTCUTS: [string, string, string][] = [
   ["Pick color pair", "⌥⌘P", "Ctrl+Alt+P"],
   ["Capture region", "⌥⌘S", "Ctrl+Alt+S"],
   ["Toggle color-blindness lens", "⌥⌘L", "Ctrl+Alt+L"],
-  ["Drop an issue marker", "I, then click", "I, then click"],
-  ["Pan / zoom the capture", "Scroll / ⌘-scroll", "Scroll / Ctrl-scroll"],
 ];
 
 const FAQ = [
+  {
+    q: "Do I need to create an audit or finding?",
+    a: "No. Standalone captures are a complete screenshot-only workflow. Capture, annotate, copy, and export without entering the audit workspace.",
+  },
   {
     q: "Do reviewers need to install anything to see a report?",
     a: "No. Published reports are web pages at app.thewcag.com/s/… that open in any browser. Only the person creating reports needs the app and an account.",
@@ -73,7 +76,7 @@ export default function ScreenshotToolPage() {
           "@type": "HowTo",
           name: "How to capture and share accessibility screenshots with TheWCAG",
           description:
-            "Capture, annotate, copy, export, or share a screenshot without creating a TheWCAG audit.",
+            "Capture, annotate, copy, export, or share a screenshot without creating an audit, or attach it directly to a structured finding.",
           step: STEPS.map((s, i) => ({
             "@type": "HowToStep",
             position: i + 1,
@@ -87,7 +90,8 @@ export default function ScreenshotToolPage() {
         <p className="mt-3 max-w-2xl text-muted">
           Keep your audit process. TheWCAG gives you a separate screenshot workspace for capturing
           any app, adding clear annotations, copying or exporting the result, and sharing an
-          unlisted review link when you choose.
+          unlisted review link when you choose. The same capture flow can also attach evidence to a
+          finding when your workflow needs it.
         </p>
         <div className="mt-6">
           <Link
@@ -97,6 +101,21 @@ export default function ScreenshotToolPage() {
             Download the free app
           </Link>
         </div>
+
+        <figure className="guide-figure">
+          <div className="guide-figure__image">
+            <Image
+              src="/guides/getting-started/standalone-capture-library.png"
+              alt="TheWCAG standalone capture library with region and full-screen capture actions and a recent local capture, separate from the audit stages."
+              width={1191}
+              height={768}
+              priority
+            />
+          </div>
+          <figcaption>
+            <p><strong>Screenshot-only by design.</strong> The capture library remains a standalone utility even when an audit is open.</p>
+          </figcaption>
+        </figure>
 
         <section className="mt-14" aria-labelledby="steps">
           <h2 id="steps" className="text-xl font-bold tracking-tight">

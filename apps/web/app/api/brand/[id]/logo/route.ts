@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
-import { getImage, publicImageUrl } from "@/lib/r2";
+import { getImage } from "@/lib/r2";
+import { hasActiveProSubscription } from "@/lib/billing/entitlements";
 
 export const runtime = "nodejs";
 
-/** Serve a user's white-label logo. Redirects to the R2 CDN in production,
- *  streams from the bucket in dev. Public by design because it's on shared reports. */
+/** Stream a white-label logo only while the owner has active Pro access. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const [row] = await db
@@ -15,22 +15,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     .from(users)
     .where(eq(users.id, id))
     .limit(1);
-  if (!row?.key) return new NextResponse("Not found", { status: 404 });
-
-  const cdn = publicImageUrl(row.key);
-  if (cdn) {
-    return new NextResponse(null, {
-      status: 302,
-      headers: { Location: cdn, "Cache-Control": "public, max-age=3600" },
-    });
-  }
+  if (!row?.key || !(await hasActiveProSubscription(id))) return new NextResponse("Not found", { status: 404 });
 
   const obj = await getImage(row.key);
   if (!obj) return new NextResponse("Not found", { status: 404 });
   return new NextResponse(Buffer.from(obj.body), {
     headers: {
       "Content-Type": obj.contentType,
-      "Cache-Control": "public, max-age=3600",
+      "Cache-Control": "public, max-age=300, stale-while-revalidate=60",
       "X-Content-Type-Options": "nosniff",
       ...(obj.contentType === "image/svg+xml"
         ? { "Content-Security-Policy": "sandbox; default-src 'none'; style-src 'unsafe-inline'" }

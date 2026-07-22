@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
-export const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://app.thewcag.com";
+export const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://app.thewcag.com").replace(/\/+$/, "");
 
 export const PRODUCT_DESCRIPTION =
-  "TheWCAG is a local-first accessibility audit workstation for macOS and Windows with browser evidence capture, WCAG 2.2 planning, annotated screenshots, findings, retesting, and shareable reports.";
+  "TheWCAG is a local-first accessibility audit workstation for macOS and Windows with WCAG 2.2 planning, finding-owned evidence, remediation tickets, accessible reports, retesting, and program trends.";
 
 export const SOCIAL_IMAGE = {
   url: `${SITE_URL}/opengraph-image`,

@@ -34,6 +34,31 @@ describe("desktop storage validation", () => {
     expect(result[1].key).toBe("cap-2:1");
   });
 
+  it("preserves the bounded review state and traceability of browser intake", () => {
+    const result = mergeFindings([], [{
+      key: "browser-finding",
+      title: "Button has no accessible name",
+      wcag: "4.1.2",
+      severity: "major",
+      status: "open",
+      reviewState: "pending",
+      note: "Queued for review",
+      location: "https://example.com/checkout",
+      evidenceCaptureIds: ["cap-browser-12345678"],
+      captureId: "cap-browser-12345678",
+      statusHistory: [{ status: "open", changedAt: 42 }],
+      createdAt: 42,
+    }]);
+
+    expect(result[0]).toMatchObject({
+      reviewState: "pending",
+      location: "https://example.com/checkout",
+      evidenceCaptureIds: ["cap-browser-12345678"],
+      captureId: "cap-browser-12345678",
+      statusHistory: [{ status: "open", changedAt: 42 }],
+    });
+  });
+
   it("keeps findings isolated by audit", async () => {
     const directory = await mkdtemp(join(tmpdir(), "thewcag-store-"));
     try {

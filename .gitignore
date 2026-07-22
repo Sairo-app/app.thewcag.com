@@ -5,11 +5,15 @@ target/
 *.local
 apps/desktop/out/
 apps/desktop/release/
+apps/desktop/release-check/
 
 # Next.js build output
 .next/
 next-env.d.ts
 *.tsbuildinfo
+playwright-report/
+playwright-a11y-report/
+test-results/
 
 # Local design-tool and editor state
 .claude/

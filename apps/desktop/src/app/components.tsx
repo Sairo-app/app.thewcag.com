@@ -41,6 +41,7 @@ export function IconButton({
 }
 export function Button({
   children,
+  id,
   onClick,
   variant = "secondary",
   icon: Icon,
@@ -49,6 +50,7 @@ export function Button({
   className = "",
 }: {
   children: ReactNode;
+  id?: string;
   onClick?: () => void;
   variant?: "primary" | "secondary" | "quiet" | "danger";
   icon?: ComponentType<{ size?: number; weight?: "bold" | "regular" }>;
@@ -58,6 +60,7 @@ export function Button({
 }) {
   return (
     <button
+      id={id}
       type={type}
       onClick={onClick}
       disabled={disabled}

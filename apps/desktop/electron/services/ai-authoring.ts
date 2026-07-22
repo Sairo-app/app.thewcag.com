@@ -281,6 +281,8 @@ function responseErrorMessage(body: ProviderResponseError): string {
 
 function safeProviderMessage(message: string): string {
   return message
+    // Provider errors are untrusted text; strip C0 controls before displaying them.
+    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f\u007f]/g, " ")
     .replace(/(?:sk|sk-ant|sk-or-v1)-[a-zA-Z0-9_-]{8,}/g, "[redacted key]")
     .replace(/\s+/g, " ")

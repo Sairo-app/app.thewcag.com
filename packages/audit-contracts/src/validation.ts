@@ -361,5 +361,16 @@ export function parseNativeRequest(value: unknown): NativeRequestV1 {
       draft: parseAiFindingDraft(item.draft),
     };
   }
+  if (type === "finding:queue") {
+    const auditId = stringAt(item.auditId, "request.auditId", 48, 1);
+    if (!AUDIT_ID.test(auditId)) throw new ContractValidationError("invalid audit ID", "request.auditId");
+    return {
+      protocolVersion: NATIVE_PROTOCOL_VERSION,
+      requestId,
+      type,
+      auditId,
+      evidence: parseEvidencePacket(item.evidence),
+    };
+  }
   throw new ContractValidationError("unsupported request type", "request.type");
 }

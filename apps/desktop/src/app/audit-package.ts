@@ -7,12 +7,18 @@ import type {
   FindingSavedView,
   PublishedReport,
 } from "../shared/desktop";
+import {
+  normalizeFindingEvidence,
+  referencedEvidenceCaptureIds,
+} from "../shared/finding-evidence";
 
 export const AUDIT_PACKAGE_VERSION = 1;
 
 export interface AuditPackageCapture {
   id: string;
   title: string;
+  sampleItemId?: string;
+  testRunId?: string;
   rawPngDataUrl: string;
   thumbnailPngDataUrl?: string;
   document?: string;
@@ -33,6 +39,8 @@ export interface AuditPackagePayload {
     reports: PublishedReport[];
   };
   captures: AuditPackageCapture[];
+  /** Captures retained from older packages that are not related to any finding. */
+  unassignedCaptureIds?: string[];
 }
 
 interface AuditPackageDocument {
@@ -103,6 +111,8 @@ function validateStructuredSections(sections: Record<string, unknown>): void {
         ) ||
         !finiteNumber(run.createdAt) ||
         !finiteNumber(run.modifiedAt) ||
+        (run.sampleItemId !== undefined &&
+          (typeof run.sampleItemId !== "string" || run.sampleItemId.length > 100)) ||
         !Array.isArray(run.steps) ||
         run.steps.length > 100 ||
         run.steps.some(
@@ -125,6 +135,20 @@ function validateStructuredSections(sections: Record<string, unknown>): void {
         !["blocker", "major", "minor"].includes(String(finding.severity)) ||
         !["open", "retest", "fixed", "accepted"].includes(String(finding.status)) ||
         !finiteNumber(finding.createdAt) ||
+        (finding.sampleItemId !== undefined &&
+          (typeof finding.sampleItemId !== "string" || finding.sampleItemId.length > 100)) ||
+        (finding.testRunId !== undefined &&
+          (typeof finding.testRunId !== "string" || finding.testRunId.length > 100)) ||
+        (finding.evidenceCaptureIds !== undefined &&
+          (!Array.isArray(finding.evidenceCaptureIds) ||
+            finding.evidenceCaptureIds.length > 100 ||
+            new Set(finding.evidenceCaptureIds).size !== finding.evidenceCaptureIds.length ||
+            finding.evidenceCaptureIds.some(
+              (captureId) =>
+                typeof captureId !== "string" ||
+                !captureId.trim() ||
+                captureId.length > 100,
+            ))) ||
         (finding.occurrences !== undefined &&
           (!Array.isArray(finding.occurrences) ||
             finding.occurrences.length > 2_000 ||
@@ -133,6 +157,17 @@ function validateStructuredSections(sections: Record<string, unknown>): void {
                 !object(occurrence) ||
                 !hasStrings(occurrence, ["id", "location", "note"]) ||
                 !finiteNumber(occurrence.createdAt),
+            ))) ||
+        (finding.statusHistory !== undefined &&
+          (!Array.isArray(finding.statusHistory) ||
+            finding.statusHistory.length > 5_000 ||
+            finding.statusHistory.some(
+              (entry) =>
+                !object(entry) ||
+                !["open", "retest", "fixed", "accepted"].includes(
+                  String(entry.status),
+                ) ||
+                !finiteNumber(entry.changedAt),
             ))) ||
         (finding.affectedUsers !== undefined &&
           (!Array.isArray(finding.affectedUsers) ||
@@ -237,6 +272,44 @@ function validatePayload(payload: unknown): asserts payload is AuditPackagePaylo
   ) {
     throw new Error("The audit package has invalid project metadata.");
   }
+  if (payload.audit.scopeProfile !== undefined) {
+    const profile = payload.audit.scopeProfile;
+    const targetTypes = [
+      "content-site",
+      "web-product",
+      "commerce-service",
+      "release-regression",
+      "desktop-product",
+      "mobile-product",
+      "document-set",
+      "component-library",
+    ];
+    const features = ["authentication", "checkout", "forms", "media", "documents", "components"];
+    if (
+      !object(profile) ||
+      profile.version !== 1 ||
+      !targetTypes.includes(String(profile.targetType)) ||
+      typeof profile.templateId !== "string" ||
+      !profile.templateId.trim() ||
+      profile.templateId.length > 120 ||
+      !["high", "medium", "low"].includes(String(profile.confidence)) ||
+      !Array.isArray(profile.featureIds) ||
+      profile.featureIds.length > features.length ||
+      new Set(profile.featureIds).size !== profile.featureIds.length ||
+      profile.featureIds.some((feature) => !features.includes(String(feature))) ||
+      !Array.isArray(profile.reasons) ||
+      profile.reasons.length > 12 ||
+      profile.reasons.some(
+        (reason) =>
+          typeof reason !== "string" ||
+          !reason.trim() ||
+          reason.length > 500,
+      ) ||
+      !finiteNumber(profile.confirmedAt)
+    ) {
+      throw new Error("The audit package has an invalid scope profile.");
+    }
+  }
   const sections = payload.sections;
   const limits: Array<[string, number]> = [
     ["sampleItems", 2_000],
@@ -272,6 +345,14 @@ function validatePayload(payload: unknown): asserts payload is AuditPackagePaylo
       throw new Error("The audit package contains an invalid capture.");
     }
     if (
+      (capture.sampleItemId !== undefined &&
+        (typeof capture.sampleItemId !== "string" || capture.sampleItemId.length > 100)) ||
+      (capture.testRunId !== undefined &&
+        (typeof capture.testRunId !== "string" || capture.testRunId.length > 100))
+    ) {
+      throw new Error("The audit package contains invalid capture context.");
+    }
+    if (
       capture.thumbnailPngDataUrl !== undefined &&
       (typeof capture.thumbnailPngDataUrl !== "string" ||
         !PNG_DATA_URL.test(capture.thumbnailPngDataUrl) ||
@@ -286,19 +367,47 @@ function validatePayload(payload: unknown): asserts payload is AuditPackagePaylo
       throw new Error("The audit package contains an invalid annotation document.");
     }
   }
+  if (
+    payload.unassignedCaptureIds !== undefined &&
+    (!Array.isArray(payload.unassignedCaptureIds) ||
+      payload.unassignedCaptureIds.length > 100 ||
+      new Set(payload.unassignedCaptureIds).size !== payload.unassignedCaptureIds.length ||
+      payload.unassignedCaptureIds.some(
+        (captureId) => typeof captureId !== "string" || !captureId.trim() || captureId.length > 100,
+      ))
+  ) {
+    throw new Error("The audit package has an invalid unassigned captures bucket.");
+  }
+}
+
+export function migrateAuditPackageEvidence(
+  payload: AuditPackagePayload,
+): AuditPackagePayload {
+  const findings = payload.sections.findings.map(normalizeFindingEvidence);
+  const assigned = referencedEvidenceCaptureIds(findings);
+  const unassignedCaptureIds = payload.captures
+    .map((capture) => capture.id)
+    .filter((captureId) => !assigned.has(captureId));
+  return {
+    ...payload,
+    sections: { ...payload.sections, findings },
+    ...(unassignedCaptureIds.length ? { unassignedCaptureIds } : { unassignedCaptureIds: undefined }),
+  };
 }
 
 export async function serializeAuditPackage(
   payload: AuditPackagePayload,
 ): Promise<string> {
   validatePayload(payload);
-  const encoded = JSON.stringify(payload);
+  const prepared = migrateAuditPackageEvidence(payload);
+  validatePayload(prepared);
+  const encoded = JSON.stringify(prepared);
   if (encoded.length > MAX_PACKAGE_CHARACTERS) {
     throw new Error("The audit package is too large. Remove unnecessary captures and try again.");
   }
   const document: AuditPackageDocument = {
     schemaVersion: AUDIT_PACKAGE_VERSION,
-    payload,
+    payload: prepared,
     integrity: {
       algorithm: "SHA-256",
       digest: await sha256(encoded),
@@ -331,5 +440,5 @@ export async function parseAuditPackage(text: string): Promise<AuditPackagePaylo
   if (digest !== document.integrity.digest) {
     throw new Error("The audit package failed its integrity check and was not imported.");
   }
-  return document.payload;
+  return migrateAuditPackageEvidence(document.payload);
 }

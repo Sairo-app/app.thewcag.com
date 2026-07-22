@@ -1,31 +1,31 @@
 import Link from "next/link";
-import { auth, signOut } from "@/auth";
-import { isAdminEmail } from "@/lib/admin";
 import { HeaderNav } from "./HeaderNav";
 import { SiteMenu } from "./SiteMenu";
+import { HeaderAccount } from "./HeaderAccount";
 import {
   BookIcon,
   ContrastIcon,
   CropIcon,
   DownloadIcon,
   EyeIcon,
-  ImageIcon,
-  LogInIcon,
-  LogOutIcon,
+  FileCheckIcon,
+  FlagIcon,
+  LinkIcon,
 } from "@/components/icons";
 
 const MOBILE_NAV = [
+  ["/getting-started", "Getting started", <BookIcon key="getting-started" size={16} />],
   ["/accessibility-audit-software", "Audit software", <BookIcon key="software" size={16} />],
-  ["/chrome-accessibility-extension", "Chrome extension", <ContrastIcon key="extension" size={16} />],
+  ["/accessibility-reporting-software", "Accessible reporting", <FileCheckIcon key="reporting" size={16} />],
+  ["/accessibility-issue-tracker-integrations", "Issue tracker integrations", <LinkIcon key="integrations" size={16} />],
+  ["/accessibility-program-management", "Program management", <FlagIcon key="program" size={16} />],
   ["/screenshot-tool", "Screenshot tool", <CropIcon key="screenshots" size={16} />],
+  ["/chrome-accessibility-extension", "Chrome extension", <ContrastIcon key="extension" size={16} />],
   ["/wcag-contrast", "Guides", <EyeIcon key="resources" size={16} />],
+  ["/pricing", "Pricing", <BookIcon key="pricing" size={16} />],
 ] as const;
 
-export async function Header() {
-  const session = await auth();
-  const signedIn = Boolean(session?.user);
-  const admin = isAdminEmail(session?.user?.email);
-
+export function Header() {
   return (
     <header className="site-header">
       <div className="site-header__inner">
@@ -40,22 +40,7 @@ export async function Header() {
         </div>
 
         <div className="site-header__utilities">
-          {signedIn ? (
-            <details className="account-menu">
-              <summary>Account</summary>
-              <div className="account-menu__panel">
-                <p>{session?.user?.email}</p>
-                {admin && <Link href="/admin">Admin</Link>}
-                <Link href="/screenshots"><ImageIcon size={15} />My reports</Link>
-                <Link href="/brand">Report branding</Link>
-                <form action={async () => { "use server"; await signOut({ redirectTo: "/" }); }}>
-                  <button type="submit"><LogOutIcon size={15} />Sign out</button>
-                </form>
-              </div>
-            </details>
-          ) : (
-            <Link href="/signin" className="site-signin"><LogInIcon size={15} />Sign in</Link>
-          )}
+          <HeaderAccount />
 
           <SiteMenu>
             <nav aria-label="Mobile primary">
@@ -67,17 +52,7 @@ export async function Header() {
             </nav>
             <div className="site-menu__rule" />
             <div className="site-menu__account">
-              {signedIn ? (
-                <>
-                  {admin && <Link href="/admin" className="site-menu__link">Admin</Link>}
-                  <Link href="/screenshots" className="site-menu__link"><ImageIcon size={16} />My reports</Link>
-                  <form action={async () => { "use server"; await signOut({ redirectTo: "/" }); }}>
-                    <button type="submit" className="site-menu__link"><LogOutIcon size={16} />Sign out</button>
-                  </form>
-                </>
-              ) : (
-                <Link href="/signin" className="site-menu__link"><LogInIcon size={16} />Sign in</Link>
-              )}
+              <HeaderAccount mobile />
             </div>
           </SiteMenu>
 

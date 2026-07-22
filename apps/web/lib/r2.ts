@@ -4,15 +4,6 @@ import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } fro
 // keyed by an opaque object key stored alongside the screenshot metadata.
 const BUCKET = process.env.R2_BUCKET ?? "thewcag-reports";
 
-// Public bucket URL (custom domain like https://cdn.thewcag.com, or the
-// managed *.r2.dev URL). When set, images are served straight from
-// Cloudflare's CDN; otherwise the app streams them (dev / private bucket).
-export const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL?.replace(/\/+$/, "") || null;
-
-export function publicImageUrl(key: string): string | null {
-  return R2_PUBLIC_URL ? `${R2_PUBLIC_URL}/${key}` : null;
-}
-
 function assertConfigured(): void {
   const missing = ["R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET"].filter(
     (k) => !process.env[k],
@@ -46,7 +37,7 @@ export async function putImage(key: string, body: Buffer, contentType: string): 
       Key: key,
       Body: body,
       ContentType: contentType,
-      CacheControl: "public, max-age=31536000, immutable",
+      CacheControl: "private, no-store",
     }),
   );
 }
@@ -56,15 +47,30 @@ export async function getImage(key: string): Promise<{ body: Uint8Array; content
     const res = await client().send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
     const body = await res.Body!.transformToByteArray();
     return { body, contentType: res.ContentType ?? "image/png" };
-  } catch {
-    return null;
+  } catch (error) {
+    const value = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+    if (value?.name === "NoSuchKey" || value?.$metadata?.httpStatusCode === 404) return null;
+    console.error(`[r2] failed to read ${key}`, error);
+    throw error;
   }
 }
 
 export async function deleteImage(key: string): Promise<void> {
-  try {
-    await client().send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
-  } catch {
-    /* best-effort */
+  await client().send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+}
+
+export async function deleteImageBestEffort(key: string): Promise<boolean> {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      await deleteImage(key);
+      return true;
+    } catch (error) {
+      if (attempt === 3) {
+        console.error(`[r2] failed to delete ${key} after ${attempt} attempts`, error);
+        return false;
+      }
+      await new Promise((resolve) => setTimeout(resolve, attempt * 100));
+    }
   }
+  return false;
 }

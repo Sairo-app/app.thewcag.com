@@ -6,6 +6,7 @@ import { TrashIcon } from "./icons";
 
 export function DeleteButton({ slug }: { slug: string }) {
   const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
   const confirmRef = useRef<HTMLButtonElement>(null);
 
@@ -17,13 +18,16 @@ export function DeleteButton({ slug }: { slug: string }) {
 
   if (!confirming) {
     return (
-      <button
-        onClick={() => setConfirming(true)}
-        className="inline-flex items-center gap-1 text-xs text-muted hover:text-red-700"
-      >
-        <TrashIcon size={13} />
-        Delete
-      </button>
+      <span>
+        <button
+          onClick={() => { setError(""); setConfirming(true); }}
+          className="inline-flex items-center gap-1 text-xs text-muted hover:text-red-700"
+        >
+          <TrashIcon size={13} />
+          Delete
+        </button>
+        {error ? <span role="alert" className="ml-2 text-xs text-red-700">{error}</span> : null}
+      </span>
     );
   }
   return (
@@ -31,7 +35,15 @@ export function DeleteButton({ slug }: { slug: string }) {
       <button
         ref={confirmRef}
         disabled={pending}
-        onClick={() => startTransition(() => deleteScreenshot(slug))}
+        onClick={() => startTransition(async () => {
+          try {
+            await deleteScreenshot(slug);
+            setConfirming(false);
+          } catch {
+            setError("The report could not be deleted. Try again.");
+            setConfirming(false);
+          }
+        })}
         className="font-medium text-red-700 hover:underline disabled:opacity-60"
       >
         {pending ? "Deleting…" : "Confirm delete"}

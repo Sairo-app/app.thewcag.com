@@ -51,7 +51,7 @@ describe("CaptureCoordinator scope", () => {
   it("keeps standalone region captures outside the active audit", async () => {
     const { coordinator, captures } = setup();
     coordinator.activateAudit("aud-a1234567");
-    const session = await coordinator.begin("capture", undefined, true);
+    const session = await coordinator.begin("capture", undefined, {}, true);
     await coordinator.complete(session.sessionId, {
       mode: "capture",
       rect: { x: 0, y: 0, width: 1, height: 1 },
@@ -61,6 +61,7 @@ describe("CaptureCoordinator scope", () => {
       FRAME.dataUrl,
       "Area capture",
       undefined,
+      {},
     );
   });
 
@@ -77,17 +78,19 @@ describe("CaptureCoordinator scope", () => {
       FRAME.dataUrl,
       "Area capture",
       "aud-a1234567",
+      {},
     );
   });
 
   it("keeps standalone full-screen captures outside the active audit", async () => {
     const { coordinator, captures } = setup();
     coordinator.activateAudit("aud-a1234567");
-    await coordinator.fullscreen(undefined, true);
+    await coordinator.fullscreen(undefined, {}, true);
     expect(captures.create).toHaveBeenCalledWith(
       FRAME.dataUrl,
       "Full screen capture",
       undefined,
+      {},
     );
   });
 });

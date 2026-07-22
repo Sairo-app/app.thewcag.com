@@ -54,8 +54,11 @@ Acceptance:
 
 Delivered:
 
-- Four built-in audit templates cover web products, release regression, desktop applications, and document collections. Auditors can save and remove personal templates without changing prior audits.
+- A built-in scoper combines auditor-provided context with bounded inspection of up to nine public same-origin HTML pages. It groups representative templates, records exact sample URLs, detects feature signals, explains its confidence, recommends a reviewable template, and creates the guided test matrix. It does not authenticate, submit forms, inspect third-party origins, or decide conformance, and every suggestion requires auditor confirmation. Inspection remains blocked until core planning fields and exact sample locations are ready.
+- Eight built-in audit templates cover content websites, web products, commerce or service journeys, release regression, desktop applications, mobile applications, document collections, and component libraries. Auditors can save and remove personal templates without changing prior audits.
 - Six guided test scripts cover authentication, checkout, forms, media, documents, and reusable components, with step observations and explicit blocked or complete states.
+- Inspect includes a focused guided audit session that selects or resumes the next sample and run, requires an observation for every completed step, launches context-linked evidence capture, and creates complete editable findings without introducing a separate workflow stage.
+- Plan includes a read-only coverage map for sample, guided-run, capture, finding, and mapped-WCAG traceability. It highlights missing records, keeps unassigned legacy work visible, and links directly to Inspect, Evidence, Findings, or Review.
 - Checklist rows support configurable pass, fail, not-applicable, previous, next, and expand shortcuts with a visible shortcut legend and single-action undo.
 - Findings have stable `F-001` style references, repeat-failure duplication, occurrence records, before-and-after evidence, saved queues, multi-select triage, selected-item export, and undoable bulk changes.
 - Complete `.thewcag-audit.json` packages include audit context, sample, guided runs, findings, views, checklist decisions, captures, annotation documents, activity, palettes, contrast history, and report records. Imports validate schema bounds and a SHA-256 integrity record before writing local data, and roll back partial imports on failure.

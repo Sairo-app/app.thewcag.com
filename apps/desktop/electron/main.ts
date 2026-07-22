@@ -17,6 +17,8 @@ import { ScreenCaptureService } from "./services/screen-capture";
 import { SettingsService } from "./services/settings";
 import { JsonStore } from "./services/store";
 import { UpdateService } from "./services/updater";
+import { TicketConnectorService } from "./services/ticket-connectors";
+import { FunnelTelemetryService } from "./services/funnel-telemetry";
 import { WindowManager } from "./windows";
 import { createTray, installApplicationMenu } from "./menu";
 import { registerIpc } from "./ipc";
@@ -25,6 +27,7 @@ import { nativeOriginFromArgs, runNativeHost } from "./native-host";
 import { registerNativeMessagingHost } from "./native-host-registration";
 
 const nativeOrigin = nativeOriginFromArgs(process.argv);
+const packagedSmokeTest = process.argv.includes("--thewcag-smoke-test");
 
 if (nativeOrigin) {
   void runNativeHost(nativeOrigin);
@@ -38,7 +41,9 @@ app.name = "TheWCAG";
 app.setName("TheWCAG");
 app.setAppUserModelId("com.thewcag.app");
 app.commandLine.appendSwitch("force-color-profile", "srgb");
-app.setPath("userData", join(app.getPath("appData"), "TheWCAG"));
+if (!app.commandLine.hasSwitch("user-data-dir")) {
+  app.setPath("userData", join(app.getPath("appData"), "TheWCAG"));
+}
 
 const lock = app.requestSingleInstanceLock();
 if (!lock) app.quit();
@@ -81,16 +86,19 @@ app.on("second-instance", (_event, argv) => {
 async function start(): Promise<void> {
   await app.whenReady();
   nativeTheme.themeSource = "light";
-  await registerNativeMessagingHost({
-    platform: process.platform,
-    resourcesPath: process.resourcesPath,
-    executablePath: process.execPath,
-    homePath: app.getPath("home"),
-  }).catch((error) => logFatal(error));
-  if (process.defaultApp && process.argv[1]) {
-    app.setAsDefaultProtocolClient("thewcag", process.execPath, [process.argv[1]]);
-  } else {
-    app.setAsDefaultProtocolClient("thewcag");
+  if (!packagedSmokeTest) {
+    await registerNativeMessagingHost({
+      platform: process.platform,
+      resourcesPath: process.resourcesPath,
+      executablePath: process.execPath,
+      homePath: app.getPath("home"),
+      userDataPath: app.getPath("userData"),
+    }).catch((error) => logFatal(error));
+    if (process.defaultApp && process.argv[1]) {
+      app.setAsDefaultProtocolClient("thewcag", process.execPath, [process.argv[1]]);
+    } else {
+      app.setAsDefaultProtocolClient("thewcag");
+    }
   }
 
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
@@ -102,25 +110,27 @@ async function start(): Promise<void> {
   const captures = new CaptureRepository(userData);
   await Promise.all([store.initialize(), captures.initialize()]);
 
-  const windows = new WindowManager();
+  const windows = new WindowManager((error) => { void logFatal(error); });
   const screenCapture = new ScreenCaptureService();
   const captureCoordinator = new CaptureCoordinator(screenCapture, captures, windows);
   const auth = new AuthService(userData, store);
   const ai = new AiAuthoringService(userData, auth);
+  const tickets = new TicketConnectorService(userData);
   const notifyError = (error: unknown) => windows.broadcast("notification", { text: error instanceof Error ? error.message : String(error), error: true });
   const settings = new SettingsService(store, {
     inspect: () => void captureCoordinator.begin("pair").catch(notifyError),
-    capture: () => void captureCoordinator.begin("capture", undefined, true).catch(notifyError),
+    capture: () => void captureCoordinator.begin("capture", undefined, {}, true).catch(notifyError),
     lens: () => { windows.toggleLens(); },
   }, (action, accelerator) => {
     windows.broadcast("shortcut:failed", { action, accelerator });
     windows.broadcast("notification", { text: `The ${action} shortcut ${accelerator} is already in use`, error: true });
   },
   (value) => screenCapture.setHighDpi(value.captureHighDpi));
+  const telemetry = new FunnelTelemetryService(settings, store);
   const updates = new UpdateService((state) => windows.broadcast("update:state", state));
 
   services = { auth, windows, settings, captureCoordinator };
-  registerIpc({ ai, auth, captureCoordinator, captures, capture: screenCapture, settings, store, updates, windows });
+  registerIpc({ ai, auth, captureCoordinator, captures, capture: screenCapture, settings, store, telemetry, tickets, updates, windows });
 
   protocol.handle("thewcag-asset", async (request) => {
     if (request.method !== "GET") {
@@ -157,7 +167,9 @@ async function start(): Promise<void> {
   if (initialLink) pendingLinks.push(initialLink);
   for (const link of pendingLinks.splice(0)) await handleDeepLink(link);
 
-  setTimeout(() => { void updates.check(false); }, 8_000);
+  if (!packagedSmokeTest) {
+    setTimeout(() => { void updates.check(false); }, 8_000);
+  }
 }
 
 app.on("activate", () => services?.windows.showMain());

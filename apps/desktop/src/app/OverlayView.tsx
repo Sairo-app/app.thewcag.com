@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Check, Crosshair, FrameCorners, Ruler, X } from "@phosphor-icons/react";
+import { ArrowRight, Crosshair, FrameCorners, Ruler, X } from "@phosphor-icons/react";
 import type { OverlayResult, OverlaySession, PickedColor, Point } from "../shared/desktop";
 import { desktop } from "./api";
 

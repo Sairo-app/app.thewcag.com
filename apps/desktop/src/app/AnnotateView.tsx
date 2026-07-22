@@ -48,7 +48,6 @@ import {
   SEVERITY_COLORS,
   type AnnotationDoc,
   type IssueId,
-  type Severity,
   type Shape,
   type Tool,
 } from "../lib/annotate/model";
@@ -99,9 +98,9 @@ export function AnnotateView() {
   const [redo, setRedo] = useState<AnnotationDoc[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [exporting, setExporting] = useState<"copy" | "export" | null>(null);
+  const [exporting, setExporting] = useState<"copy" | "export" | "copy-markdown" | "export-markdown" | null>(null);
   const [retryAction, setRetryAction] = useState<
-    "copy" | "export" | "save" | null
+    "copy" | "export" | "copy-markdown" | "export-markdown" | "save" | null
   >(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const baseRef = useRef<HTMLCanvasElement | null>(null);
@@ -206,7 +205,8 @@ export function AnnotateView() {
       }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
         event.preventDefault();
-        event.shiftKey ? redoOnce() : undoOnce();
+        if (event.shiftKey) redoOnce();
+        else undoOnce();
       }
       if (event.key === "Escape") {
         setDraft(null);
@@ -238,12 +238,17 @@ export function AnnotateView() {
   }
   function point(event: ReactPointerEvent): Point {
     const rect = event.currentTarget.getBoundingClientRect();
+    const width = image?.naturalWidth || 1;
+    const height = image?.naturalHeight || 1;
     return {
-      x:
-        ((event.clientX - rect.left) / rect.width) * (image?.naturalWidth || 1),
-      y:
-        ((event.clientY - rect.top) / rect.height) *
-        (image?.naturalHeight || 1),
+      x: Math.max(
+        0,
+        Math.min(width - 1, ((event.clientX - rect.left) / Math.max(rect.width, 1)) * width),
+      ),
+      y: Math.max(
+        0,
+        Math.min(height - 1, ((event.clientY - rect.top) / Math.max(rect.height, 1)) * height),
+      ),
     };
   }
   function commit(next: AnnotationDoc) {
@@ -387,6 +392,9 @@ export function AnnotateView() {
   }
   async function pointerUp(event: ReactPointerEvent<HTMLCanvasElement>) {
     if (!drag) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
     const end = point(event);
     if (tool === "select" && drag.shape) {
       setUndo((items) => [
@@ -424,7 +432,7 @@ export function AnnotateView() {
       return;
     }
     if (draft) {
-      let next = { ...draft, id: doc.nextId, x2: end.x, y2: end.y };
+      const next = { ...draft, id: doc.nextId, x2: end.x, y2: end.y };
       if (Math.hypot(next.x2 - next.x1, next.y2 - next.y1) > 3) {
         if (next.kind === "probe" && baseRef.current) {
           const ctx = baseRef.current.getContext("2d", {
@@ -535,6 +543,57 @@ export function AnnotateView() {
       setExporting(null);
     }
   }
+  function captureMarkdown(): string {
+    const title = capture?.title || "Annotated capture";
+    const annotations = doc.shapes.map((shape, index) => {
+      const issue = shape.kind === "badge"
+        ? ISSUE_TYPES.find((item) => item.id === shape.issueType)
+        : undefined;
+      const label = issue?.label || TOOLS.find((item) => item.id === shape.kind)?.label || shape.kind;
+      const details = [
+        shape.severity,
+        issue?.sc ? `WCAG ${issue.sc}` : "",
+        shape.note || shape.text,
+      ].filter(Boolean).join(" · ");
+      return `${index + 1}. **${label}**${details ? ` — ${details}` : ""}`;
+    });
+    return [
+      `# ${title.replace(/[\r\n#]+/g, " ").trim()}`,
+      "",
+      `- Captured: ${capture ? new Date(capture.createdAt).toISOString() : "Unknown"}`,
+      `- Dimensions: ${capture ? `${capture.width} × ${capture.height}` : "Unknown"}`,
+      `- Annotations: ${doc.shapes.length}`,
+      "",
+      "## Annotations",
+      "",
+      ...(annotations.length ? annotations : ["No annotations recorded."]),
+      "",
+    ].join("\n");
+  }
+  async function exportMarkdown(copy = false) {
+    if (exporting) return;
+    const action = copy ? "copy-markdown" : "export-markdown";
+    setExporting(action);
+    try {
+      const text = captureMarkdown();
+      if (copy) {
+        await desktop.invoke("clipboard:write-text", { text });
+        show("Annotation Markdown copied");
+      } else {
+        const path = await desktop.invoke<string | null>("dialog:save-text", {
+          name: `${capture?.title || "annotated-capture"}.md`,
+          text,
+        });
+        if (path) show("Annotation Markdown exported");
+      }
+      setRetryAction(null);
+    } catch (error) {
+      setRetryAction(action);
+      show(messageFromError(error, "The annotation Markdown could not be exported. Try again."), true);
+    } finally {
+      setExporting(null);
+    }
+  }
   function retryLastAction() {
     const action = retryAction;
     setRetryAction(null);
@@ -543,9 +602,16 @@ export function AnnotateView() {
     if (action === "copy" || action === "export") {
       void exportPng(action === "copy");
     }
+    if (action === "copy-markdown" || action === "export-markdown") {
+      void exportMarkdown(action === "copy-markdown");
+    }
   }
   async function addFindings() {
     const badges = doc.shapes.filter((shape) => shape.kind === "badge");
+    if (!badges.length) {
+      show("Add at least one issue marker before creating findings.", true);
+      return;
+    }
     const items: Finding[] = badges.map((shape, index) => {
       const issue =
         ISSUE_TYPES.find((item) => item.id === shape.issueType) ||
@@ -558,35 +624,40 @@ export function AnnotateView() {
         severity: shape.severity || "major",
         status: "open",
         note: shape.note || issue.template,
+        evidenceCaptureIds: [id],
         captureId: id,
         createdAt: Date.now(),
       };
     });
-    const saved = await desktop.invoke<Finding[]>("store:add-findings", {
-      items,
-      auditId: capture?.auditId,
-    });
-    const identities = new Map(saved.map((finding) => [finding.key, finding.id]));
-    const nextDocument: AnnotationDoc = {
-      ...doc,
-      shapes: doc.shapes.map((shape) => {
-        if (shape.kind !== "badge") return shape;
-        const findingId = identities.get(`${id}-${shape.id}`);
-        return findingId && findingId !== shape.findingId
-          ? { ...shape, findingId }
-          : shape;
-      }),
-    };
-    if (nextDocument.shapes.some((shape, index) => shape !== doc.shapes[index])) {
-      setDoc(nextDocument);
-      await desktop.invoke("capture:save-document", {
-        id,
-        json: JSON.stringify(nextDocument),
+    try {
+      const saved = await desktop.invoke<Finding[]>("store:add-findings", {
+        items,
+        auditId: capture?.auditId,
       });
+      const identities = new Map(saved.map((finding) => [finding.key, finding.id]));
+      const nextDocument: AnnotationDoc = {
+        ...doc,
+        shapes: doc.shapes.map((shape) => {
+          if (shape.kind !== "badge") return shape;
+          const findingId = identities.get(`${id}-${shape.id}`);
+          return findingId && findingId !== shape.findingId
+            ? { ...shape, findingId }
+            : shape;
+        }),
+      };
+      if (nextDocument.shapes.some((shape, index) => shape !== doc.shapes[index])) {
+        setDoc(nextDocument);
+        await desktop.invoke("capture:save-document", {
+          id,
+          json: JSON.stringify(nextDocument),
+        });
+      }
+      show(
+        `${items.length} finding${items.length === 1 ? "" : "s"} added to the audit`,
+      );
+    } catch (error) {
+      show(messageFromError(error), true);
     }
-    show(
-      `${items.length} finding${items.length === 1 ? "" : "s"} added to the audit`,
-    );
   }
   async function reviewReport() {
     await save(false);
@@ -655,6 +726,20 @@ export function AnnotateView() {
             {exporting === "export" ? "Exporting" : "Export"}
           </Button>
           <Button
+            icon={Clipboard}
+            disabled={saving || Boolean(exporting)}
+            onClick={() => void exportMarkdown(true)}
+          >
+            {exporting === "copy-markdown" ? "Copying" : "Copy Markdown"}
+          </Button>
+          <Button
+            icon={DownloadSimple}
+            disabled={saving || Boolean(exporting)}
+            onClick={() => void exportMarkdown(false)}
+          >
+            {exporting === "export-markdown" ? "Exporting" : "Export Markdown"}
+          </Button>
+          <Button
             variant="primary"
             icon={FloppyDisk}
             disabled={saving || Boolean(exporting)}
@@ -711,7 +796,11 @@ export function AnnotateView() {
               aria-label={`Annotation canvas with ${doc.shapes.length} annotations. Select an annotation from the list or use arrow keys to move the selected annotation.`}
               onPointerDown={pointerDown}
               onPointerMove={pointerMove}
-              onPointerUp={(event) => void pointerUp(event)}
+              onPointerUp={(event) => void pointerUp(event).catch((error) => {
+                setDrag(null);
+                show(messageFromError(error), true);
+              })}
+              onPointerCancel={() => setDrag(null)}
               data-tool={tool}
             />
           </div>

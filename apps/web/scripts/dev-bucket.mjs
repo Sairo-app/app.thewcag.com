@@ -1,7 +1,7 @@
 import {
   CreateBucketCommand,
+  DeleteBucketPolicyCommand,
   HeadBucketCommand,
-  PutBucketPolicyCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
 
@@ -23,22 +23,12 @@ try {
   console.log(`created bucket "${Bucket}"`);
 }
 
-// Anonymous read so the local MinIO mirrors a public R2 bucket (R2_PUBLIC_URL).
-// In production you enable public access on the R2 bucket instead.
-await s3.send(
-  new PutBucketPolicyCommand({
-    Bucket,
-    Policy: JSON.stringify({
-      Version: "2012-10-17",
-      Statement: [
-        {
-          Effect: "Allow",
-          Principal: { AWS: ["*"] },
-          Action: ["s3:GetObject"],
-          Resource: [`arn:aws:s3:::${Bucket}/*`],
-        },
-      ],
-    }),
-  }),
-);
-console.log("public-read policy applied");
+// Hosted images must remain private so report lifecycle checks cannot be
+// bypassed with a direct object URL. Remove an older development policy if it
+// exists; a missing policy is already the desired state.
+try {
+  await s3.send(new DeleteBucketPolicyCommand({ Bucket }));
+  console.log("removed legacy public-read policy");
+} catch {
+  console.log("bucket is private");
+}

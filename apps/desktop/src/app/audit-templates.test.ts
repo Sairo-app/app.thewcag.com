@@ -24,11 +24,25 @@ describe("auditor templates and guided test scripts", () => {
 
   it("keeps built-in template script references valid", () => {
     const scriptIds = new Set(AUDIT_TEST_SCRIPTS.map((script) => script.id));
-    expect(BUILT_IN_AUDIT_TEMPLATES.length).toBeGreaterThanOrEqual(4);
+    expect(BUILT_IN_AUDIT_TEMPLATES).toHaveLength(8);
+    expect(new Set(BUILT_IN_AUDIT_TEMPLATES.map((template) => template.targetType))).toEqual(
+      new Set([
+        "content-site",
+        "web-product",
+        "commerce-service",
+        "release-regression",
+        "desktop-product",
+        "mobile-product",
+        "document-set",
+        "component-library",
+      ]),
+    );
     expect(
       BUILT_IN_AUDIT_TEMPLATES.every(
         (template) =>
           template.source === "built-in" &&
+          Boolean(template.targetType) &&
+          Boolean(template.featureIds?.length) &&
           template.sampleItems.length > 0 &&
           template.testScriptIds.every((id) => scriptIds.has(id)),
       ),

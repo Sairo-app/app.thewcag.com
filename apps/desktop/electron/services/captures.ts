@@ -48,7 +48,12 @@ export class CaptureRepository {
     await mkdir(this.directory, { recursive: true });
   }
 
-  async create(pngDataUrl: string, title = "Screen capture", auditId?: string): Promise<CaptureEntry> {
+  async create(
+    pngDataUrl: string,
+    title = "Screen capture",
+    auditId?: string,
+    context?: { sampleItemId?: string; testRunId?: string },
+  ): Promise<CaptureEntry> {
     if (auditId) assertAuditId(auditId);
     const bytes = decodePng(pngDataUrl);
     const id = `cap-${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
@@ -61,10 +66,14 @@ export class CaptureRepository {
       width: size.width,
       height: size.height,
       auditId,
+      sampleItemId: context?.sampleItemId,
+      testRunId: context?.testRunId,
     }));
     return {
       id,
       auditId,
+      sampleItemId: context?.sampleItemId,
+      testRunId: context?.testRunId,
       title,
       createdAt,
       modifiedAt: createdAt,
@@ -97,7 +106,15 @@ export class CaptureRepository {
     try {
       const [file, metadata, document, legacySize] = await Promise.all([
         stat(join(this.directory, `${id}.png`)),
-        this.readJson<{ title?: string; createdAt?: number; width?: number; height?: number; auditId?: string }>(`${id}.meta.json`),
+        this.readJson<{
+          title?: string;
+          createdAt?: number;
+          width?: number;
+          height?: number;
+          auditId?: string;
+          sampleItemId?: string;
+          testRunId?: string;
+        }>(`${id}.meta.json`),
         this.readJson<{ shapes?: Array<{ kind?: string }> }>(`${id}.json`),
         this.readPngSize(join(this.directory, `${id}.png`)),
       ]);
@@ -106,6 +123,12 @@ export class CaptureRepository {
       return {
         id,
         auditId: metadata?.auditId,
+        sampleItemId: typeof metadata?.sampleItemId === "string"
+          ? metadata.sampleItemId.slice(0, 100)
+          : undefined,
+        testRunId: typeof metadata?.testRunId === "string"
+          ? metadata.testRunId.slice(0, 100)
+          : undefined,
         title: metadata?.title || "Screen capture",
         createdAt: metadata?.createdAt || file.birthtimeMs || file.mtimeMs,
         modifiedAt: file.mtimeMs,

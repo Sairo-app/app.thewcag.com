@@ -1,9 +1,31 @@
 import { execFile } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, stat, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { join } from "node:path";
 
 const run = promisify(execFile);
+
+export async function validatePackagedRuntime(context) {
+  if (context.electronPlatformName !== "win32") return;
+  const requiredFiles = [
+    {
+      path: join(context.appOutDir, "locales", "en-US.pak"),
+      description: "Electron's required locale",
+    },
+    {
+      path: join(context.appOutDir, "resources", "app.asar"),
+      description: "the packaged application archive",
+    },
+  ];
+  for (const required of requiredFiles) {
+    try {
+      const details = await stat(required.path);
+      if (!details.isFile() || details.size === 0) throw new Error("empty");
+    } catch {
+      throw new Error(`Windows package is missing ${required.description}: ${required.path}`);
+    }
+  }
+}
 
 /**
  * electron-builder injects broad macOS usage descriptions and enables
@@ -12,6 +34,8 @@ const run = promisify(execFile);
  * declarations before signing and make App Transport Security explicit.
  */
 export default async function afterPack(context) {
+  await validatePackagedRuntime(context);
+
   const extensionId = (process.env.THEWCAG_EXTENSION_ID || "").trim();
   if (/^[a-p]{32}$/.test(extensionId)) {
     const resources = context.electronPlatformName === "darwin"

@@ -9,7 +9,9 @@ import type {
   InvokeChannel,
   PlatformInfo,
   UpdateState,
+  TicketConnectorConfiguration,
 } from "../shared/desktop";
+import { DEFAULT_TICKET_FIELD_MAPPINGS } from "../shared/ticket-connectors";
 
 const AI_DEFAULT_MODELS: Record<AiProviderId, string> = {
   thewcag: "Managed automatically",
@@ -21,6 +23,12 @@ const AI_DEFAULT_MODELS: Record<AiProviderId, string> = {
 interface PreviewAiState {
   activeProvider: AiProviderId;
   providers: Partial<Record<ApiKeyProviderId, { model: string; verifiedAt?: number }>>;
+}
+
+interface PreviewCapture extends CaptureEntry {
+  rawPngDataUrl: string;
+  thumbnailPngDataUrl?: string;
+  document?: string;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -41,6 +49,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   appearance: "light",
   reduceMotion: false,
   captureHighDpi: true,
+  shareAnonymousFunnelTelemetry: false,
 };
 
 const listeners = new Map<DesktopEvent, Set<(payload: unknown) => void>>();
@@ -50,7 +59,7 @@ function previewPlatform(): PlatformInfo {
   return {
     platform: mac ? "macos" : "windows",
     arch: "preview",
-    version: "3.0.3-preview",
+    version: "3.0.4-preview",
     windowId: 0,
     view: (new URLSearchParams(location.search).get("view") as PlatformInfo["view"]) || "main",
     reduceMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
@@ -97,6 +106,33 @@ function previewAiConfiguration(state = previewAiState()): AiConfiguration {
   };
 }
 
+function previewCaptures(): PreviewCapture[] {
+  try {
+    const value = JSON.parse(getLocal("preview-captures") ?? "[]") as unknown;
+    return Array.isArray(value) ? value as PreviewCapture[] : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePreviewCaptures(captures: PreviewCapture[]): void {
+  setLocal("preview-captures", JSON.stringify(captures));
+}
+
+function dataUrlPngSize(dataUrl: string): { width: number; height: number } {
+  try {
+    const bytes = atob(dataUrl.split(",", 2)[1] ?? "");
+    const numberAt = (offset: number) =>
+      ((bytes.charCodeAt(offset) << 24) >>> 0) +
+      (bytes.charCodeAt(offset + 1) << 16) +
+      (bytes.charCodeAt(offset + 2) << 8) +
+      bytes.charCodeAt(offset + 3);
+    return { width: numberAt(16), height: numberAt(20) };
+  } catch {
+    return { width: 1, height: 1 };
+  }
+}
+
 async function previewInvoke<T>(channel: InvokeChannel, payload?: unknown): Promise<T> {
   const value = (payload ?? {}) as Record<string, unknown>;
   switch (channel) {
@@ -115,6 +151,7 @@ async function previewInvoke<T>(channel: InvokeChannel, payload?: unknown): Prom
     }
     case "settings:save": setLocal("settings", JSON.stringify(payload)); return payload as T;
     case "settings:reset": setLocal("settings", JSON.stringify(DEFAULT_SETTINGS)); return DEFAULT_SETTINGS as T;
+    case "telemetry:emit": return { attempted: false, accepted: false, reason: "preview" } as T;
     case "store:get": return getLocal(String(value.key)) as T;
     case "store:set": setLocal(String(value.key), String(value.json)); return undefined as T;
     case "store:remove": try { localStorage.removeItem(`thewcag:${String(value.key)}`); } catch { /* preview storage is best effort */ } return undefined as T;
@@ -125,10 +162,60 @@ async function previewInvoke<T>(channel: InvokeChannel, payload?: unknown): Prom
       setLocal(key, JSON.stringify([...items, ...prior]));
       return undefined as T;
     }
-    case "capture:list": return [] as T;
-    case "capture:read-document": return null as T;
-    case "capture:read-data": return null as T;
+    case "capture:create": {
+      const rawPngDataUrl = String(value.pngDataUrl ?? "");
+      const size = dataUrlPngSize(rawPngDataUrl);
+      const now = Date.now();
+      const capture: PreviewCapture = {
+        id: `cap-preview-${crypto.randomUUID().slice(0, 8)}`,
+        auditId: typeof value.auditId === "string" ? value.auditId : undefined,
+        sampleItemId: typeof value.sampleItemId === "string" ? value.sampleItemId : undefined,
+        testRunId: typeof value.testRunId === "string" ? value.testRunId : undefined,
+        title: String(value.title ?? "Screen capture"),
+        createdAt: now,
+        modifiedAt: now,
+        issues: 0,
+        width: size.width,
+        height: size.height,
+        assetUrl: rawPngDataUrl,
+        thumbnailUrl: null,
+        rawPngDataUrl,
+      };
+      savePreviewCaptures([capture, ...previewCaptures()]);
+      return capture as T;
+    }
+    case "capture:list": {
+      const auditId = typeof value.auditId === "string" ? value.auditId : undefined;
+      return previewCaptures().filter((capture) => !auditId || capture.auditId === auditId) as T;
+    }
+    case "capture:read-document":
+      return (previewCaptures().find((capture) => capture.id === value.id)?.document ?? null) as T;
+    case "capture:read-data": {
+      const capture = previewCaptures().find((item) => item.id === value.id);
+      return (value.kind === "thumbnail"
+        ? capture?.thumbnailPngDataUrl ?? null
+        : capture?.rawPngDataUrl ?? null) as T;
+    }
+    case "capture:save-document": {
+      savePreviewCaptures(previewCaptures().map((capture) =>
+        capture.id === value.id
+          ? { ...capture, document: String(value.json ?? ""), issues: (String(value.json ?? "").match(/"kind":"badge"/g) ?? []).length }
+          : capture));
+      return undefined as T;
+    }
+    case "capture:save-thumbnail": {
+      const thumbnail = String(value.pngDataUrl ?? "");
+      savePreviewCaptures(previewCaptures().map((capture) =>
+        capture.id === value.id
+          ? { ...capture, thumbnailPngDataUrl: thumbnail, thumbnailUrl: thumbnail }
+          : capture));
+      return undefined as T;
+    }
+    case "capture:delete":
+      savePreviewCaptures(previewCaptures().filter((capture) => capture.id !== value.id));
+      return undefined as T;
     case "dialog:open-text": return null as T;
+    case "dialog:save-pdf": return null as T;
     case "screen:permission":
     case "screen:request-permission": return "granted" as T;
     case "auth:account": return { signedIn: false } satisfies Account as T;
@@ -168,6 +255,20 @@ async function previewInvoke<T>(channel: InvokeChannel, payload?: unknown): Prom
       setLocal("ai-provider-settings", JSON.stringify(state));
       return previewAiConfiguration(state) as T;
     }
+    case "ticket:configuration": return {
+      secureStorageAvailable: false,
+      connectors: (["jira", "linear", "github"] as const).map((id) => ({
+        id,
+        label: id === "jira" ? "Jira" : id === "linear" ? "Linear" : "GitHub Issues",
+        configured: false,
+        mapping: DEFAULT_TICKET_FIELD_MAPPINGS[id],
+      })),
+    } satisfies TicketConnectorConfiguration as T;
+    case "ticket:save-connector":
+    case "ticket:remove-connector":
+    case "ticket:create":
+    case "ticket:sync":
+      throw new Error("Ticket connectors are available in the installed desktop app.");
     case "report:publish": return `https://app.thewcag.com/s/preview-${Date.now().toString(36)}` as T;
     case "update:check": return { status: "current", message: "Preview build" } satisfies UpdateState as T;
     case "clipboard:write-text": await navigator.clipboard?.writeText(String(value.text ?? "")); return undefined as T;
@@ -177,6 +278,10 @@ async function previewInvoke<T>(channel: InvokeChannel, payload?: unknown): Prom
     case "capture:open":
     case "lens:toggle":
       throw new Error("This action is available in the installed desktop app.");
+    case "lens:state":
+      return false as T;
+    case "scope:discover":
+      throw new Error("Website scope discovery is available in the installed desktop app.");
     case "capture:assign-unscoped":
     case "audit:activate":
     case "workspace:navigate":

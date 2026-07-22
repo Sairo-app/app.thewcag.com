@@ -23,14 +23,14 @@ The core audit workflow remains local-first. AI output is always a draft, WCAG m
 |---|---|
 | On-screen contrast picker | Samples foreground and background pixels from any application or monitor, displays the WCAG 2.x ratio and AA/AAA verdicts, reports signed APCA Lc, and suggests nearby passing colors. |
 | Standalone Screenshot tool | Captures a region or full screen into a re-editable local document without requiring a TheWCAG audit. Users can annotate, copy, export, or publish an unlisted share link while keeping their existing audit workflow. |
-| Capture and annotation | Tools include issue badges, arrows, boxes, target measurement, contrast probes, focus-order markers, solid or pixel redaction, text, and non-destructive crop-to-new-capture. Audit evidence uses the same editor while remaining scoped to its audit. |
+| Capture and annotation | Captures a region or full screen into a re-editable local document. Tools include issue badges, arrows, boxes, target measurement, contrast probes, focus-order markers, solid or pixel redaction, text, and non-destructive crop-to-new-capture. The standalone capture library works without an audit or finding and exports/copies annotated PNG or Markdown. |
 | Color-vision lens | Shows the screen beneath a protected, always-on-top window with protanopia, deuteranopia, tritanopia, or achromatopsia simulation, adjustable severity, split view, zoom, low-acuity blur, low-contrast simulation, and PNG export. |
-| Audit workspace | Treats each project as an isolated audit with its own evaluation goal, scope, structured representative sample, exclusions, browser and device matrix, assistive-technology coverage, captures, findings, checklist, conclusions, reports, and activity history. The five-stage Plan, Inspect, Evidence, Review, and Deliver workflow keeps the next required action and delivery state visible. Built-in and personal templates make approved matrices repeatable, while integrity-checked audit packages move the complete local record between computers. |
-| Guided testing | Provides reusable, step-by-step scripts for authentication, checkout, forms, media, downloadable documents, and design-system components. Each run records observations and planned, in-progress, blocked, or complete state alongside the representative sample. |
-| Findings register | Supports AI-assisted and manual findings with immutable global IDs plus short audit-local references, location, linked capture, before-and-after comparison, repeated-component occurrences, affected-user groups, severity rationale, WCAG mapping, remediation owner, ticket, target date, accepted-risk rationale, and retest records. Built-in and personal views, duplication, multi-select triage, undoable bulk owner/status/severity/date changes, sorting, editing, recovery, and selected-item Markdown export keep remediation queues manageable. |
+| Audit workspace | Treats each project as an isolated audit with its own evaluation goal, scope, structured representative sample, exclusions, browser and device matrix, assistive-technology coverage, captures, findings, checklist, conclusions, reports, and activity history. The four-stage Plan, Inspect, Review, and Deliver workflow keeps the next required action and delivery state visible; findings and the all-captures library remain an optional record view rather than a required stage. A built-in scoper can inspect up to nine bounded public same-origin HTML pages, group representative templates, detect feature signals, recommend one of eight reviewable templates, create an exact-URL sample and guided test matrix, and block inspection until the core plan is ready. A read-only coverage map connects each sample to tests, finding-owned evidence, and mapped WCAG decisions while keeping unassigned legacy captures visible. Personal templates make approved matrices repeatable, while integrity-checked audit packages move the complete local record between computers. Discovery does not sign in, submit forms, leave the final origin, or make a conformance decision; the auditor must confirm every suggestion. |
+| Guided testing | Provides a focused Inspect session and reusable scripts for authentication, checkout, forms, media, downloadable documents, and design-system components. One action selects the next sample and run; finding authoring can launch capture and annotation directly, attaching the result without a stage hop. Sample, run, capture, finding, and WCAG links survive export and import. |
+| Findings register | Supports AI-assisted and manual findings with immutable global IDs, short audit-local references, multiple attached captures, before-and-after comparison, repeated-component occurrences, affected-user groups, severity rationale, WCAG mapping, remediation owner, ticket, target date, accepted-risk rationale, and retest records. Built-in and personal views, duplication, multi-select triage, undoable bulk owner/status/severity/date changes, sorting, editing, recovery, and selected-item Markdown export keep remediation queues manageable. |
 | WCAG checklist | Tracks the criteria applicable to the selected WCAG 2.2 Level A or AA target by POUR principle. Each criterion includes informative manual test prompts, a direct W3C Understanding reference, pass, fail, or reasoned not-applicable decisions, notes, progress, filters, failure-to-finding linkage, contextual CSV or Markdown exports, keyboard-first row navigation, configurable decision keys, and undo. |
 | Palette matrix | Accepts up to 16 hex colors, persists the palette, calculates every foreground/background pair, visualizes AA-normal and AA-large/UI thresholds, and copies the matrix as CSV. |
-| Evidence and reporting | Exports or copies annotated PNGs, merges annotation issues without overwriting later triage, and produces portable Markdown or printable HTML audit records with stable finding references, guided-run outcomes, repeated occurrences, and remediation comparisons. A guarded auditor conclusion distinguishes a focused evidence report from a complete audit. Delivery checks cover evaluation context, sample and guided-run completion, criterion decisions, N/A rationale, failure traceability, finding completeness, conclusion readiness, privacy attestation, and authentication before publishing a shareable link. |
+| Evidence and reporting | Evidence belongs to findings by default and can include multiple annotated captures plus before/after and occurrence relationships. The optional capture library keeps legacy or capture-only images in a visible unassigned bucket. Reports include stable finding-to-evidence references, and Delivery checks require every finding to have linked local evidence. |
 | Capture library and settings | Keeps up to 100 recent captures locally with editable source data and annotated thumbnails. Includes remappable global shortcuts, launch-at-login, update installation, screen-permission guidance, high-DPI capture, and a tray/menu-bar workflow. |
 
 Default global shortcuts are:
@@ -47,24 +47,24 @@ Checklist decision keys are configured separately in Settings. Their defaults ar
 
 ### Chrome evidence extension
 
-The Manifest V3 extension turns a browser observation into structured audit evidence without claiming automated conformance. The toolbar opens a compact popup for quick capture. The optional side panel is a separate, expanded workspace for reviewing evidence, controlling the approved payload, editing a generated draft, and saving the confirmed result.
+The Manifest V3 extension turns a browser observation into a reviewable desktop issue without claiming automated conformance. The toolbar opens a compact popup for quick capture. The optional side panel lets the auditor describe the issue, inspect and control the evidence payload, and send it to the selected desktop audit as **Needs review**. Full draft editing remains available as an optional extension-side path.
 
 The capture flow is:
 
 1. Open the toolbar popup on the page being audited.
-2. Choose **Select element** for one control, image, or text target, or **Select region** for a barrier spanning multiple elements.
+2. Choose **Component** for one control, image, or text target, or **Region** for a barrier spanning multiple elements.
 3. Mark the target on the webpage. The service worker creates a contextual screenshot with the selected control or region highlighted and stores the evidence even after Chrome closes the popup.
-4. Reopen the popup when the toolbar badge shows `1`, then choose **Review in workspace**.
+4. Reopen the popup when the toolbar badge shows `1`, then choose **Add issue details**.
 5. Inspect the contextual marked screenshot, selector, semantic context, deterministic signals, and the complete bounded payload.
 6. Describe the observed behavior and optional task context. Choose whether the screenshot, element text, and sanitized page address may be included.
-7. Create a local structured draft or, when the paired desktop app is connected, generate an AI-assisted draft with TheWCAG, OpenAI, Claude, or OpenRouter.
-8. Confirm the title, description, actual and expected results, user impact, affected users, severity, WCAG mappings, recommendation, example fix, and reproduction steps before saving into an audit.
+7. Choose **Send to desktop review**. The native host stores the screenshot in the normal capture repository, links it to a bounded finding draft, and logs the record as **Needs review**.
+8. Open **Findings** in the desktop app and confirm the title, actual and expected results, user impact, affected users, severity, WCAG mappings, recommendation, and reproduction steps. No external or generated value silently becomes an auditor decision.
 
 | Mode | Available behavior |
 |---|---|
 | Extension only | Element and region capture, marked high-DPI crop, deterministic checks, local persistence, local structured draft, Markdown export, and copy |
-| Extension plus desktop | Lists local audits, saves confirmed findings and evidence into the selected audit, and keeps the device credential outside Chrome |
-| Extension plus desktop and configured AI | Sends only the user-approved payload through the selected provider and returns a schema-validated, editable finding draft |
+| Extension plus desktop | Lists local audits, stores approved screenshots and context, queues findings for review, and keeps the device credential outside Chrome |
+| Extension plus desktop and configured AI | Sends only the user-approved payload through the selected provider and stores its schema-validated draft as unconfirmed; a local deterministic draft is used when no provider is configured |
 
 The extension requests temporary `activeTab` access only after a toolbar action. It does not request permanent access to every website. Regular `http` and `https` pages, including localhost, are supported. Chrome-owned pages such as `chrome://settings`, DevTools, the Chrome Web Store, and other protected browser surfaces cannot be inspected by extensions.
 
@@ -111,7 +111,7 @@ The accessibility core is intentionally framework-independent and currently cons
 
 The desktop application uses one React bundle for multiple sandboxed Electron windows. `apps/desktop/src/main.tsx` selects the UI from the validated `view` query supplied by the main process:
 
-- `main`: staged audit workstation with Plan, Inspect, Evidence, Review, and Deliver plus palette, vision, account, and settings utilities.
+- `main`: staged audit workstation with Plan, Inspect, Review, and Deliver; findings/captures are an optional record view alongside palette, vision, account, and settings utilities.
 - `overlay`: one frozen full-screen inspection window per monitor.
 - `annotate`: re-editable screenshot editor with keyboard-accessible annotation selection and a handoff into report review.
 - `lens`: live color-vision and low-vision simulation.
@@ -123,7 +123,7 @@ Native services live in `apps/desktop/electron/`; the renderer sees only the all
 - Desktop captures are stored in the OS application-data directory as a raw PNG, an editable JSON annotation document, and an annotated thumbnail.
 - Audit context, findings, checklist results, palettes, activity, and report history are isolated per audit in local JSON files.
 - Every issue badge and finding receives an immutable `WCG-F-YYYYMMDD-…` identity at capture or creation. `WCG` is the platform namespace, `F` means finding, the date is the UTC creation day, and the final 26 Crockford Base32 characters provide 130 bits of cryptographic entropy. Short `F-001` references remain audit-local navigation labels, never identities. Local persistence repairs legacy or conflicting IDs through an append-only allocation ledger; the publishing service validates IDs, repairs duplicates, and records them in a non-recycling global registry.
-- Browser evidence is sanitized and retained locally until the auditor explicitly approves generation. The extension can omit its screenshot, element text, or sanitized page address from the approved payload.
+- Browser evidence is sanitized and retained locally until the auditor explicitly approves sending it to desktop review or optional generation. The extension can omit its screenshot, element text, or sanitized page address from the approved payload.
 - Form values and passwords are not extracted as semantic fields. The selected screenshot may still contain visible page content, which is why users can inspect and omit it before generation. Cookies, browser storage, authentication headers, network bodies, clipboard contents, browser history, executable page code, URL credentials, query parameters, and fragments are not collected.
 - The desktop device token is stored in macOS Keychain or Windows Credential Manager. Only its SHA-256 hash is stored in Postgres.
 - User-supplied OpenAI, Anthropic, and OpenRouter keys are encrypted by the operating system credential service. Keys remain in the Electron main process, are never returned to the renderer or extension, and are sent only to their selected provider.
@@ -297,13 +297,21 @@ R2_ENDPOINT=http://localhost:9000
 R2_ACCESS_KEY_ID=minioadmin
 R2_SECRET_ACCESS_KEY=minioadmin
 R2_BUCKET=thewcag-reports
-R2_PUBLIC_URL=http://localhost:9000/thewcag-reports
 ADMIN_EMAILS=
 OPENAI_API_KEY=
 OPENAI_FINDING_MODEL=gpt-5.6-terra
 AI_SAFETY_SALT=replace-with-a-separate-random-secret
-AI_GENERATIONS_PER_HOUR=30
-AI_GENERATIONS_PER_DAY=200
+DODO_PAYMENTS_API_KEY=
+DODO_PAYMENTS_WEBHOOK_KEY=
+DODO_PAYMENTS_BUSINESS_ID=
+DODO_PAYMENTS_ENVIRONMENT=test_mode
+DODO_PRO_MONTHLY_PRODUCT_ID=
+DODO_PRO_ANNUAL_PRODUCT_ID=
+BILLING_RECONCILE_SECRET=replace-with-a-separate-32-character-secret
+PRO_AI_GENERATIONS_PER_PERIOD=150
+PRO_AI_GENERATIONS_PER_HOUR=20
+PRO_HOSTED_REPORT_LIMIT=100
+PRO_STORAGE_QUOTA_BYTES=1073741824
 ```
 
 Create the development bucket, then start the website:
@@ -337,13 +345,16 @@ node --env-file=.env.local scripts/dev-seed.mjs
 | `R2_ACCESS_KEY_ID` | Report storage | Object-storage access key. |
 | `R2_SECRET_ACCESS_KEY` | Report storage | Object-storage secret. |
 | `R2_BUCKET` | Report storage | Bucket name; production defaults conceptually to `thewcag-reports` but explicit configuration is validated before use. |
-| `R2_PUBLIC_URL` | Production delivery | Public R2 custom domain or managed URL. If absent, the app streams objects through its image routes. |
 | `ADMIN_EMAILS` | Admin | Comma-separated, case-insensitive list allowed to access `/admin`; unset means no admins. |
 | `OPENAI_API_KEY` | Optional AI authoring | Server-only provider credential. If absent, the endpoint reports unavailable and the extension keeps its local draft. |
 | `OPENAI_FINDING_MODEL` | Optional AI authoring | Configurable structured multimodal model, defaulting to `gpt-5.6-terra`. Change only after representative accessibility-finding evaluations. |
 | `AI_SAFETY_SALT` | AI privacy | Separate secret used to derive a stable, non-reversible provider safety identifier from the device record. |
-| `AI_GENERATIONS_PER_HOUR` | AI limits | Per-account rolling hourly generation limit. |
-| `AI_GENERATIONS_PER_DAY` | AI limits | Per-account rolling daily generation limit. |
+| `DODO_PAYMENTS_API_KEY`, `DODO_PAYMENTS_WEBHOOK_KEY`, `DODO_PAYMENTS_BUSINESS_ID` | Pro billing | Server-only Dodo API, signature, and business identifiers. |
+| `DODO_PAYMENTS_ENVIRONMENT` | Pro billing | `test_mode` locally/staging and `live_mode` in production. |
+| `DODO_PRO_MONTHLY_PRODUCT_ID`, `DODO_PRO_ANNUAL_PRODUCT_ID` | Pro billing | Allowlisted recurring Dodo products. |
+| `BILLING_RECONCILE_SECRET` | Billing operations | Strong bearer secret for the scheduled reconciliation and retention route. |
+| `PRO_AI_GENERATIONS_PER_PERIOD`, `PRO_AI_GENERATIONS_PER_HOUR` | Pro allowance | Managed-AI billing-period and abuse limits. |
+| `PRO_HOSTED_REPORT_LIMIT`, `PRO_STORAGE_QUOTA_BYTES` | Pro allowance | Hosted report count and private-object-storage caps. |
 
 Desktop and extension builds also use:
 
@@ -368,7 +379,7 @@ It currently performs:
 3. Desktop storage, native-host, and native-protocol tests.
 4. Website payload, device-connect, AI schema, and brand-logo validation tests.
 5. Node release-version and updater-manifest tests.
-6. TypeScript validation for contracts, extension, desktop, and website.
+6. Repository-wide ESLint checks plus TypeScript validation for contracts, extension, desktop, and website.
 7. Extension and Electron production builds.
 8. The Next.js production build and route generation.
 
@@ -424,8 +435,8 @@ Production desktop releases are tag-driven. Before tagging:
 5. Create and push the exact `v<desktop-version>` tag.
 
 ```sh
-git tag -a v3.0.3 -m "TheWCAG v3.0.3"
-git push origin v3.0.3
+git tag -a v3.0.4 -m "TheWCAG v3.0.4"
+git push origin v3.0.4
 ```
 
 The release workflow first rejects a tag that does not exactly match the desktop package version and refuses to publish unless all mandatory Apple signing and notarization credentials plus the valid repository variable `THEWCAG_EXTENSION_ID` are present. It then:
@@ -460,6 +471,8 @@ Changes should preserve keyboard access, visible focus, semantic names and state
 - [SKILL.md](SKILL.md): repository-specific implementation and verification workflow.
 - [CHANGELOG.md](CHANGELOG.md): shipped versions and unreleased changes.
 - [docs/AUDITOR-PRODUCT-ROADMAP.md](docs/AUDITOR-PRODUCT-ROADMAP.md): phased plan for a complete auditor workflow, integrations, collaboration, reporting, evidence, and enterprise controls.
+- [docs/SAAS-DODO-PAYMENTS-PLAN.md](docs/SAAS-DODO-PAYMENTS-PLAN.md): implementation-ready Free/Pro SaaS, entitlement, Dodo Payments subscription, webhook, retention, testing, and rollout plan.
+- [docs/BILLING-OPERATIONS.md](docs/BILLING-OPERATIONS.md): Dodo catalog, deployment, reconciliation, retention, incident, and launch operations.
 - [docs/RELEASING.md](docs/RELEASING.md): production signing and release operations.
 - [docs/SITE-INTEGRATION.md](docs/SITE-INTEGRATION.md): current desktop, website, authentication, publishing, and download integration.
 - [docs/AI-EXTENSION-IMPLEMENTATION.md](docs/AI-EXTENSION-IMPLEMENTATION.md): browser evidence architecture, contracts, privacy boundaries, phased delivery, and acceptance criteria.

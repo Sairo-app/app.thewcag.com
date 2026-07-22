@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readBoundedJson, RequestBodyTooLargeError } from "./bounded-json";
+import { readBoundedJson, readBoundedText, RequestBodyTooLargeError } from "./bounded-json";
 
 describe("bounded JSON requests", () => {
   it("parses a request within the byte limit", async () => {
@@ -35,5 +35,11 @@ describe("bounded JSON requests", () => {
       body: "{}",
     });
     await expect(readBoundedJson(request, 100)).rejects.toBeInstanceOf(RequestBodyTooLargeError);
+  });
+
+  it("preserves the exact bounded webhook text used for signature verification", async () => {
+    const raw = '{"type":"subscription.active", "value": 1}\n';
+    const request = new Request("https://app.thewcag.com/api/billing/webhooks", { method: "POST", body: raw });
+    await expect(readBoundedText(request, 1_000)).resolves.toBe(raw);
   });
 });

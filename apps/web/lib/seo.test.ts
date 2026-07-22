@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import sitemap, { PUBLIC_ROUTES } from "../app/sitemap";
 import { breadcrumbJsonLd, createPageMetadata, SITE_URL } from "./seo";
 
 describe("SEO metadata", () => {
@@ -26,5 +27,25 @@ describe("SEO metadata", () => {
         { position: 2, item: `${SITE_URL}/accessibility-audit-software` },
       ],
     });
+  });
+
+  it("keeps every public product-intent page in a unique canonical sitemap", () => {
+    const entries = sitemap();
+    const urls = entries.map((entry) => entry.url);
+
+    expect(urls).toHaveLength(new Set(urls).size);
+    expect(PUBLIC_ROUTES.map((route) => route.path)).toEqual(expect.arrayContaining([
+      "/accessibility-reporting-software",
+      "/accessibility-issue-tracker-integrations",
+      "/accessibility-program-management",
+      "/privacy",
+      "/terms",
+    ]));
+    expect(urls).toEqual(expect.arrayContaining([
+      `${SITE_URL}/accessibility-reporting-software`,
+      `${SITE_URL}/accessibility-issue-tracker-integrations`,
+      `${SITE_URL}/accessibility-program-management`,
+    ]));
+    expect(urls.some((url) => url.includes("/api/") || url.includes("/account"))).toBe(false);
   });
 });

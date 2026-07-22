@@ -45,16 +45,22 @@ import {
   nextFindingReference,
   normalizeFindingReferences,
 } from "../../shared/finding-references";
+import { findingStatusHistoryAfterChange } from "../../shared/finding-lifecycle";
+import {
+  findingPrimaryEvidenceCaptureIds,
+  unassignedCaptures,
+} from "../../shared/finding-evidence";
 import {
   FindingEditorDialog,
   type FindingEditorValue,
 } from "../FindingEditorDialog";
 
 type Tab = "captures" | "findings";
-type BuiltInFindingView = "all" | "blockers" | "retest" | "missing-mapping" | "overdue";
+type BuiltInFindingView = "all" | "needs-review" | "blockers" | "retest" | "missing-mapping" | "overdue";
 
 const BUILT_IN_FINDING_VIEWS: Array<{ id: BuiltInFindingView; label: string }> = [
   { id: "all", label: "All findings" },
+  { id: "needs-review", label: "Needs review" },
   { id: "blockers", label: "Blockers" },
   { id: "retest", label: "Retest queue" },
   { id: "missing-mapping", label: "Missing WCAG mapping" },
@@ -76,10 +82,10 @@ export function EvidenceView({
   onNavigate,
   recordActivity,
 }: {
-  auditId: string;
+  auditId?: string;
   initialTab?: Tab;
-  onNavigate: (stage: WorkspaceStage) => void;
-  recordActivity: RecordAuditActivity;
+  onNavigate?: (stage: WorkspaceStage) => void;
+  recordActivity?: RecordAuditActivity;
 }) {
   const [tab, setTab] = useState<Tab>(initialTab);
   const [captures, setCaptures] = useState<CaptureEntry[]>([]);
@@ -117,8 +123,10 @@ export function EvidenceView({
   } | null>(null);
   const bulkUndoRef = useRef<{ findings: Finding[]; label: string } | null>(null);
   const findingsWriteQueue = useRef<Promise<void>>(Promise.resolve());
-  const findingsKey = auditStoreKey(auditId, "findings");
-  const findingViewsKey = auditStoreKey(auditId, "findingViews");
+  const refreshVersion = useRef(0);
+  const findingsKey = auditId ? auditStoreKey(auditId, "findings") : "standalone:findings";
+  const findingViewsKey = auditId ? auditStoreKey(auditId, "findingViews") : "standalone:findingViews";
+  const logActivity: RecordAuditActivity = recordActivity ?? (async () => undefined);
 
   function persistFindings(next: Finding[]) {
     const key = findingsKey;
@@ -128,11 +136,13 @@ export function EvidenceView({
   }
 
   async function refresh() {
+    const version = ++refreshVersion.current;
     const [nextCaptures, storedFindings, nextViews] = await Promise.all([
       listCaptures(auditId),
-      getStored<Finding[]>(findingsKey, []),
-      getStored<FindingSavedView[]>(findingViewsKey, []),
+      auditId ? getStored<Finding[]>(findingsKey, []) : Promise.resolve([]),
+      auditId ? getStored<FindingSavedView[]>(findingViewsKey, []) : Promise.resolve([]),
     ]);
+    if (version !== refreshVersion.current) return;
     const normalized = normalizeFindingReferences(storedFindings);
     setCaptures(nextCaptures);
     setFindings(normalized.findings);
@@ -156,11 +166,11 @@ export function EvidenceView({
   async function startCapture(full = false) {
     setBusy(true);
     try {
-      if (full) await desktop.invoke("capture:fullscreen", { auditId });
-      else await desktop.invoke("capture:begin", { mode: "capture", auditId });
+      if (full) await desktop.invoke("capture:fullscreen", { auditId, standalone: !auditId });
+      else await desktop.invoke("capture:begin", { mode: "capture", auditId, standalone: !auditId });
       await refresh();
       if (full)
-        await recordActivity({
+        await logActivity({
           kind: "captured",
           title: "Full screen captured",
         });
@@ -200,21 +210,31 @@ export function EvidenceView({
       show("Record the risk acceptance rationale before accepting this finding.", true);
       return;
     }
+    const changedAt = Date.now();
     const next = findings.map((item) =>
       item.key === key
         ? {
             ...item,
             ...patch,
-            modifiedAt: Date.now(),
+            statusHistory:
+              patch.status === undefined
+                ? item.statusHistory
+                : findingStatusHistoryAfterChange(item, patch.status, changedAt),
+            modifiedAt: changedAt,
             retestedAt:
               patch.status === "fixed" && item.status !== "fixed"
-                ? Date.now()
+                ? changedAt
                 : item.retestedAt,
           }
         : item,
     );
     setFindings(next);
-    await persistFindings(next);
+    try {
+      await persistFindings(next);
+    } catch (error) {
+      setFindings(findings);
+      show(messageFromError(error), true);
+    }
   }
 
   async function saveFinding(value: FindingEditorValue) {
@@ -230,10 +250,12 @@ export function EvidenceView({
         source: "manual" as const,
       }),
       ...value,
+      reviewState: "reviewed",
       title: value.title.trim(),
       wcag: value.wcag.trim(),
       location: value.location.trim(),
-      captureId: value.captureId || undefined,
+      evidenceCaptureIds: value.evidenceCaptureIds,
+      captureId: value.evidenceCaptureIds[0] || value.captureId || undefined,
       beforeCaptureId: value.beforeCaptureId || undefined,
       afterCaptureId: value.afterCaptureId || undefined,
       comparisonNote: value.comparisonNote.trim(),
@@ -244,7 +266,9 @@ export function EvidenceView({
       })),
       owner: value.owner.trim(),
       ticket: value.ticket.trim(),
+      ticketLink: value.ticketLink,
       dueDate: value.dueDate,
+      evidenceLink: value.evidenceLink.trim(),
       riskAcceptance: value.riskAcceptance.trim(),
       description: value.description.trim(),
       actualResult: value.actualResult.trim(),
@@ -255,6 +279,7 @@ export function EvidenceView({
       recommendation: value.recommendation.trim(),
       note: value.note.trim(),
       retestNote: value.retestNote.trim(),
+      statusHistory: findingStatusHistoryAfterChange(existing ?? undefined, value.status, now),
       modifiedAt: now,
       retestedAt:
         value.status === "fixed" && existing?.status !== "fixed"
@@ -264,45 +289,80 @@ export function EvidenceView({
     const next = existing
       ? findings.map((item) => item.key === existing.key ? nextFinding : item)
       : [nextFinding, ...findings];
+    try {
+      await persistFindings(next);
+      setFindings(next);
+      setEditingFinding(undefined);
+      try {
+        await logActivity({
+          kind: "finding",
+          title: existing ? "Finding updated" : "Manual finding created",
+          detail: nextFinding.title,
+        });
+      } catch (error) {
+        show(
+          `${existing ? "Finding updated" : "Finding created"}, but its activity entry could not be saved: ${messageFromError(error)}`,
+          true,
+        );
+        return;
+      }
+      show(existing ? "Finding updated" : "Finding created");
+    } catch (error) {
+      show(messageFromError(error), true);
+    }
+  }
+
+  async function saveTicketFinding(updated: Finding) {
+    const prior = findings;
+    const next = findings.map((item) => item.key === updated.key ? updated : item);
     setFindings(next);
-    await persistFindings(next);
-    await recordActivity({
-      kind: "finding",
-      title: existing ? "Finding updated" : "Manual finding created",
-      detail: nextFinding.title,
-    });
-    setEditingFinding(undefined);
-    show(existing ? "Finding updated" : "Finding created");
+    setEditingFinding(updated);
+    try {
+      await persistFindings(next);
+    } catch (error) {
+      setFindings(prior);
+      setEditingFinding(prior.find((item) => item.key === updated.key));
+      throw error;
+    }
   }
 
   async function removeFinding(key: string) {
+    if (!auditId) return;
     const index = findings.findIndex((item) => item.key === key);
     if (index < 0) return;
     const next = findings.filter((item) => item.key !== key);
-    setFindings(next);
     const checklistKey = auditStoreKey(auditId, "checklist");
-    const checklist = await getStored<Record<string, { result: string; note: string; findingKey?: string }>>(
-      checklistKey,
-      {},
-    );
-    const links = Object.entries(checklist)
-      .filter(([, entry]) => entry.findingKey === key)
-      .map(([criterion]) => criterion);
-    const nextChecklist = Object.fromEntries(
-      Object.entries(checklist).map(([criterion, entry]) => [
-        criterion,
-        entry.findingKey === key ? { ...entry, findingKey: undefined } : entry,
-      ]),
-    );
-    deletedRef.current = { item: findings[index], index, links };
-    await Promise.all([
-      persistFindings(next),
-      setStored(checklistKey, nextChecklist),
-    ]);
-    show("Finding removed. Use Undo below to restore it.");
+    try {
+      const checklist = await getStored<Record<string, { result: string; note: string; findingKey?: string }>>(
+        checklistKey,
+        {},
+      );
+      const links = Object.entries(checklist)
+        .filter(([, entry]) => entry.findingKey === key)
+        .map(([criterion]) => criterion);
+      const nextChecklist = Object.fromEntries(
+        Object.entries(checklist).map(([criterion, entry]) => [
+          criterion,
+          entry.findingKey === key ? { ...entry, findingKey: undefined } : entry,
+        ]),
+      );
+      await setStored(checklistKey, nextChecklist);
+      try {
+        await persistFindings(next);
+      } catch (error) {
+        await setStored(checklistKey, checklist).catch(() => undefined);
+        throw error;
+      }
+      deletedRef.current = { item: findings[index], index, links };
+      setFindings(next);
+      show("Finding removed. Use Undo below to restore it.");
+    } catch (error) {
+      show(messageFromError(error), true);
+    }
   }
 
   async function undoFinding() {
+    if (!auditId) return;
     const deleted = deletedRef.current;
     if (!deleted) return;
     const next = [...findings];
@@ -407,7 +467,7 @@ export function EvidenceView({
       text: lines.join("\n"),
     });
     if (path) {
-      await recordActivity({
+      await logActivity({
         kind: "exported",
         title: "Findings exported",
         detail: `${items.length} findings in Markdown`,
@@ -481,6 +541,7 @@ export function EvidenceView({
       duplicateOfId: item.id,
       status: "open",
       location: "",
+      evidenceCaptureIds: [],
       captureId: undefined,
       beforeCaptureId: undefined,
       afterCaptureId: undefined,
@@ -492,16 +553,18 @@ export function EvidenceView({
       riskAcceptance: "",
       retestNote: "",
       retestedAt: undefined,
+      statusHistory: [{ status: "open", changedAt: now }],
       createdAt: now,
       modifiedAt: now,
       source: "manual",
+      reviewState: "reviewed",
     };
     const next = [duplicate, ...findings];
     try {
       await persistFindings(next);
       setFindings(next);
       setEditingFinding(duplicate);
-      await recordActivity({
+      await logActivity({
         kind: "finding",
         title: "Finding duplicated",
         detail: `${duplicate.reference} from ${item.reference}`,
@@ -518,7 +581,15 @@ export function EvidenceView({
     const now = Date.now();
     const next = findings.map((finding) =>
       selectedFindings.has(finding.key)
-        ? { ...finding, ...patch, modifiedAt: now }
+        ? {
+            ...finding,
+            ...patch,
+            statusHistory:
+              patch.status === undefined
+                ? finding.statusHistory
+                : findingStatusHistoryAfterChange(finding, patch.status, now),
+            modifiedAt: now,
+          }
         : finding,
     );
     try {
@@ -527,7 +598,7 @@ export function EvidenceView({
       setFindings(next);
       const count = selectedFindings.size;
       setSelectedFindings(new Set());
-      await recordActivity({
+      await logActivity({
         kind: "finding",
         title: "Bulk finding update",
         detail: `${label}, ${count} findings`,
@@ -558,10 +629,15 @@ export function EvidenceView({
       ),
     [captures, query],
   );
+  const unassignedCaptureIds = useMemo(
+    () => new Set(unassignedCaptures(captures, findings).map((capture) => capture.id)),
+    [captures, findings],
+  );
   const filteredFindings = useMemo(
     () =>
       findings
         .filter((item) =>
+          (findingViewId !== "needs-review" || item.reviewState === "pending") &&
           (findingViewId !== "blockers" || item.severity === "blocker") &&
           (findingViewId !== "retest" || item.status === "retest") &&
           (findingViewId !== "missing-mapping" || !item.wcag.trim() || /needs/i.test(item.wcag)) &&
@@ -592,7 +668,7 @@ export function EvidenceView({
         }),
     [findingSeverity, findingSort, findingStatus, findingViewId, findings, query],
   );
-  const openCount = findings.filter((item) => item.status === "open").length;
+  const pendingReviewCount = findings.filter((item) => item.reviewState === "pending").length;
   const selectedVisible = filteredFindings.filter((item) =>
     selectedFindings.has(item.key),
   );
@@ -608,15 +684,17 @@ export function EvidenceView({
           </span>
         </div>
         <div>
-          <span className="section-label">Native high-DPI capture</span>
-          <h2>Turn the screen into evidence</h2>
+          <span className="section-label">{auditId ? "Optional capture library" : "Standalone screenshot workspace"}</span>
+          <h2>{auditId ? "Capture here, or add evidence inside a finding" : "Capture and annotate without starting an audit"}</h2>
           <p>
-            Select only the affected region or capture the current display. Each
-            image opens in the annotation workspace.
+            {auditId
+              ? "Finding authoring is the fastest way to keep evidence linked. This library remains available for capture-only work and legacy unassigned images."
+              : "Select a region or the current display. Annotate, copy, or export it locally—no audit or finding is created."}
           </p>
         </div>
         <div className="capture-actions">
           <Button
+            id="capture-annotate-action"
             variant="primary"
             icon={FrameCorners}
             disabled={busy}
@@ -635,15 +713,17 @@ export function EvidenceView({
       </section>
 
       <div className="library-toolbar">
-        <Segmented
-          value={tab}
-          onChange={setTab}
-          label="Evidence type"
-          options={[
-            { value: "captures", label: `Captures ${captures.length}` },
-            { value: "findings", label: `Findings ${findings.length}` },
-          ]}
-        />
+        {auditId ? (
+          <Segmented
+            value={tab}
+            onChange={setTab}
+            label="Library type"
+            options={[
+              { value: "captures", label: `Captures ${captures.length}` },
+              { value: "findings", label: `Findings ${findings.length}` },
+            ]}
+          />
+        ) : <strong className="standalone-library-label">Recent local captures · {captures.length}/100</strong>}
         <label className="search-field">
           <MagnifyingGlass size={17} />
           <input
@@ -673,7 +753,7 @@ export function EvidenceView({
               variant="primary"
               icon={ShareNetwork}
               disabled={!findings.length || !captures.length}
-              onClick={() => onNavigate("share")}
+              onClick={() => onNavigate?.("share")}
             >
               Review report
             </Button>
@@ -843,8 +923,8 @@ export function EvidenceView({
             <>
               <div className="finding-summary">
                 <div>
-                  <strong>{openCount}</strong>
-                  <span>open</span>
+                  <strong>{pendingReviewCount}</strong>
+                  <span>needs review</span>
                 </div>
                 <div>
                   <strong>
@@ -926,6 +1006,9 @@ export function EvidenceView({
                         <code>{compactFindingId(item.id)}</code>
                         <Copy size={12} />
                       </button>
+                      {item.reviewState === "pending" ? (
+                        <span className="finding-review-state">Needs review</span>
+                      ) : null}
                       <small>
                         {[item.location, item.note].filter(Boolean).join(" · ") || "No location or implementation note"}
                       </small>
@@ -1001,11 +1084,13 @@ export function EvidenceView({
                   <section className="finding-detail" id={`finding-detail-${item.key}`} aria-label={`Details for ${item.title}`}>
                     <div className="finding-detail-meta">
                       <span>
-                        {item.reference} · {item.source === "ai"
-                          ? "AI-assisted draft, auditor confirmed"
-                          : item.source === "manual"
-                            ? "Manually documented finding"
-                            : "Structured browser evidence"}
+                        {item.reference} · {item.reviewState === "pending"
+                          ? "Browser intake awaiting auditor review"
+                          : item.source === "ai"
+                            ? "AI-assisted draft, auditor confirmed"
+                            : item.source === "manual"
+                              ? "Manually documented finding"
+                              : "Structured browser evidence"}
                         {item.duplicateOf ? ` · Duplicated from ${item.duplicateOf}` : ""}
                       </span>
                       {item.confidence ? <span className={`finding-confidence finding-confidence-${item.confidence}`}>{item.confidence} confidence</span> : null}
@@ -1028,6 +1113,22 @@ export function EvidenceView({
                           </span>
                         </figcaption>
                       </figure>
+                    ) : null}
+                    {findingPrimaryEvidenceCaptureIds(item).length ? (
+                      <section className="finding-capture-evidence" aria-label={`Attached captures for ${item.reference}`}>
+                        <strong>Attached evidence · {findingPrimaryEvidenceCaptureIds(item).length}</strong>
+                        <div>
+                          {findingPrimaryEvidenceCaptureIds(item).map((captureId) => {
+                            const capture = captures.find((entry) => entry.id === captureId);
+                            return capture ? (
+                              <button key={captureId} type="button" onClick={() => void desktop.invoke("capture:open", { id: captureId })}>
+                                <img src={capture.thumbnailUrl || capture.assetUrl} alt="" />
+                                <span>{capture.title}</span>
+                              </button>
+                            ) : <span className="missing-evidence-reference" key={captureId}>Missing local capture · {captureId}</span>;
+                          })}
+                        </div>
+                      </section>
                     ) : null}
                     {item.beforeCaptureId || item.afterCaptureId ? (
                       <section className="evidence-comparison" aria-label={`Before and after evidence for ${item.reference}`}>
@@ -1068,6 +1169,21 @@ export function EvidenceView({
                           item.ticket ? `Reference: ${item.ticket}` : "",
                           item.dueDate ? `Target: ${item.dueDate}` : "",
                         ].filter(Boolean).join(" · ")}</p>
+                        {item.ticketLink ? (
+                          <div className="finding-ticket-summary">
+                            <dl>
+                              <div><dt>Local decision</dt><dd>{item.status}</dd></div>
+                              <div><dt>External status</dt><dd>{item.ticketLink.externalStatus || "Unknown"}</dd></div>
+                            </dl>
+                            <span className={`status ${item.ticketLink.syncState === "in-sync" ? "status-success" : item.ticketLink.syncState === "review" ? "status-warning" : "status-danger"}`}>
+                              {item.ticketLink.syncState === "in-sync" ? "In sync" : item.ticketLink.syncState === "review" ? `${item.ticketLink.conflicts.length} to review` : "Sync error"}
+                            </span>
+                            <button type="button" className="text-action" onClick={() => void desktop.invoke("shell:open-external", { url: item.ticketLink!.url })}>Open ticket</button>
+                            {item.ticketLink.syncState !== "in-sync" ? (
+                              <button type="button" className="text-action" onClick={() => setEditingFinding(item)}>Review changes</button>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
                     <div className="finding-detail-block"><span>User impact</span><p>{item.userImpact}</p></div>
@@ -1148,9 +1264,15 @@ export function EvidenceView({
         </section>
       ) : (
         <section className="capture-library">
+          {auditId && unassignedCaptureIds.size ? (
+            <div className="unassigned-captures-notice" role="status">
+              <WarningCircle size={18} weight="duotone" />
+              <span><strong>Unassigned captures · {unassignedCaptureIds.size}</strong><small>These images are preserved but not linked to a finding. Attach them from a finding editor when they support an issue.</small></span>
+            </div>
+          ) : null}
           {filteredCaptures.length ? (
             filteredCaptures.map((entry) => (
-              <article className="capture-card" key={entry.id}>
+              <article className="capture-card" key={entry.id} data-unassigned={unassignedCaptureIds.has(entry.id)}>
                 <button
                   className="capture-thumb"
                   onClick={() =>
@@ -1170,6 +1292,7 @@ export function EvidenceView({
                       {entry.issues} issue{entry.issues === 1 ? "" : "s"}
                     </span>
                   ) : null}
+                  {auditId && unassignedCaptureIds.has(entry.id) ? <span className="capture-assignment-badge">Unassigned</span> : null}
                 </button>
                 <div className="capture-meta">
                   <div>
@@ -1223,18 +1346,20 @@ export function EvidenceView({
       <ConfirmDialog
         open={Boolean(captureToDelete)}
         title={`Delete ${captureToDelete?.title || "capture"}?`}
-        description="This permanently removes the capture and its annotations from the current audit."
+        description={auditId ? "This permanently removes the capture and its annotations from the current audit." : "This permanently removes the local capture and its annotations."}
         confirmLabel="Delete capture"
         busy={deleteBusy}
         onCancel={() => setCaptureToDelete(null)}
         onConfirm={() => void confirmCaptureDelete()}
       />
       <FindingEditorDialog
-        open={editingFinding !== undefined}
+        open={Boolean(auditId) && editingFinding !== undefined}
         finding={editingFinding ?? null}
         captures={captures}
+        auditId={auditId}
         onClose={() => setEditingFinding(undefined)}
         onSave={(value) => void saveFinding(value)}
+        onTicketUpdate={saveTicketFinding}
       />
     </div>
   );

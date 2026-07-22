@@ -22,7 +22,7 @@ import type {
   WorkspaceStage,
 } from "../../shared/desktop";
 import { desktop, getStored, listCaptures, setStored } from "../api";
-import { auditPlanProgress } from "../audit-plan";
+import { auditPlanProgress, auditTestRunComplete } from "../audit-plan";
 import { auditStoreKey, type RecordAuditActivity } from "../audits";
 import { Button, Field, StatusBadge, Toast } from "../components";
 import { WCAG_CRITERIA } from "../data/wcag";
@@ -31,6 +31,10 @@ import { ISSUE_TYPES } from "../../lib/annotate/model";
 import { compactFindingId } from "@accessibility-build/audit-contracts";
 import { renderCaptureBase64 } from "../capture-render";
 import { normalizeFindingReferences } from "../../shared/finding-references";
+import {
+  findingEvidenceCaptureIds,
+  findingHasEvidence,
+} from "../../shared/finding-evidence";
 
 type ChecklistState = Record<
   string,
@@ -71,6 +75,20 @@ export function ShareView({
   const reportsKey = auditStoreKey(audit.id, "reports");
 
   useEffect(() => {
+    let cancelled = false;
+    setCaptures([]);
+    setFindings([]);
+    setChecklist({});
+    setSampleItems([]);
+    setTestRuns([]);
+    setReports([]);
+    setCaptureId("");
+    setTitle(`${audit.project} accessibility report`);
+    setDescription(
+      audit.scope || `Accessibility review for ${audit.target || audit.project}.`,
+    );
+    setAttested(false);
+    setPublishedUrl("");
     void Promise.all([
       listCaptures(audit.id),
       getStored<Finding[]>(auditStoreKey(audit.id, "findings"), []),
@@ -89,6 +107,7 @@ export function ShareView({
         nextReports,
         nextAccount,
       ]) => {
+        if (cancelled) return;
         setCaptures(nextCaptures);
         const normalized = normalizeFindingReferences(nextFindings);
         setFindings(normalized.findings);
@@ -103,13 +122,23 @@ export function ShareView({
         setTestRuns(nextTestRuns);
         setReports(nextReports);
         setAccount(nextAccount);
-        setCaptureId((current) => current || nextCaptures[0]?.id || "");
+        const availableCaptureIds = new Set(nextCaptures.map((capture) => capture.id));
+        const linkedCaptureId = normalized.findings
+          .flatMap(findingEvidenceCaptureIds)
+          .find((id) => availableCaptureIds.has(id));
+        setCaptureId(linkedCaptureId || nextCaptures[0]?.id || "");
       })
-      .catch((error) => show(messageFromError(error), true));
-    return desktop.on(
+      .catch((error) => {
+        if (!cancelled) show(messageFromError(error), true);
+      });
+    const stopAccount = desktop.on(
       "account:changed",
       () => void desktop.invoke<Account>("auth:account").then(setAccount),
     );
+    return () => {
+      cancelled = true;
+      stopAccount();
+    };
   }, [audit.id]);
 
   const selectedCapture =
@@ -124,8 +153,7 @@ export function ShareView({
   const includedFindings = useMemo(
     () =>
       activeFindings.filter(
-        (finding) =>
-          (!finding.captureId || finding.captureId === captureId),
+        (finding) => findingEvidenceCaptureIds(finding).includes(captureId),
       ),
     [activeFindings, captureId],
   );
@@ -156,8 +184,11 @@ export function ShareView({
     ).length;
     const sampleComplete =
       sampleItems.length > 0 &&
-      sampleItems.every((item) => item.status === "complete");
-    const testRunsComplete = testRuns.every((run) => run.status === "complete");
+      sampleItems.every(
+        (item) => item.status === "complete" && item.location.trim(),
+      );
+    const testRunsComplete =
+      testRuns.length > 0 && testRuns.every(auditTestRunComplete);
     const incompleteFindings = activeFindings.filter(
       (finding) =>
         !finding.wcag.trim() ||
@@ -169,6 +200,13 @@ export function ShareView({
         !finding.severityRationale?.trim() ||
         !finding.recommendation?.trim(),
     ).length;
+    const availableCaptureIds = new Set(captures.map((capture) => capture.id));
+    const findingsWithoutEvidence = findings.filter(
+      (finding) => !findingHasEvidence(finding, availableCaptureIds),
+    ).length;
+    const findingsPendingReview = findings.filter(
+      (finding) => finding.reviewState === "pending",
+    ).length;
     const recordReady =
       plan.complete === plan.total &&
       sampleComplete &&
@@ -176,7 +214,9 @@ export function ShareView({
       reviewed === applicable.length &&
       unlinkedFailures === 0 &&
       undocumentedNA === 0 &&
-      incompleteFindings === 0;
+      incompleteFindings === 0 &&
+      findingsWithoutEvidence === 0 &&
+      findingsPendingReview === 0;
     const conclusionReady =
       audit.executiveSummary.trim() &&
       audit.limitations.trim() &&
@@ -192,6 +232,8 @@ export function ShareView({
       unlinkedFailures,
       undocumentedNA,
       incompleteFindings,
+      findingsWithoutEvidence,
+      findingsPendingReview,
       sampleComplete,
       sampleCount: sampleItems.length,
       testRunsComplete,
@@ -204,14 +246,15 @@ export function ShareView({
         audit.conclusion === "meets-target" && !canMeetTarget,
       fullAuditReady: recordReady && Boolean(conclusionReady),
     };
-  }, [activeFindings, audit, checklist, findings, sampleItems, testRuns]);
+  }, [activeFindings, audit, captures, checklist, findings, sampleItems, testRuns]);
   const ready = Boolean(
     selectedCapture &&
       title.trim() &&
       description.trim() &&
       attested &&
       includedFindings.length &&
-      account.signedIn,
+      account.signedIn &&
+      account.features?.hostedReports.enabled,
   );
 
   async function signIn() {
@@ -234,7 +277,7 @@ export function ShareView({
     const completedAt =
       conclusion === "meets-target" || conclusion === "does-not-meet-target"
         ? audit.completedAt || new Date().toISOString().slice(0, 10)
-        : audit.completedAt;
+        : "";
     onAuditChange({ conclusion, completedAt });
     try {
       await recordActivity({
@@ -264,6 +307,7 @@ export function ShareView({
         label: finding.title,
         severity: finding.severity,
         note: finding.note,
+        status: finding.status,
       }));
       const url = await desktop.invoke<string>("report:publish", {
         title: title.trim(),
@@ -284,7 +328,8 @@ export function ShareView({
       };
       const next = [report, ...reports].slice(0, 40);
       setReports(next);
-      await Promise.all([
+      setPublishedUrl(url);
+      const followUp = await Promise.allSettled([
         setStored(reportsKey, next),
         desktop.invoke("clipboard:write-text", { text: url }),
         recordActivity({
@@ -294,8 +339,13 @@ export function ShareView({
           url,
         }),
       ]);
-      setPublishedUrl(url);
-      show("Report published. Link copied to clipboard.");
+      const failed = followUp.filter((result) => result.status === "rejected").length;
+      show(
+        failed
+          ? `Report published, but ${failed} local follow-up ${failed === 1 ? "action" : "actions"} failed. The share link is available below.`
+          : "Report published. Link copied to clipboard.",
+        failed > 0,
+      );
     } catch (error) {
       show(messageFromError(error), true);
     } finally {
@@ -467,6 +517,21 @@ export function ShareView({
               </small>
             </span>
           </div>
+          <div data-ready={delivery.findingsWithoutEvidence === 0}>
+            {delivery.findingsWithoutEvidence === 0 ? (
+              <CheckCircle size={18} weight="fill" />
+            ) : (
+              <WarningCircle size={18} weight="fill" />
+            )}
+            <span>
+              <strong>Finding evidence</strong>
+              <small>
+                {delivery.findingsWithoutEvidence
+                  ? `${delivery.findingsWithoutEvidence} findings need a linked capture`
+                  : "Every finding has linked local evidence"}
+              </small>
+            </span>
+          </div>
           <div data-ready={delivery.incompleteFindings === 0}>
             {delivery.incompleteFindings === 0 ? (
               <CheckCircle size={18} weight="fill" />
@@ -479,6 +544,21 @@ export function ShareView({
                 {delivery.incompleteFindings
                   ? `${delivery.incompleteFindings} included findings need detail`
                   : "Included findings have core audit details"}
+              </small>
+            </span>
+          </div>
+          <div data-ready={delivery.findingsPendingReview === 0}>
+            {delivery.findingsPendingReview === 0 ? (
+              <CheckCircle size={18} weight="fill" />
+            ) : (
+              <WarningCircle size={18} weight="fill" />
+            )}
+            <span>
+              <strong>Auditor review</strong>
+              <small>
+                {delivery.findingsPendingReview
+                  ? `${delivery.findingsPendingReview} browser findings need review`
+                  : "No browser intake is awaiting an auditor decision"}
               </small>
             </span>
           </div>
@@ -577,7 +657,7 @@ export function ShareView({
             <p>
               {delivery.conclusionConflict
                 ? "The recorded outcome conflicts with the current audit record. Change the outcome or resolve the incomplete coverage and unresolved failures before export."
-                : "Meeting the target remains unavailable until the plan, sample, guided test runs, criterion review, finding details, and all unresolved failures are complete."}
+                : "Meeting the target remains unavailable until the plan, sample, guided test runs, criterion review, finding details, linked evidence, and all unresolved failures are complete."}
             </p>
           </div>
         ) : null}
@@ -598,7 +678,11 @@ export function ShareView({
           <Field label="Evidence capture">
             <select
               value={captureId}
-              onChange={(event) => setCaptureId(event.target.value)}
+              onChange={(event) => {
+                setCaptureId(event.target.value);
+                setAttested(false);
+                setPublishedUrl("");
+              }}
             >
               {captures.map((capture) => (
                 <option key={capture.id} value={capture.id}>
@@ -714,10 +798,24 @@ export function ShareView({
                 Sign in
               </Button>
             </div>
+          ) : !account.features?.hostedReports.enabled ? (
+            <div className="sign-in-callout">
+              <LockKey size={20} weight="duotone" />
+              <div>
+                <strong>Pro is required for hosted links</strong>
+                <p>Local reports and exports remain free and stay on this computer.</p>
+              </div>
+              <Button
+                icon={ArrowSquareOut}
+                onClick={() => void desktop.invoke("shell:open-external", { url: account.actions?.upgradeUrl || "https://app.thewcag.com/pricing" })}
+              >
+                View Pro
+              </Button>
+            </div>
           ) : (
             <div className="signed-in-line">
               <Check size={16} weight="bold" />
-              <span>Publishing as {account.email}</span>
+              <span>Publishing as {account.email} · {account.features.hostedReports.active} of {account.features.hostedReports.limit} hosted reports</span>
             </div>
           )}
           <Button
@@ -741,6 +839,8 @@ export function ShareView({
             <p className="publish-hint">
               This capture has no included findings.
             </p>
+          ) : account.signedIn && !account.features?.hostedReports.enabled ? (
+            <p className="publish-hint">Choose Pro to create a hosted share link, or export the report locally for free.</p>
           ) : null}
         </aside>
       </div>
