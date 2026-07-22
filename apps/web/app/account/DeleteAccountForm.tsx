@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { deleteOwnAccount, type DeleteAccountState } from "./actions";
 
 export function DeleteAccountForm() {
+  const [confirmation, setConfirmation] = useState("");
   const [state, action, pending] = useActionState<DeleteAccountState, FormData>(
     deleteOwnAccount,
     null,
@@ -16,6 +17,8 @@ export function DeleteAccountForm() {
       <input
         id="delete-confirmation"
         name="confirmation"
+        value={confirmation}
+        onChange={(event) => setConfirmation(event.target.value)}
         required
         autoComplete="off"
         aria-describedby={state?.error ? "delete-account-error" : undefined}
@@ -24,7 +27,7 @@ export function DeleteAccountForm() {
       {state?.error ? <p id="delete-account-error" role="alert" className="text-sm text-red-700">{state.error}</p> : null}
       <button
         type="submit"
-        disabled={pending}
+        disabled={pending || confirmation !== "DELETE MY ACCOUNT"}
         className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
       >
         {pending ? "Deleting account…" : "Permanently delete account"}

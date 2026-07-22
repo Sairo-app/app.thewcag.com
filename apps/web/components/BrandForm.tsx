@@ -58,7 +58,8 @@ export function BrandForm({
   }
 
   const showLogo = logoPreview && !removeLogo;
-  const safeColor = HEX.test(color) ? color : DEFAULT_COLOR;
+  const colorValid = HEX.test(color);
+  const safeColor = colorValid ? color : DEFAULT_COLOR;
 
   return (
     <form action={formAction} className="mt-8 space-y-8">
@@ -89,19 +90,26 @@ export function BrandForm({
           <div className="mt-1.5 flex items-center gap-2">
             <input
               type="color"
-              name="color"
-              value={color}
+              value={safeColor}
               onChange={(e) => setColor(e.target.value)}
               aria-label="Accent color"
               className="h-9 w-12 shrink-0 cursor-pointer rounded-md border border-border bg-card"
             />
             <input
+              name="color"
               value={color}
               onChange={(e) => setColor(e.target.value)}
               aria-label="Accent color hex"
+              aria-invalid={!colorValid}
+              aria-describedby={!colorValid ? "brand-color-error" : undefined}
               className="w-28 rounded-lg border border-border bg-card px-3 py-2 font-mono text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
+          {!colorValid && (
+            <span id="brand-color-error" role="alert" className="mt-1.5 block text-xs text-red-700">
+              Enter a six-digit hex color such as #b83b12.
+            </span>
+          )}
         </label>
       </div>
 
@@ -141,7 +149,7 @@ export function BrandForm({
       <div className="flex items-center gap-3">
         <button
           type="submit"
-          disabled={pending || Boolean(fileError)}
+          disabled={pending || Boolean(fileError) || !colorValid}
           className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60"
         >
           {pending ? "Saving…" : "Save branding"}

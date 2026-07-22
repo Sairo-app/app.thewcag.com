@@ -443,6 +443,7 @@ export function App({ surface }: { surface: ExtensionSurface }) {
 
   return (
     <div className={`app-shell surface-${surface}`}>
+      <a className="skip-link" href="#extension-main">Skip to capture workspace</a>
       <header className="app-header">
         <div className="brand">
           <img src="/logo.png" alt="" />
@@ -452,7 +453,7 @@ export function App({ surface }: { surface: ExtensionSurface }) {
           </div>
         </div>
         <div className="header-actions">
-          <span className={`connection connection-${desktopState}`}>
+          <span className={`connection connection-${desktopState}`} role="status" aria-live="polite">
             <span aria-hidden="true" />
             {desktopState === "connected" ? "Desktop ready" : desktopState === "checking" ? "Checking" : "Local mode"}
           </span>
@@ -472,7 +473,7 @@ export function App({ surface }: { surface: ExtensionSurface }) {
         </div>
       ) : null}
 
-      <main>
+      <main id="extension-main" tabIndex={-1}>
         {surface === "popup" && evidence ? (
           <section className="popup-ready" aria-labelledby="popup-ready-heading">
             <div className="section-heading">

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { reports, users } from "@/lib/schema";
@@ -39,6 +40,7 @@ export default async function AdminReports({ searchParams }: { searchParams: Pro
   ]);
   const total = totalRow?.n ?? 0;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (page > pages) redirect(pages === 1 ? "/admin/reports" : `/admin/reports?page=${pages}`);
 
   return (
     <section aria-label="All reports">

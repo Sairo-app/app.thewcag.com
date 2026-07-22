@@ -3,6 +3,7 @@ import { auth, signOut } from "@/auth";
 import { isAdminEmail } from "@/lib/admin";
 import { HeaderNav } from "./HeaderNav";
 import { SiteMenu } from "./SiteMenu";
+import { AccountMenu } from "./AccountMenu";
 import {
   BookIcon,
   ContrastIcon,
@@ -43,8 +44,7 @@ export async function Header() {
 
         <div className="site-header__utilities">
           {signedIn ? (
-            <details className="account-menu">
-              <summary>Account</summary>
+            <AccountMenu>
               <div className="account-menu__panel">
                 <p>{session?.user?.email}</p>
                 {admin && <Link href="/admin">Admin</Link>}
@@ -56,7 +56,7 @@ export async function Header() {
                   <button type="submit"><LogOutIcon size={15} />Sign out</button>
                 </form>
               </div>
-            </details>
+            </AccountMenu>
           ) : (
             <Link href="/signin" className="site-signin"><LogInIcon size={15} />Sign in</Link>
           )}

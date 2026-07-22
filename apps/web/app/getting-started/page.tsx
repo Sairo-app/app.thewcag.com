@@ -147,7 +147,7 @@ export default function GettingStartedPage() {
               <ol className="guide-instructions">
                 <li><strong>Install the desktop app.</strong><span>Use the Windows or macOS installer from the download page, then launch TheWCAG from the normal application shortcut.</span></li>
                 <li><strong>Create a useful project name.</strong><span>Choose a name that identifies the product and release, such as “Customer portal · July release”.</span></li>
-                <li><strong>Decide whether you need browser capture.</strong><span>The Chrome extension is optional. Add it when you want semantic webpage context alongside the visual screenshot.</span></li>
+                <li><strong>Decide whether you need browser capture.</strong><span>The Chrome extension is optional. Add it when you want semantic webpage context alongside the visual screenshot. Until its public store listing is ready, use the <Link href="/chrome-accessibility-extension">developer-build installation steps</Link>.</span></li>
               </ol>
               <aside className="guide-note"><strong>Privacy first</strong><p>You can complete a local audit, export it, and use an AI provider with your own key without signing in. A Pro subscription is needed only for TheWCAG managed AI and hosted report services.</p></aside>
               <DoneWhen>The project name identifies the work and the Plan stage is visible.</DoneWhen>

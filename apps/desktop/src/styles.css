@@ -2012,6 +2012,7 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
+[href]:focus-visible,
 [tabindex]:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
@@ -5079,6 +5080,27 @@ html[data-motion="reduced"] *::after {
   width: 44px;
   height: 44px;
   object-fit: contain;
+}
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 10000;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+  border: 2px solid var(--focus);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--paper);
+  font-weight: var(--weight-bold);
+  text-decoration: none;
+  transform: translateY(-160%);
+  transition: transform 120ms ease;
+}
+.skip-link:focus {
+  transform: translateY(0);
 }
 .workspace-loading strong {
   color: var(--ink);

@@ -50,6 +50,7 @@ export default async function MyScreenshotsPage({ searchParams }: { searchParams
   ]);
   const total = totalRow?.n ?? 0;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (page > pages) redirect(pages === 1 ? "/screenshots" : `/screenshots?page=${pages}`);
 
   return (
     <>
@@ -73,8 +74,14 @@ export default async function MyScreenshotsPage({ searchParams }: { searchParams
 
         {rows.length === 0 ? (
           <div className="mt-10 rounded-xl border border-border bg-card p-8 text-center text-sm text-muted">
-            No shared screenshots yet. In the desktop app, capture and annotate an issue, then press{" "}
-            <strong>Share</strong> to publish one here.
+            <strong className="block text-base text-foreground">No published reports yet</strong>
+            <p className="mx-auto mt-2 max-w-md">
+              In the desktop app, collect and review the evidence, then open <strong>Deliver</strong> to publish a report you choose.
+            </p>
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              <Link href="/getting-started" className="rounded-lg border border-border px-3 py-2 font-medium text-foreground hover:bg-background">Follow the first audit guide</Link>
+              <Link href="/download" className="rounded-lg bg-primary px-3 py-2 font-semibold text-primary-foreground">Download the desktop app</Link>
+            </div>
           </div>
         ) : (
           <ul className="mt-8 space-y-3">

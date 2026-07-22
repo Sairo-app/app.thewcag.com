@@ -2,15 +2,13 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { MenuIcon } from "./icons";
 
 /**
- * Mobile navigation disclosure. A plain <details> only closes when its
- * summary is clicked again, so this adds the behavior people expect from a
- * menu: close on Escape (returning focus to the trigger), on any click or
- * tap outside the panel, and after navigating to another page.
+ * Desktop account disclosure with the same predictable dismissal behavior as
+ * the mobile menu: Escape restores focus, outside clicks close the panel, and
+ * navigation never leaves a stale menu open on the next page.
  */
-export function SiteMenu({ children }: { children: ReactNode }) {
+export function AccountMenu({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDetailsElement>(null);
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -24,18 +22,18 @@ export function SiteMenu({ children }: { children: ReactNode }) {
     const details = ref.current;
     if (!details) return;
 
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== "Escape" || !details!.open) return;
+    function close(restoreFocus = false) {
       details!.removeAttribute("open");
       setOpen(false);
-      details!.querySelector("summary")?.focus();
+      if (restoreFocus) details!.querySelector("summary")?.focus();
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && details!.open) close(true);
     }
 
     function onPointerDown(event: PointerEvent) {
-      if (details!.open && !details!.contains(event.target as Node)) {
-        details!.removeAttribute("open");
-        setOpen(false);
-      }
+      if (details!.open && !details!.contains(event.target as Node)) close();
     }
 
     document.addEventListener("keydown", onKeyDown);
@@ -49,14 +47,13 @@ export function SiteMenu({ children }: { children: ReactNode }) {
   return (
     <details
       ref={ref}
-      className="site-menu"
+      className="account-menu"
       onToggle={() => setOpen(Boolean(ref.current?.open))}
     >
-      <summary aria-label={open ? "Close navigation menu" : "Open navigation menu"} className="site-menu__trigger">
-        <MenuIcon size={16} />
-        <span>Menu</span>
+      <summary aria-label={open ? "Close account menu" : "Open account menu"}>
+        Account
       </summary>
-      <div className="site-menu__panel">{children}</div>
+      {children}
     </details>
   );
 }

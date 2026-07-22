@@ -1,5 +1,6 @@
 import { and, desc, gt, isNull, sql } from "drizzle-orm";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { billingSubscriptions, desktopDevices, reports, users } from "@/lib/schema";
 import { requireAdmin } from "@/lib/admin";
@@ -52,6 +53,7 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
   ]);
   const total = totalRow?.n ?? 0;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (page > pages) redirect(pages === 1 ? "/admin/users" : `/admin/users?page=${pages}`);
 
   const byUserReports = new Map(reportAgg.map((r) => [r.userId, r]));
   const byUserDevices = new Map(deviceAgg.map((d) => [d.userId, d.n]));

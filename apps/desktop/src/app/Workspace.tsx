@@ -731,6 +731,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
         } as CSSProperties
       }
     >
+      <a className="skip-link" href="#audit-workspace-main">Skip to audit workspace</a>
       <Toast message={notice} onClose={() => setNotice(null)} />
       <aside className="stage-rail" aria-label="Audit workflow">
         <button
@@ -814,6 +815,12 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
           <div className="command-actions">
             <StatusBadge tone="success">Stored locally</StatusBadge>
             <IconButton
+              label="Open first audit guide"
+              onClick={() => void desktop.invoke("shell:open-external", { url: "https://app.thewcag.com/getting-started" })}
+            >
+              <BookOpenText size={18} />
+            </IconButton>
+            <IconButton
               label={inspector ? "Hide audit panel" : "Show audit panel"}
               className="inspector-toggle"
               ariaExpanded={inspector}
@@ -831,7 +838,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
           </div>
         </header>
 
-        <main className={`workstage ${inspector ? "with-inspector" : ""}`}>
+        <main id="audit-workspace-main" tabIndex={-1} className={`workstage ${inspector ? "with-inspector" : ""}`}>
           <section className="task-column">
             <div className="task-heading">
               <div>
