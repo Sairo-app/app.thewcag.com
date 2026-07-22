@@ -65,6 +65,7 @@ const EVENT_CHANNELS = new Set<DesktopEvent>([
   "shortcut:failed",
   "notification",
   "navigation:tool",
+  "screenshot:share",
 ]);
 
 const bridge: DesktopBridge = Object.freeze({

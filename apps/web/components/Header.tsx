@@ -17,7 +17,7 @@ import {
 const MOBILE_NAV = [
   ["/accessibility-audit-software", "Audit software", <BookIcon key="software" size={16} />],
   ["/chrome-accessibility-extension", "Chrome extension", <ContrastIcon key="extension" size={16} />],
-  ["/#platforms", "Mac and Windows", <CropIcon key="platforms" size={16} />],
+  ["/screenshot-tool", "Screenshot tool", <CropIcon key="screenshots" size={16} />],
   ["/wcag-contrast", "Guides", <EyeIcon key="resources" size={16} />],
 ] as const;
 
@@ -83,7 +83,7 @@ export async function Header() {
 
           <Link href="/download" aria-label="Download TheWCAG" className="site-header__download">
             <DownloadIcon size={15} />
-            <strong>Download</strong>
+            <strong>Download free</strong>
           </Link>
         </div>
       </div>

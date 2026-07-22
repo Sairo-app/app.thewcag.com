@@ -80,6 +80,7 @@ describe("evidence capture", () => {
     const evidence: EvidencePacketV1 = {
       schemaVersion: EVIDENCE_SCHEMA_VERSION,
       id: "fc926f9f-e1bf-4590-ad71-a22ebca60dcc",
+      findingId: "WCG-F-20260722-00000-00000-00000-00000-000000",
       capturedAt: 1_800_000_000_000,
       captureMode: "element",
       observation: "The checkout button is announced only as button.",
@@ -106,6 +107,7 @@ describe("evidence capture", () => {
     const evidence: EvidencePacketV1 = {
       schemaVersion: EVIDENCE_SCHEMA_VERSION,
       id: "fc926f9f-e1bf-4590-ad71-a22ebca60dcc",
+      findingId: "WCG-F-20260722-00000-00000-00000-00000-000001",
       capturedAt: 1_800_000_000_000,
       captureMode: "element",
       observation: "The checkout button is announced only as button.",

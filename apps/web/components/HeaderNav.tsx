@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 const NAV = [
   { href: "/accessibility-audit-software", label: "Audit software" },
   { href: "/chrome-accessibility-extension", label: "Chrome extension" },
-  { href: "/#platforms", label: "Platforms" },
+  { href: "/screenshot-tool", label: "Screenshot tool" },
   { href: "/wcag-contrast", label: "Guides" },
 ];
 

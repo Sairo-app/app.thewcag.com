@@ -6,6 +6,7 @@ import {
   parseAiFindingDraft,
   parseEvidencePacket,
   parseNativeRequest,
+  createFindingId,
   type AiFindingDraftV1,
   type EvidencePacketV1,
 } from "./index";
@@ -14,6 +15,7 @@ function evidence(): EvidencePacketV1 {
   return {
     schemaVersion: EVIDENCE_SCHEMA_VERSION,
     id: "3c977290-cb66-4bbd-a68b-72b770828b39",
+    findingId: createFindingId(1_800_000_000_000, new Uint8Array(26)),
     auditId: "aud-checkout1",
     capturedAt: 1_800_000_000_000,
     captureMode: "element",
@@ -104,7 +106,14 @@ describe("audit contracts", () => {
   it("accepts bounded evidence and strips unknown fields", () => {
     const parsed = parseEvidencePacket({ ...evidence(), ignored: "value" });
     expect(parsed.id).toBe(evidence().id);
+    expect(parsed.findingId).toBe(evidence().findingId);
     expect("ignored" in parsed).toBe(false);
+  });
+
+  it("allocates a valid identity when legacy evidence has none", () => {
+    const legacy = { ...evidence() } as Record<string, unknown>;
+    delete legacy.findingId;
+    expect(parseEvidencePacket(legacy).findingId).toMatch(/^WCG-F-20270115-/);
   });
 
   it("rejects sensitive mismatched image payloads", () => {

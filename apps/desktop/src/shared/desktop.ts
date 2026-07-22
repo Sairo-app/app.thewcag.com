@@ -7,7 +7,7 @@ import type {
 
 export type AppView = "main" | "overlay" | "annotate" | "lens";
 export type WorkspaceStage = "plan" | "inspect" | "evidence" | "review" | "share";
-export type WorkspaceUtility = "vision" | "palette" | "settings";
+export type WorkspaceUtility = "screenshot" | "vision" | "palette" | "settings";
 export type WorkspaceTool = WorkspaceStage | WorkspaceUtility | "capture" | "checklist";
 export type OverlayMode = "pair" | "foreground" | "background" | "capture" | "measure";
 
@@ -172,6 +172,8 @@ export interface PublishedReport {
 }
 
 export interface Finding {
+  /** Immutable, globally unique platform identity. Never use the audit reference as identity. */
+  id: string;
   key: string;
   reference?: string;
   title: string;
@@ -191,6 +193,7 @@ export interface Finding {
   afterCaptureId?: string;
   comparisonNote?: string;
   duplicateOf?: string;
+  duplicateOfId?: string;
   occurrences?: FindingOccurrence[];
   createdAt: number;
   schemaVersion?: 2;
@@ -309,7 +312,8 @@ export type DesktopEvent =
   | "update:state"
   | "shortcut:failed"
   | "notification"
-  | "navigation:tool";
+  | "navigation:tool"
+  | "screenshot:share";
 
 export type InvokeChannel =
   | "app:platform"

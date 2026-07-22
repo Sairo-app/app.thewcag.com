@@ -209,6 +209,12 @@ export function setStored<T>(key: string, value: T): Promise<void> {
   return desktop.invoke("store:set", { key, json: JSON.stringify(value) });
 }
 
-export async function listCaptures(auditId?: string): Promise<CaptureEntry[]> {
-  return desktop.invoke("capture:list", auditId ? { auditId } : undefined);
+export async function listCaptures(
+  auditId?: string,
+  options?: { unscoped?: boolean },
+): Promise<CaptureEntry[]> {
+  return desktop.invoke("capture:list", {
+    ...(auditId ? { auditId } : {}),
+    ...(options?.unscoped ? { unscoped: true } : {}),
+  });
 }

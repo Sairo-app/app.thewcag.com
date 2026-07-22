@@ -2,6 +2,8 @@ import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import {
+  createFindingId,
+  isFindingId,
   parseAiFindingDraft,
   type AiFindingDraftV1,
 } from "@accessibility-build/audit-contracts";
@@ -10,6 +12,13 @@ import { normalizeFindingReferences } from "../../src/shared/finding-references"
 
 const KEY = /^[a-zA-Z0-9_-]{1,64}$/;
 const MAX_JSON_BYTES = 10 * 1024 * 1024;
+const FINDINGS_KEY = /^findings(?:-aud-[a-z0-9-]{6,36})?$/;
+
+interface FindingIdentityLedger {
+  version: 1;
+  /** Identity to stable internal key. Entries are append-only. */
+  identities: Record<string, string>;
+}
 
 export function assertStoreKey(key: string): void {
   if (!KEY.test(key)) throw new Error("Invalid storage key");
@@ -26,6 +35,11 @@ export function mergeFindings(existing: Finding[], incoming: unknown): Finding[]
     if (!finding.key || seen.has(finding.key) || typeof finding.title !== "string") continue;
     seen.add(finding.key);
     const base: Finding = {
+      id: isFindingId(finding.id)
+        ? finding.id
+        : createFindingId(
+            typeof finding.createdAt === "number" ? finding.createdAt : Date.now(),
+          ),
       key: finding.key,
       title: finding.title.trim().slice(0, 240),
       wcag: typeof finding.wcag === "string" ? finding.wcag.slice(0, 20) : "",
@@ -39,6 +53,9 @@ export function mergeFindings(existing: Finding[], incoming: unknown): Finding[]
       captureId: typeof finding.captureId === "string" ? finding.captureId : undefined,
       createdAt: typeof finding.createdAt === "number" ? finding.createdAt : Date.now(),
     };
+    if (typeof finding.duplicateOfId === "string" && isFindingId(finding.duplicateOfId)) {
+      base.duplicateOfId = finding.duplicateOfId;
+    }
     if (finding.schemaVersion === 2) {
       try {
         const draft = parseAiFindingDraft({
@@ -106,6 +123,7 @@ export function mergeFindings(existing: Finding[], incoming: unknown): Finding[]
 
 export class JsonStore {
   readonly directory: string;
+  private identityQueue: Promise<void> = Promise.resolve();
 
   constructor(userData: string) {
     this.directory = join(userData, "store");
@@ -144,8 +162,12 @@ export class JsonStore {
 
   async setRaw(key: string, json: string): Promise<void> {
     if (Buffer.byteLength(json, "utf8") > MAX_JSON_BYTES) throw new Error("Stored document is too large");
-    JSON.parse(json);
-    await this.atomicWrite(this.pathFor(key), json);
+    const parsed = JSON.parse(json) as unknown;
+    const contents = FINDINGS_KEY.test(key)
+      ? await this.reserveFindingIdentities(parsed)
+      : json;
+    if (Buffer.byteLength(contents, "utf8") > MAX_JSON_BYTES) throw new Error("Stored document is too large");
+    await this.atomicWrite(this.pathFor(key), contents);
   }
 
   async set<T>(key: string, value: T): Promise<void> {
@@ -163,6 +185,62 @@ export class JsonStore {
 
   async remove(key: string): Promise<void> {
     await rm(this.pathFor(key), { force: true });
+  }
+
+  private reserveFindingIdentities(value: unknown): Promise<string> {
+    if (
+      !Array.isArray(value) ||
+      value.some(
+        (finding) =>
+          !finding ||
+          typeof finding !== "object" ||
+          typeof (finding as Partial<Finding>).key !== "string",
+      )
+    ) {
+      return Promise.reject(new Error("Invalid finding document"));
+    }
+    const findings = normalizeFindingReferences(value as Finding[]).findings;
+    let output = "";
+    const reservation = this.identityQueue.then(async () => {
+      const path = this.pathFor("finding-identities");
+      let ledger: FindingIdentityLedger;
+      try {
+        ledger = JSON.parse(await readFile(path, "utf8")) as FindingIdentityLedger;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+        ledger = { version: 1, identities: {} };
+      }
+      if (
+        ledger.version !== 1 ||
+        !ledger.identities ||
+        typeof ledger.identities !== "object" ||
+        Object.entries(ledger.identities).some(
+          ([id, key]) => !isFindingId(id) || typeof key !== "string" || !key,
+        )
+      ) {
+        throw new Error("Invalid finding identity ledger");
+      }
+      const identities = { ...ledger.identities };
+      const reserved = new Set(Object.keys(identities));
+      const next = findings.map((finding) => {
+        let id = finding.id;
+        const owner = identities[id];
+        if (owner && owner !== finding.key) {
+          do id = createFindingId(finding.createdAt || Date.now());
+          while (reserved.has(id));
+        }
+        identities[id] = finding.key;
+        reserved.add(id);
+        return id === finding.id ? finding : { ...finding, id };
+      });
+      await this.atomicWrite(
+        path,
+        JSON.stringify({ version: 1, identities } satisfies FindingIdentityLedger),
+      );
+      output = JSON.stringify(next);
+    });
+    this.identityQueue = reservation.catch(() => undefined);
+    return reservation.then(() => output);
   }
 
   private async atomicWrite(path: string, contents: string | Buffer): Promise<void> {

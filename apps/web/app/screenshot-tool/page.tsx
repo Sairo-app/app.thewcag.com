@@ -6,9 +6,9 @@ import { ProductLinks } from "@/components/ProductLinks";
 import { createPageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Accessibility Screenshot Tool - Full How-To Guide",
+  title: "Standalone Accessibility Screenshot Tool",
   description:
-    "A complete guide to TheWCAG's screenshot and annotation tool: capture any region, flag issues against WCAG success criteria, measure target sizes, probe contrast, and publish a shareable report.",
+    "Capture, annotate, copy, export, and share accessibility screenshots without creating an audit or replacing your existing workflow.",
   path: "/screenshot-tool",
   keywords: ["accessibility screenshot tool", "WCAG annotation tool", "accessibility evidence capture", "annotated accessibility report"],
 });
@@ -16,15 +16,15 @@ export const metadata: Metadata = createPageMetadata({
 const STEPS: { title: string; body: string }[] = [
   {
     title: "Capture a region",
-    body: "Press the Capture shortcut (default ⌥⌘S on macOS, Ctrl+Alt+S on Windows). The screen freezes with a magnified loupe. Drag a box around the area you want, or press Space to capture the whole screen. The capture opens in the annotation window.",
+    body: "Open Screenshot tool from Utilities, or press the Capture shortcut (default ⌥⌘S on macOS, Ctrl+Alt+S on Windows). Drag around the area you want or capture the full display. The image opens in the annotation window and stays outside every audit.",
   },
   {
     title: "Flag an issue",
-    body: "Press I and click where the problem is to drop a numbered issue marker. Each marker becomes a row in the findings panel. Add as many as you need - they stay anchored to the image as you zoom and pan.",
+    body: "Press I and click where the problem is to drop a numbered issue marker. Add as many as you need. They remain anchored to the image and are included as structured notes when you create a share link.",
   },
   {
     title: "Describe it against WCAG",
-    body: "For each marker, pick the WCAG success criterion it violates (e.g. 1.4.3 Contrast, 2.5.8 Target Size), set a severity (blocker, major, minor), and write a note. This turns a screenshot into a structured, standards-referenced report.",
+    body: "For each marker, choose the issue type, set a severity, and write a note. Use WCAG references when they help, or keep the screenshot independent when your team uses another audit or ticketing process.",
   },
   {
     title: "Measure & probe",
@@ -36,7 +36,7 @@ const STEPS: { title: string; body: string }[] = [
   },
   {
     title: "Save or publish",
-    body: "Export the annotated image as PNG, or the findings as Markdown, for a ticket or doc. Or publish to a shareable app.thewcag.com link that anyone can open in a browser - no account required to view.",
+    body: "Copy the annotated image, export it as PNG, or create an unlisted app.thewcag.com link that anyone can open in a browser. An account is needed only to create a link, not for local capture or export.",
   },
 ];
 
@@ -71,9 +71,9 @@ export default function ScreenshotToolPage() {
         data={{
           "@context": "https://schema.org",
           "@type": "HowTo",
-          name: "How to audit accessibility with TheWCAG's screenshot tool",
+          name: "How to capture and share accessibility screenshots with TheWCAG",
           description:
-            "Capture a screenshot, flag issues against WCAG success criteria, measure target sizes, probe contrast, and publish a shareable report.",
+            "Capture, annotate, copy, export, or share a screenshot without creating a TheWCAG audit.",
           step: STEPS.map((s, i) => ({
             "@type": "HowToStep",
             position: i + 1,
@@ -85,9 +85,9 @@ export default function ScreenshotToolPage() {
       <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-16">
         <h1 className="text-3xl font-bold tracking-tight">The accessibility screenshot tool</h1>
         <p className="mt-3 max-w-2xl text-muted">
-          TheWCAG turns a screenshot into a structured accessibility report. Capture any part of any
-          app, flag issues against specific WCAG success criteria, measure target sizes, probe
-          contrast, and share the result as a link your team can open. Here is the full workflow.
+          Keep your audit process. TheWCAG gives you a separate screenshot workspace for capturing
+          any app, adding clear annotations, copying or exporting the result, and sharing an
+          unlisted review link when you choose.
         </p>
         <div className="mt-6">
           <Link
@@ -172,7 +172,7 @@ export default function ScreenshotToolPage() {
           </Link>
           .
         </p>
-        <ProductLinks heading="Keep screenshot evidence connected to the audit" />
+        <ProductLinks heading="Use Screenshot tool alone or connect the full audit workflow" />
       </main>
       <Footer />
     </>

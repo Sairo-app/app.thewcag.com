@@ -14,6 +14,7 @@ function evidence(includeImage = false): EvidencePacketV1 {
   return {
     schemaVersion: EVIDENCE_SCHEMA_VERSION,
     id: "3c977290-cb66-4bbd-a68b-72b770828b39",
+    findingId: "WCG-F-20260722-00000-00000-00000-00000-000004",
     capturedAt: 1_800_000_000_000,
     captureMode: "element",
     observation: "The checkout button is announced only as button.",

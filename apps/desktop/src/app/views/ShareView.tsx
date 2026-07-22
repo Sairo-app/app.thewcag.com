@@ -27,8 +27,9 @@ import { auditStoreKey, type RecordAuditActivity } from "../audits";
 import { Button, Field, StatusBadge, Toast } from "../components";
 import { WCAG_CRITERIA } from "../data/wcag";
 import { messageFromError, useTransientMessage } from "../hooks";
-import { ISSUE_TYPES, parseDoc } from "../../lib/annotate/model";
-import { renderDoc } from "../../lib/annotate/render";
+import { ISSUE_TYPES } from "../../lib/annotate/model";
+import { compactFindingId } from "@accessibility-build/audit-contracts";
+import { renderCaptureBase64 } from "../capture-render";
 import { normalizeFindingReferences } from "../../shared/finding-references";
 
 type ChecklistState = Record<
@@ -39,34 +40,6 @@ type ChecklistState = Record<
     findingKey?: string;
   }
 >;
-
-async function renderCapture(entry: CaptureEntry): Promise<string> {
-  const [raw, image] = await Promise.all([
-    desktop.invoke<string | null>("capture:read-document", { id: entry.id }),
-    new Promise<HTMLImageElement>((resolve, reject) => {
-      const next = new Image();
-      next.crossOrigin = "anonymous";
-      next.onload = () => resolve(next);
-      next.onerror = () =>
-        reject(new Error("The selected capture could not be loaded"));
-      next.src = entry.assetUrl;
-    }),
-  ]);
-  const doc = parseDoc(raw || "");
-  const canvas = document.createElement("canvas");
-  const scale = Math.min(1, 1600 / image.naturalWidth);
-  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-  const source = document.createElement("canvas");
-  source.width = image.naturalWidth;
-  source.height = image.naturalHeight;
-  renderDoc(source.getContext("2d")!, image, doc?.shapes ?? [], {
-    selectedId: null,
-    forExport: true,
-  });
-  canvas.getContext("2d")!.drawImage(source, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL("image/png").split(",")[1];
-}
 
 export function ShareView({
   audit,
@@ -283,8 +256,9 @@ export function ShareView({
     if (!ready || !selectedCapture || publishing) return;
     setPublishing(true);
     try {
-      const imageBase64 = await renderCapture(selectedCapture);
+      const imageBase64 = await renderCaptureBase64(selectedCapture);
       const issues = includedFindings.map((finding, index) => ({
+        id: finding.id,
         n: index + 1,
         sc: finding.wcag || undefined,
         label: finding.title,
@@ -708,7 +682,9 @@ export function ShareView({
                 <i className={`severity-${finding.severity}`} />
                 <span>
                   <strong>{finding.title}</strong>
-                  <small>{finding.wcag || ISSUE_TYPES.at(-1)?.label}</small>
+                  <small>
+                    {finding.wcag || ISSUE_TYPES.at(-1)?.label} · {compactFindingId(finding.id)}
+                  </small>
                 </span>
                 <StatusBadge
                   tone={

@@ -1,18 +1,33 @@
 import { describe, expect, it } from "vitest";
+import { createFindingId, isFindingId } from "@accessibility-build/audit-contracts";
 import { decodePngBase64, sanitizeReportIssues } from "./reports";
 
 describe("sanitizeReportIssues", () => {
   it("normalizes untrusted issue fields and assigns stable sequential numbers", () => {
+    const id = createFindingId(1_800_000_000_000, new Uint8Array(26));
     const issues = sanitizeReportIssues([
-      { n: 99, sc: " 1.4.3 ", label: "  Contrast\u0000 issue  ", severity: "BLOCKER", note: " Fix it " },
+      { id, n: 99, sc: " 1.4.3 ", label: "  Contrast\u0000 issue  ", severity: "BLOCKER", note: " Fix it " },
       { n: -2, sc: "javascript:alert(1)", label: "", severity: "unknown", note: 4 },
       null,
     ]);
 
     expect(issues).toEqual([
-      { n: 1, sc: "1.4.3", label: "Contrast  issue", severity: "blocker", note: "Fix it" },
-      { n: 2, sc: undefined, label: "Accessibility issue", severity: "major", note: "" },
+      { id, n: 1, sc: "1.4.3", label: "Contrast  issue", severity: "blocker", note: "Fix it" },
+      { id: expect.any(String), n: 2, sc: undefined, label: "Accessibility issue", severity: "major", note: "" },
     ]);
+    expect(isFindingId(issues[1].id)).toBe(true);
+    expect(issues[1].id).not.toBe(id);
+  });
+
+  it("repairs duplicate IDs at the publishing boundary", () => {
+    const id = createFindingId();
+    const issues = sanitizeReportIssues([
+      { id, label: "First" },
+      { id, label: "Second" },
+    ]);
+    expect(issues[0].id).toBe(id);
+    expect(issues[1].id).not.toBe(id);
+    expect(isFindingId(issues[1].id)).toBe(true);
   });
 
   it("caps issue count and text lengths", () => {

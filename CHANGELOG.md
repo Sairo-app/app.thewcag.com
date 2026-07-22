@@ -10,6 +10,7 @@
 
 **Desktop experience**
 
+- Added immutable `WCG-F-YYYYMMDD-…` identities for browser evidence, screenshot issue badges, manual findings, checklist findings, imports, exports, and published reports, backed by local non-reuse safeguards and a global published-ID registry.
 - Completed the responsive workspace pass across compact and resizable sidebars, settings, capture, evidence, review, delivery, and narrow-window layouts.
 - Improved provider setup, validation feedback, empty states, keyboard focus, text wrapping, overflow containment, and destructive-action safeguards.
 

@@ -36,6 +36,8 @@ export interface Shape {
   issueType?: IssueId;
   severity?: Severity;
   note?: string;
+  /** Immutable identity allocated as soon as an issue badge is captured. */
+  findingId?: string;
   /** redact: solid is the safe default - pixelation can be reversed */
   style?: "solid" | "pixel";
 }
@@ -53,11 +55,35 @@ export function emptyDoc(): AnnotationDoc {
 export function parseDoc(json: string): AnnotationDoc | null {
   try {
     const doc = JSON.parse(json);
-    if (doc?.version === 1 && Array.isArray(doc.shapes)) return doc as AnnotationDoc;
+    if (doc?.version === 1 && Array.isArray(doc.shapes)) {
+      return normalizeAnnotationFindingIds(doc as AnnotationDoc).document;
+    }
   } catch {
     /* corrupted doc - start fresh rather than crash */
   }
   return null;
+}
+
+export function normalizeAnnotationFindingIds(document: AnnotationDoc): {
+  document: AnnotationDoc;
+  changed: boolean;
+} {
+  const used = new Set<string>();
+  let changed = false;
+  const shapes = document.shapes.map((shape) => {
+    if (shape.kind !== "badge") return shape;
+    let findingId = shape.findingId;
+    if (!isFindingId(findingId) || used.has(findingId)) {
+      do findingId = createFindingId(); while (used.has(findingId));
+      changed = true;
+    }
+    used.add(findingId);
+    return findingId === shape.findingId ? shape : { ...shape, findingId };
+  });
+  return {
+    document: changed ? { ...document, shapes } : document,
+    changed,
+  };
 }
 
 export function issueTypeOf(shape: Shape) {
@@ -65,3 +91,4 @@ export function issueTypeOf(shape: Shape) {
 }
 
 export const TARGET_MIN = 24; // WCAG 2.5.8 minimum target size
+import { createFindingId, isFindingId } from "@accessibility-build/audit-contracts";

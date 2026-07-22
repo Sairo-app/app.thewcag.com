@@ -18,25 +18,25 @@ import {
 } from "@/components/icons";
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Accessibility Audit Software for Real Interface Evidence",
+  title: "Accessibility Audit Software for the Rendered Experience",
   description:
-    "TheWCAG combines a macOS and Windows accessibility audit workstation, Chrome evidence capture, WCAG 2.2 planning, findings, retesting, and controlled reports.",
+    "Audit what people see with TheWCAG. Capture browser and desktop evidence, create review-ready WCAG findings, retest fixes, and deliver controlled reports.",
   path: "/",
   keywords: ["accessibility audit software", "WCAG audit tool", "accessibility testing app", "Chrome accessibility extension"],
 });
 
 const PRINCIPLES = [
   {
-    title: "Plan the evaluation",
-    body: "Define the goal, scope, representative sample, environments, assistive technologies, and methodology before decisions begin.",
+    title: "Find what scanners miss",
+    body: "Inspect the rendered interface across browsers and desktop apps, including temporary states that never appear in a source-code report.",
   },
   {
-    title: "Inspect and document",
-    body: "Measure rendered interfaces, capture browser or desktop evidence, and keep every finding connected to its proof and WCAG decision.",
+    title: "Keep the proof attached",
+    body: "Capture visual and semantic context with the issue so reviewers can see the barrier, reproduce it, and understand the WCAG decision.",
   },
   {
-    title: "Retest and deliver",
-    body: "Track remediation, compare before and after evidence, complete readiness checks, and export or publish only what you choose.",
+    title: "Deliver a defensible record",
+    body: "Review severity, ownership, remediation, WCAG mapping, and retest history before you export or publish anything.",
   },
 ] as const;
 
@@ -49,8 +49,8 @@ const CAPABILITIES = [
   },
   {
     icon: CropIcon,
-    title: "Evidence that stays editable",
-    body: "Capture a region and add issue markers, arrows, boxes, measurements, focus order, text, and redaction.",
+    title: "Standalone screenshot tool",
+    body: "Capture, annotate, copy, export, or share a screenshot without creating an audit or changing your existing workflow.",
     href: "/screenshot-tool",
   },
   {
@@ -119,23 +119,27 @@ export default function Home() {
           <div className="home-shell home-hero__inner">
             <div className="home-hero__intro">
               <div className="home-hero__copy">
+                <p className="home-hero__eyebrow">Local-first accessibility audit software</p>
                 <h1 id="home-heading">
-                  <span>Capture.</span>
-                  <span>Review.</span>
-                  <span>Deliver.</span>
+                  <span>Audit what</span>
+                  <span>people see.</span>
                 </h1>
-                <p>
-                  Capture browser and desktop evidence, draft complete findings with your preferred AI provider, review every WCAG decision, and deliver a report from one local-first workspace.
+                <p className="home-hero__lead">
+                  Find barriers automation misses. Capture the rendered experience, turn evidence into review-ready WCAG findings, and deliver a report from one focused workspace.
                 </p>
                 <div className="home-actions">
                   <Link href="/download" className="button button--primary">
-                    Download desktop app <ArrowRightIcon size={16} />
+                    Download free <ArrowRightIcon size={16} />
                   </Link>
                   <Link href="#workflow" className="button button--secondary">
-                    Explore the workflow
+                    See how it works
                   </Link>
                 </div>
-                <p className="home-hero__product-line">macOS and Windows + Chrome extension + bring your own AI key</p>
+                <div className="home-hero__assurances" aria-label="Download details">
+                  <span><CheckIcon size={14} /> No account to start</span>
+                  <span><CheckIcon size={14} /> macOS and Windows</span>
+                  <span><CheckIcon size={14} /> Local by default</span>
+                </div>
               </div>
 
               <div className="home-hero__stage">
@@ -147,19 +151,19 @@ export default function Home() {
 
         <aside className="home-proof" aria-label="Product facts">
           <div className="home-shell home-proof__inner">
-            <span>Context-rich capture</span>
-            <span>AI-assisted finding drafts</span>
-            <span>WCAG 2.2 audit workspace</span>
-            <span>Export and controlled publishing</span>
+            <span><CheckIcon size={15} /> Free desktop app</span>
+            <span><CheckIcon size={15} /> Works without an account</span>
+            <span><CheckIcon size={15} /> Evidence stays on your device</span>
+            <span><CheckIcon size={15} /> WCAG 2.2 audit workflow</span>
           </div>
         </aside>
 
         <section id="purpose" className="home-purpose" aria-labelledby="purpose-heading">
           <div className="home-shell">
             <div className="section-heading">
-              <h2 id="purpose-heading">Accessibility happens in the rendered experience.</h2>
+              <h2 id="purpose-heading">A source-code report is not the user experience.</h2>
               <p>
-                Automation can inspect code. TheWCAG gives human auditors the instruments to examine the interface people actually receive.
+                TheWCAG gives human auditors the instruments and evidence trail to evaluate the interface people actually receive.
               </p>
             </div>
             <div className="home-purpose__principles">
@@ -204,15 +208,15 @@ export default function Home() {
         <section className="home-connected" aria-labelledby="connected-heading">
           <div className="home-shell">
             <div className="section-heading section-heading--compact">
-              <h2 id="connected-heading">Three surfaces, one clear responsibility each.</h2>
-              <p>The browser captures the webpage, the desktop owns the audit, and the website handles services you explicitly request.</p>
+              <h2 id="connected-heading">Keep the context from capture to handoff.</h2>
+              <p>Move a real barrier through one continuous workflow instead of rebuilding the evidence in documents and ticket fields.</p>
             </div>
             <div className="home-connected__flow">
-              <Link href="/chrome-accessibility-extension"><strong>Chrome extension</strong><span>Select a control or region and review contextual evidence.</span></Link>
+              <Link href="/chrome-accessibility-extension"><strong>Capture the barrier</strong><span>Select a webpage control or region with its visual and semantic context intact.</span></Link>
               <span aria-hidden="true">→</span>
-              <Link href="/accessibility-audit-software"><strong>Desktop workstation</strong><span>Store the audit locally, confirm findings, manage remediation, and retest.</span></Link>
+              <Link href="/accessibility-audit-software"><strong>Confirm the finding</strong><span>Review the evidence, WCAG decision, severity, ownership, and remediation locally.</span></Link>
               <span aria-hidden="true">→</span>
-              <Link href="/download"><strong>Website service</strong><span>Sign in, request AI drafting, publish chosen reports, and download releases.</span></Link>
+              <Link href="/download"><strong>Deliver with control</strong><span>Export a portable audit or publish only the approved report you choose.</span></Link>
             </div>
           </div>
         </section>
@@ -220,8 +224,8 @@ export default function Home() {
         <section id="platforms" className="home-platforms" aria-labelledby="platforms-heading">
           <div className="home-shell">
             <div className="section-heading">
-              <h2 id="platforms-heading">Built for the desktop you audit on.</h2>
-              <p>One familiar workflow, adapted to each platform's shortcuts, permissions, windows, and display systems.</p>
+              <h2 id="platforms-heading">Choose your desktop. Keep the audit on it.</h2>
+              <p>Start free on macOS or Windows. Your local audit does not require an account.</p>
             </div>
 
             <div className="platform-grid">
@@ -237,7 +241,7 @@ export default function Home() {
                   </ul>
                 </div>
                 <a href="/api/desktop/download?os=mac" className="button button--dark">
-                  Download for macOS <ArrowRightIcon size={16} />
+                  Download free for macOS <ArrowRightIcon size={16} />
                 </a>
               </article>
 
@@ -253,7 +257,7 @@ export default function Home() {
                   </ul>
                 </div>
                 <a href="/api/desktop/download?os=windows" className="button button--secondary">
-                  Download for Windows <ArrowRightIcon size={16} />
+                  Download free for Windows <ArrowRightIcon size={16} />
                 </a>
               </article>
             </div>
@@ -290,8 +294,8 @@ export default function Home() {
         <section className="home-trust" aria-labelledby="trust-heading">
           <div className="home-shell home-trust__inner">
             <div>
-              <h2 id="trust-heading">Your evidence stays yours.</h2>
-              <p>The web layer supports the workflow without turning every capture into cloud data.</p>
+              <h2 id="trust-heading">Local-first is a product decision.</h2>
+              <p>Audit work stays on your computer until you explicitly choose a connected service.</p>
             </div>
             <div className="home-trust__details">
               <article><h3>Local bridge</h3><p>The Chrome extension talks directly to an allowlisted desktop native host. The website is not placed inside that local connection.</p></article>

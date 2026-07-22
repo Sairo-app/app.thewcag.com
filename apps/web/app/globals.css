@@ -455,11 +455,11 @@ kbd {
 }
 
 .home-hero__copy h1 {
-  max-width: 8ch;
-  font-size: clamp(4rem, 6.6vw, 5.65rem);
+  max-width: 10ch;
+  font-size: clamp(4rem, 6.4vw, 5.55rem);
   font-weight: 800;
   letter-spacing: -0.038em;
-  line-height: 0.91;
+  line-height: 0.94;
 }
 
 .home-hero__copy h1 span {
@@ -470,7 +470,15 @@ kbd {
   color: var(--orange-text);
 }
 
-.home-hero__copy > p:not(.home-hero__product-line) {
+.home-hero__eyebrow {
+  margin-bottom: 1rem;
+  color: var(--orange-text);
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: 0.015em;
+}
+
+.home-hero__lead {
   max-width: 30rem;
   margin-top: 1.55rem;
   color: var(--body);
@@ -489,14 +497,28 @@ kbd {
   min-width: 0;
 }
 
-.home-hero__product-line {
-  max-width: 28rem;
+.home-hero__assurances {
+  display: flex;
+  max-width: 32rem;
+  flex-wrap: wrap;
+  gap: 0.55rem 1rem;
   margin-top: 1.35rem;
   border-top: 1px solid var(--line);
   padding-top: 0.85rem;
   color: var(--muted);
   font-size: 0.76rem;
   font-weight: 650;
+}
+
+.home-hero__assurances span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.home-hero__assurances svg {
+  flex: none;
+  color: var(--success);
 }
 
 .home-proof {
@@ -514,11 +536,17 @@ kbd {
   min-height: 4rem;
   align-items: center;
   justify-content: center;
+  gap: 0.45rem;
   border-left: 1px solid var(--line);
   color: var(--body);
   font-size: 0.85rem;
   font-weight: 650;
   text-align: center;
+}
+
+.home-proof__inner svg {
+  flex: none;
+  color: var(--success);
 }
 
 .home-proof__inner span:last-child {
@@ -1512,6 +1540,250 @@ kbd {
   font-size: 0.54rem;
 }
 
+/* Download conversion page */
+
+.download-page {
+  width: min(calc(100% - (var(--gutter) * 2)), var(--shell));
+  margin-inline: auto;
+  padding-block: clamp(3.75rem, 7vw, 6.5rem);
+}
+
+.download-hero {
+  max-width: 55rem;
+}
+
+.download-hero__eyebrow {
+  color: var(--orange-text);
+  font-size: 0.8rem;
+  font-weight: 750;
+  letter-spacing: 0.015em;
+}
+
+.download-hero h1 {
+  max-width: 16ch;
+  margin-top: 0.85rem;
+  font-size: clamp(3rem, 6vw, 5.25rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.download-hero > p:not(.download-hero__eyebrow) {
+  max-width: 46rem;
+  margin-top: 1.35rem;
+  color: var(--body);
+  font-size: clamp(1.05rem, 1.5vw, 1.16rem);
+  line-height: 1.65;
+}
+
+.download-hero__assurances {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.2rem;
+  margin-top: 1.5rem;
+  color: var(--body);
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.download-hero__assurances span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.download-hero__assurances svg {
+  flex: none;
+  color: var(--success);
+}
+
+.download-platforms {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: clamp(2.75rem, 5vw, 4.5rem);
+}
+
+.download-platform {
+  display: flex;
+  min-height: 27rem;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  padding: clamp(1.5rem, 3vw, 2.25rem);
+}
+
+.download-platform--windows {
+  border-color: color-mix(in oklch, var(--orange) 38%, var(--line));
+  background: var(--orange-soft);
+}
+
+.download-platform__topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.download-platform__icon {
+  display: inline-flex;
+  width: 3.8rem;
+  height: 3.8rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.download-platform__badge {
+  border: 1px solid color-mix(in oklch, var(--success) 38%, var(--line));
+  border-radius: 999px;
+  background: var(--surface);
+  padding: 0.3rem 0.55rem;
+  color: var(--success);
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.download-platform h2 {
+  margin-top: clamp(2.5rem, 5vw, 4.5rem);
+  font-size: clamp(2.25rem, 4vw, 3.5rem);
+  font-weight: 750;
+  letter-spacing: -0.038em;
+  line-height: 1;
+}
+
+.download-platform__requirements {
+  max-width: 30rem;
+  margin-top: 0.85rem;
+  color: var(--body);
+}
+
+.download-platform__security {
+  max-width: 31rem;
+  margin-top: 0.75rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.download-platform .button {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
+.download-release-note {
+  margin-top: 1rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.download-release-note a,
+.download-resources a {
+  color: var(--orange-text);
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklch, currentColor 50%, transparent);
+  text-underline-offset: 0.2em;
+}
+
+.download-release-note a:hover,
+.download-resources a:hover {
+  text-decoration-color: currentColor;
+}
+
+.download-steps {
+  display: grid;
+  grid-template-columns: minmax(15rem, 0.75fr) minmax(28rem, 1.25fr);
+  gap: clamp(3rem, 8vw, 8rem);
+  margin-top: clamp(4.75rem, 8vw, 7.5rem);
+  border-block: 1px solid var(--line);
+  padding-block: clamp(3.25rem, 6vw, 5rem);
+}
+
+.download-steps h2,
+.download-included h2 {
+  font-size: clamp(2.1rem, 4vw, 3.65rem);
+  font-weight: 750;
+  letter-spacing: -0.038em;
+  line-height: 1.05;
+}
+
+.download-steps > div > p {
+  max-width: 30rem;
+  margin-top: 1rem;
+  color: var(--body);
+}
+
+.download-steps ol {
+  border-top: 1px solid var(--line-strong);
+}
+
+.download-steps li {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr);
+  gap: 1rem;
+  border-bottom: 1px solid var(--line);
+  padding-block: 1.4rem;
+}
+
+.download-steps li > span {
+  padding-top: 0.2rem;
+  color: var(--orange-text);
+  font-family: var(--font-mono-face), monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.download-steps h3 {
+  font-size: 1.15rem;
+  font-weight: 750;
+  letter-spacing: -0.018em;
+}
+
+.download-steps li p {
+  max-width: 38rem;
+  margin-top: 0.35rem;
+  color: var(--body);
+  font-size: 0.92rem;
+}
+
+.download-included {
+  max-width: 55rem;
+  margin-top: clamp(4.75rem, 8vw, 7.5rem);
+}
+
+.download-included dl {
+  margin-top: clamp(2.5rem, 5vw, 4rem);
+  border-top: 1px solid var(--line-strong);
+}
+
+.download-included dl > div {
+  display: grid;
+  grid-template-columns: minmax(11rem, 0.48fr) minmax(0, 1fr);
+  gap: clamp(1.5rem, 4vw, 4rem);
+  border-bottom: 1px solid var(--line);
+  padding-block: 1.35rem;
+}
+
+.download-included dt {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 750;
+}
+
+.download-included dd {
+  color: var(--body);
+  font-size: 0.92rem;
+}
+
+.download-resources {
+  margin-top: 2.5rem;
+  color: var(--body);
+  font-size: 0.9rem;
+}
+
 /* Editorial and product pages */
 
 .editorial-page,
@@ -2221,7 +2493,7 @@ kbd {
   }
 
   .home-hero__copy h1 {
-    max-width: 8ch;
+    max-width: 10ch;
   }
 
   .home-hero__stage {
@@ -2230,6 +2502,11 @@ kbd {
 
   .section-heading--sticky {
     position: static;
+  }
+
+  .download-steps {
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
   }
 
   .platform-panel {
@@ -2280,6 +2557,19 @@ kbd {
 
   .platform-grid {
     grid-template-columns: 1fr;
+  }
+
+  .download-platforms {
+    grid-template-columns: 1fr;
+  }
+
+  .download-platform {
+    min-height: 25rem;
+  }
+
+  .download-included dl > div {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
   }
 
   .platform-panel {
@@ -2379,6 +2669,10 @@ kbd {
 
   .home-actions,
   .home-actions .button {
+    width: 100%;
+  }
+
+  .download-platform .button {
     width: 100%;
   }
 

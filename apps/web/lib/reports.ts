@@ -1,4 +1,8 @@
 import type { ReportIssue } from "./schema";
+import {
+  createFindingId,
+  isFindingId,
+} from "@accessibility-build/audit-contracts";
 
 export const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://app.thewcag.com";
 
@@ -48,6 +52,7 @@ function cleanText(value: unknown, maxLength: number): string {
 export function sanitizeReportIssues(value: unknown, maxItems = 100): ReportIssue[] {
   if (!Array.isArray(value)) return [];
   const issues: ReportIssue[] = [];
+  const usedIds = new Set<string>();
   for (const candidate of value.slice(0, maxItems)) {
     if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue;
     const raw = candidate as Record<string, unknown>;
@@ -57,7 +62,12 @@ export function sanitizeReportIssues(value: unknown, maxItems = 100): ReportIssu
     const sc = /^\d+(?:\.\d+){1,3}$/.test(rawSc) ? rawSc : undefined;
     const rawSeverity = cleanText(raw.severity, 20).toLowerCase();
     const severity = ISSUE_SEVERITIES.has(rawSeverity) ? rawSeverity : "major";
-    issues.push({ n: issues.length + 1, sc, label, severity, note });
+    let id = cleanText(raw.id, 64).toUpperCase();
+    if (!isFindingId(id) || usedIds.has(id)) {
+      do id = createFindingId(); while (usedIds.has(id));
+    }
+    usedIds.add(id);
+    issues.push({ id, n: issues.length + 1, sc, label, severity, note });
   }
   return issues;
 }

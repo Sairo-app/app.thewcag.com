@@ -88,6 +88,8 @@ export interface EvidenceConsentV1 {
 export interface EvidencePacketV1 {
   schemaVersion: typeof EVIDENCE_SCHEMA_VERSION;
   id: string;
+  /** Immutable platform identity for the finding this evidence can produce. */
+  findingId: string;
   auditId?: string;
   capturedAt: number;
   captureMode: EvidenceCaptureMode;

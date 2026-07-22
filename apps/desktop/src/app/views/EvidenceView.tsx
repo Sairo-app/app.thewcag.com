@@ -17,6 +17,8 @@ import {
   WarningCircle,
 } from "@phosphor-icons/react";
 import {
+  compactFindingId,
+  createFindingId,
   parseEvidencePacket,
   type EvidencePacketV1,
 } from "@accessibility-build/audit-contracts";
@@ -220,6 +222,7 @@ export function EvidenceView({
     const existing = editingFinding;
     const nextFinding: Finding = {
       ...(existing ?? {
+        id: createFindingId(now),
         key: `manual-${crypto.randomUUID()}`,
         reference: nextFindingReference(findings),
         createdAt: now,
@@ -352,6 +355,7 @@ export function EvidenceView({
       const section = [
         `## ${item.reference || "Unreferenced"}: ${item.title}`,
         "",
+        `- Finding ID: ${item.id}`,
         `- WCAG: ${item.wcag}`,
         `- Severity: ${item.severity}`,
         `- Status: ${item.status}`,
@@ -470,9 +474,11 @@ export function EvidenceView({
     const now = Date.now();
     const duplicate: Finding = {
       ...item,
+      id: createFindingId(now),
       key: `manual-${crypto.randomUUID()}`,
       reference: nextFindingReference(findings),
       duplicateOf: item.reference,
+      duplicateOfId: item.id,
       status: "open",
       location: "",
       captureId: undefined,
@@ -565,7 +571,7 @@ export function EvidenceView({
               item.dueDate! < new Date().toISOString().slice(0, 10))) &&
           (findingStatus === "all" || item.status === findingStatus) &&
           (findingSeverity === "all" || item.severity === findingSeverity) &&
-          `${item.reference ?? ""} ${item.title} ${item.wcag} ${item.location ?? ""} ${item.owner ?? ""} ${item.ticket ?? ""} ${item.note} ${item.actualResult ?? ""} ${item.userImpact ?? ""} ${item.recommendation ?? ""} ${(item.occurrences ?? []).map((occurrence) => `${occurrence.location} ${occurrence.note}`).join(" ")}`
+          `${item.id} ${item.reference ?? ""} ${item.title} ${item.wcag} ${item.location ?? ""} ${item.owner ?? ""} ${item.ticket ?? ""} ${item.note} ${item.actualResult ?? ""} ${item.userImpact ?? ""} ${item.recommendation ?? ""} ${(item.occurrences ?? []).map((occurrence) => `${occurrence.location} ${occurrence.note}`).join(" ")}`
             .toLowerCase()
             .includes(query.toLowerCase()),
         )
@@ -905,6 +911,21 @@ export function EvidenceView({
                     <span>
                       <span className="finding-reference">{item.reference}</span>
                       <strong>{item.title}</strong>
+                      <button
+                        type="button"
+                        className="finding-id-copy"
+                        title={`Copy ${item.id}`}
+                        aria-label={`Copy finding ID ${item.id}`}
+                        onClick={() => {
+                          void desktop.invoke("clipboard:write-text", {
+                            text: item.id,
+                          });
+                          show("Finding ID copied");
+                        }}
+                      >
+                        <code>{compactFindingId(item.id)}</code>
+                        <Copy size={12} />
+                      </button>
                       <small>
                         {[item.location, item.note].filter(Boolean).join(" · ") || "No location or implementation note"}
                       </small>
@@ -988,6 +1009,10 @@ export function EvidenceView({
                         {item.duplicateOf ? ` · Duplicated from ${item.duplicateOf}` : ""}
                       </span>
                       {item.confidence ? <span className={`finding-confidence finding-confidence-${item.confidence}`}>{item.confidence} confidence</span> : null}
+                    </div>
+                    <div className="finding-global-identity">
+                      <span>Immutable finding ID</span>
+                      <code>{item.id}</code>
                     </div>
                     {findingEvidence[item.key]?.image ? (
                       <figure className="finding-evidence-preview">

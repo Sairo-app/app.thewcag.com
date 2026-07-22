@@ -23,7 +23,7 @@ const COLUMNS: { heading: string; links: { href: string; label: string; icon: Re
     links: [
       { href: "/accessibility-audit-software", label: "Audit workstation", icon: <AccessibilityIcon size={15} /> },
       { href: "/chrome-accessibility-extension", label: "Chrome extension", icon: <CropIcon size={15} /> },
-      { href: "/screenshot-tool", label: "Screenshot evidence", icon: <CropIcon size={15} /> },
+      { href: "/screenshot-tool", label: "Screenshot tool", icon: <CropIcon size={15} /> },
       { href: "/color-contrast-checker", label: "Contrast checker", icon: <ContrastIcon size={15} /> },
       { href: "/download", label: "Download the app", icon: <DownloadIcon size={15} /> },
     ],
@@ -54,8 +54,8 @@ export function Footer() {
       <div className="site-footer__inner">
         <div className="site-footer__cta-panel">
           <div>
-            <h2>Catch the barrier. Keep the proof.</h2>
-            <p>Download the local-first accessibility workspace for macOS and Windows.</p>
+            <h2>Audit what people see. Keep the proof.</h2>
+            <p>Start free on macOS or Windows. No account is required for local audits.</p>
           </div>
           <Link href="/download" className="site-footer__cta">
             Download free <ArrowRightIcon size={16} />

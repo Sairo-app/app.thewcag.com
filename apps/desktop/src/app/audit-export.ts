@@ -204,6 +204,7 @@ export function buildAuditMarkdown(input: {
       lines.push(
         `### ${finding.reference || String(index + 1)}. ${heading(finding.title)}`,
         "",
+        `- Finding ID: ${finding.id}`,
         `- Criterion: ${value(finding.wcag, "Needs mapping")}`,
         `- Severity: ${finding.severity}`,
         `- Status: ${finding.status}`,
@@ -417,6 +418,7 @@ export function buildAuditHtml(input: {
           return `<article class="finding" id="finding-${index + 1}">
             <header>
               <span class="finding-number">Finding ${escapeHtml(finding.reference, String(index + 1).padStart(2, "0"))}</span>
+              <code class="finding-id">${escapeHtml(finding.id, "Identity unavailable")}</code>
               <h3>${escapeHtml(finding.title, "Untitled finding")}</h3>
               <div class="finding-tags">
                 <span class="tag severity-${finding.severity}">${escapeHtml(finding.severity, "")}</span>
@@ -523,6 +525,7 @@ export function buildAuditHtml(input: {
     .finding { margin:0 0 18px; border:1px solid var(--line); border-radius:10px; break-inside:avoid; }
     .finding > header { padding:16px; border-bottom:1px solid var(--line); }
     .finding-number { color:var(--orange); font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; }
+    .finding-id { display:block; margin:4px 0 7px; color:var(--body); font-size:10px; overflow-wrap:anywhere; }
     .finding-tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
     dl { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); margin:0; background:#faf6ee; }
     dl div { padding:10px 14px; border-bottom:1px solid var(--line); }

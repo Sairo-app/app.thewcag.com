@@ -66,6 +66,11 @@ CREATE TABLE IF NOT EXISTS "report" (
 	CONSTRAINT "report_slug_unique" UNIQUE("slug")
 );
 --> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "finding_identity" (
+	"id" text PRIMARY KEY NOT NULL,
+	"first_seen_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "ai_generation" (
 	"id" text PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,

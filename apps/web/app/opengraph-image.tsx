@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "TheWCAG accessibility audit workstation";
+export const alt = "Audit what people see with TheWCAG";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -26,8 +26,8 @@ export default function OpenGraphImage() {
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 56 }}>
           <div style={{ display: "flex", flexDirection: "column", maxWidth: 760 }}>
-            <div style={{ fontSize: 72, lineHeight: 1.02, letterSpacing: "-3px", fontWeight: 800 }}>Find the barrier. Keep the proof.</div>
-            <div style={{ marginTop: 24, color: "#556170", fontSize: 28, lineHeight: 1.35 }}>Desktop audit workstation, Chrome evidence capture, and controlled web publishing.</div>
+            <div style={{ fontSize: 76, lineHeight: 1.02, letterSpacing: "-3px", fontWeight: 800 }}>Audit what people see.</div>
+            <div style={{ marginTop: 24, color: "#556170", fontSize: 28, lineHeight: 1.35 }}>Capture the barrier, keep the evidence, and deliver a defensible WCAG audit.</div>
           </div>
           <div style={{ width: 250, height: 150, display: "flex", alignItems: "center", justifyContent: "center", border: "5px solid #ffffff", borderRadius: 15, outline: "8px solid #d9480f", background: "#fffdf7", color: "#a73509", fontSize: 24, fontWeight: 800 }}>Issue 1</div>
         </div>

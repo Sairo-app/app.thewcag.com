@@ -110,7 +110,7 @@ async function start(): Promise<void> {
   const notifyError = (error: unknown) => windows.broadcast("notification", { text: error instanceof Error ? error.message : String(error), error: true });
   const settings = new SettingsService(store, {
     inspect: () => void captureCoordinator.begin("pair").catch(notifyError),
-    capture: () => void captureCoordinator.begin("capture").catch(notifyError),
+    capture: () => void captureCoordinator.begin("capture", undefined, true).catch(notifyError),
     lens: () => { windows.toggleLens(); },
   }, (action, accelerator) => {
     windows.broadcast("shortcut:failed", { action, accelerator });

@@ -8,6 +8,7 @@ export class CaptureCoordinator {
   private sessionId: string | null = null;
   private firstColor: PickedColor | null = null;
   private activeAuditId: string | undefined;
+  private sessionAuditId: string | undefined;
 
   constructor(
     private readonly capture: ScreenCaptureService,
@@ -19,8 +20,9 @@ export class CaptureCoordinator {
     this.activeAuditId = auditId;
   }
 
-  async begin(mode: OverlayMode, auditId?: string): Promise<{ sessionId: string }> {
+  async begin(mode: OverlayMode, auditId?: string, standalone = false): Promise<{ sessionId: string }> {
     if (auditId) this.activeAuditId = auditId;
+    this.sessionAuditId = standalone ? undefined : auditId ?? this.activeAuditId;
     const frames = await this.capture.captureAll();
     this.sessionId = randomUUID();
     this.firstColor = null;
@@ -28,10 +30,14 @@ export class CaptureCoordinator {
     return { sessionId: this.sessionId };
   }
 
-  async fullscreen(auditId?: string) {
+  async fullscreen(auditId?: string, standalone = false) {
     if (auditId) this.activeAuditId = auditId;
     const frame = await this.capture.captureDisplayAtCursor();
-    const entry = await this.captures.create(frame.dataUrl, "Full screen capture", this.activeAuditId);
+    const entry = await this.captures.create(
+      frame.dataUrl,
+      "Full screen capture",
+      standalone ? undefined : auditId ?? this.activeAuditId,
+    );
     this.windows.sendToMain("capture:saved", entry);
     this.windows.openAnnotate(entry.id);
     return entry;
@@ -39,11 +45,13 @@ export class CaptureCoordinator {
 
   async complete(sessionId: string, result: OverlayResult) {
     if (!this.sessionId || sessionId !== this.sessionId) throw new Error("Inspection session has expired");
+    const auditId = this.sessionAuditId;
     this.sessionId = null;
     this.firstColor = null;
+    this.sessionAuditId = undefined;
     this.windows.closeOverlays();
     if (result?.mode === "capture") {
-      const entry = await this.captures.create(result.pngDataUrl, "Area capture", this.activeAuditId);
+      const entry = await this.captures.create(result.pngDataUrl, "Area capture", auditId);
       this.windows.sendToMain("capture:saved", entry);
       this.windows.openAnnotate(entry.id);
       return entry;
@@ -55,6 +63,7 @@ export class CaptureCoordinator {
   cancel(): void {
     this.sessionId = null;
     this.firstColor = null;
+    this.sessionAuditId = undefined;
     this.windows.closeOverlays();
   }
 

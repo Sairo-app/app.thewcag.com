@@ -12,6 +12,7 @@ import {
   Aperture,
   Archive,
   BookOpenText,
+  Camera,
   CaretDown,
   Check,
   CheckSquare,
@@ -68,6 +69,7 @@ import { PaletteView } from "./views/PaletteView";
 import { VisionView } from "./views/VisionView";
 import { SettingsView } from "./views/SettingsView";
 import { PlanView } from "./views/PlanView";
+import { ScreenshotView } from "./views/ScreenshotView";
 import { WCAG_CRITERIA } from "./data/wcag";
 
 type Route = WorkspaceStage | WorkspaceUtility;
@@ -91,6 +93,7 @@ const STAGES: {
 ];
 
 const UTILITIES: { id: WorkspaceUtility; label: string; icon: IconType }[] = [
+  { id: "screenshot", label: "Screenshot tool", icon: Camera },
   { id: "vision", label: "Vision lens", icon: Aperture },
   { id: "palette", label: "Palette", icon: Palette },
   { id: "settings", label: "Settings", icon: GearSix },
@@ -120,6 +123,11 @@ const TITLES: Record<Route, { title: string; description: string }> = {
     title: "Deliver the report",
     description:
       "Finalize the audit record, review public evidence, and publish with intent.",
+  },
+  screenshot: {
+    title: "Screenshot tool",
+    description:
+      "Capture, annotate, export, and share screenshots without using the audit workflow.",
   },
   vision: {
     title: "Vision lens",
@@ -202,6 +210,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
   const [commandIndex, setCommandIndex] = useState(0);
   const [newAuditName, setNewAuditName] = useState("");
   const [archiveConfirm, setArchiveConfirm] = useState(false);
+  const [screenshotShareId, setScreenshotShareId] = useState("");
   const [stats, setStats] = useState({
     captures: 0,
     findings: 0,
@@ -235,6 +244,8 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     updateAudit,
   } = auditWorkspace;
   const title = TITLES[active];
+  const standalone = active === "screenshot";
+  const showInspector = inspector && !standalone;
 
   const commands = useMemo(
     () =>
@@ -248,6 +259,13 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     () =>
       desktop.on<WorkspaceTool>("navigation:tool", (tool) =>
         setActive(normalizeRoute(tool)),
+      ),
+    [],
+  );
+  useEffect(
+    () =>
+      desktop.on<{ captureId: string }>("screenshot:share", (value) =>
+        setScreenshotShareId(value.captureId),
       ),
     [],
   );
@@ -605,6 +623,11 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
         recordActivity={recordActivity}
         onNavigate={navigate}
       />
+    ) : active === "screenshot" ? (
+      <ScreenshotView
+        shareCaptureId={screenshotShareId}
+        onShareHandled={() => setScreenshotShareId("")}
+      />
     ) : active === "palette" ? (
       <PaletteView auditId={activeAudit.id} />
     ) : active === "vision" ? (
@@ -688,20 +711,29 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
         onCommit={navigationSize.commit}
       />
 
-      <div className="workspace-column">
+      <div className="workspace-column" data-standalone={standalone}>
         <header className="command-bar">
           <div className="drag-space" aria-hidden />
-          <button
-            className="project-switcher"
-            onClick={() => setSwitcherOpen(true)}
-            aria-haspopup="dialog"
-          >
-            <span className="project-glyph">
-              <BookOpenText size={17} weight="duotone" />
-            </span>
-            <span className="project-name">{activeAudit.project}</span>
-            <CaretDown size={14} />
-          </button>
+          {standalone ? (
+            <div className="project-switcher standalone-tool-indicator">
+              <span className="project-glyph">
+                <Camera size={17} weight="duotone" />
+              </span>
+              <span className="project-name">Independent workspace</span>
+            </div>
+          ) : (
+            <button
+              className="project-switcher"
+              onClick={() => setSwitcherOpen(true)}
+              aria-haspopup="dialog"
+            >
+              <span className="project-glyph">
+                <BookOpenText size={17} weight="duotone" />
+              </span>
+              <span className="project-name">{activeAudit.project}</span>
+              <CaretDown size={14} />
+            </button>
+          )}
           <button
             className="command-trigger"
             aria-label="Search tools and commands"
@@ -714,15 +746,17 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
           </button>
           <div className="command-actions">
             <StatusBadge tone="success">Stored locally</StatusBadge>
-            <IconButton
-              label={inspector ? "Hide audit panel" : "Show audit panel"}
-              className="inspector-toggle"
-              ariaExpanded={inspector}
-              ariaControls="audit-context-panel"
-              onClick={() => setInspector((value) => !value)}
-            >
-              <SidebarSimple size={18} weight="bold" />
-            </IconButton>
+            {!standalone ? (
+              <IconButton
+                label={inspector ? "Hide audit panel" : "Show audit panel"}
+                className="inspector-toggle"
+                ariaExpanded={inspector}
+                ariaControls="audit-context-panel"
+                onClick={() => setInspector((value) => !value)}
+              >
+                <SidebarSimple size={18} weight="bold" />
+              </IconButton>
+            ) : null}
             <IconButton
               label="Account and settings"
               onClick={() => navigate("settings")}
@@ -732,7 +766,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
           </div>
         </header>
 
-        <main className={`workstage ${inspector ? "with-inspector" : ""}`}>
+        <main className={`workstage ${showInspector ? "with-inspector" : ""}`}>
           <section className="task-column">
             <div className="task-heading">
               <div>
@@ -757,7 +791,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
             </div>
             <div ref={taskContentRef} className="task-content">{body}</div>
           </section>
-          {compact && inspector ? (
+          {compact && showInspector ? (
             <button
               type="button"
               className="inspector-scrim"
@@ -765,7 +799,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
               onClick={() => setInspector(false)}
             />
           ) : null}
-          {inspector ? (
+          {showInspector ? (
             <PanelResizer
               className="context-resizer"
               label="Resize audit status panel"
@@ -778,7 +812,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
               onCommit={inspectorSize.commit}
             />
           ) : null}
-          {inspector ? (
+          {showInspector ? (
             <aside
               id="audit-context-panel"
               className="context-inspector"

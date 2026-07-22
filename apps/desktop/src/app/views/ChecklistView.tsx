@@ -15,6 +15,7 @@ import type {
   ChecklistShortcutSettings,
   Finding,
 } from "../../shared/desktop";
+import { createFindingId } from "@accessibility-build/audit-contracts";
 import {
   nextFindingReference,
   normalizeFindingReferences,
@@ -209,6 +210,7 @@ export function ChecklistView({
     const guidance = CRITERION_GUIDANCE[sc];
     const now = Date.now();
     const finding: Finding = {
+      id: createFindingId(now),
       key: `manual-${crypto.randomUUID()}`,
       reference: nextFindingReference(findings),
       title: `${criterion.name} does not meet WCAG ${criterion.sc}`,

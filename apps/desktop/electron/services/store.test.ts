@@ -13,6 +13,7 @@ describe("desktop storage validation", () => {
 
   it("merges new findings without overwriting triage", () => {
     const existing = [{
+      id: "WCG-F-20260722-00000-00000-00000-00000-000005",
       key: "cap-1:1",
       title: "Existing",
       wcag: "1.4.3",
@@ -42,6 +43,61 @@ describe("desktop storage validation", () => {
       expect(await store.get("findings-aud-a1234567", [])).toHaveLength(1);
       expect(await store.get("findings-aud-b1234567", [])).toHaveLength(1);
       expect(await store.get("findings", [])).toHaveLength(0);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("never reuses an identity for a different finding key", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "thewcag-identities-"));
+    try {
+      const store = new JsonStore(directory);
+      const id = "WCG-F-20260722-00000-00000-00000-00000-000007";
+      await store.set("findings-aud-first111", [{
+        id,
+        key: "finding-one",
+        title: "First",
+        wcag: "1.1.1",
+        severity: "major",
+        status: "open",
+        note: "",
+        createdAt: 1_800_000_000_000,
+      } satisfies import("../../src/shared/desktop").Finding]);
+      await store.remove("findings-aud-first111");
+      await store.set("findings-aud-second22", [{
+        id,
+        key: "finding-two",
+        title: "Second",
+        wcag: "1.1.1",
+        severity: "major",
+        status: "open",
+        note: "",
+        createdAt: 1_800_000_000_000,
+      } satisfies import("../../src/shared/desktop").Finding]);
+
+      const [second] = await store.get<import("../../src/shared/desktop").Finding[]>(
+        "findings-aud-second22",
+        [],
+      );
+      expect(second.id).not.toBe(id);
+      expect(second.id).toMatch(/^WCG-F-20270115-/);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("fails closed instead of resetting a damaged identity ledger", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "thewcag-ledger-"));
+    try {
+      const store = new JsonStore(directory);
+      await store.initialize();
+      await store.set("finding-identities", {
+        version: 1,
+        identities: { "not-a-finding-id": "finding-one" },
+      });
+      await expect(
+        store.addFindings([{ key: "finding-two", title: "Second" }], "aud-ledger123"),
+      ).rejects.toThrow(/identity ledger/i);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

@@ -14,6 +14,7 @@ import {
   type WcagMappingV1,
 } from "./types";
 import { WCAG_BY_ID } from "./wcag";
+import { createFindingId, isFindingId } from "./finding-id";
 
 const DATA_URL_MAX = 8 * 1024 * 1024;
 const PACKET_JSON_MAX = 12 * 1024 * 1024;
@@ -172,6 +173,14 @@ export function parseEvidencePacket(value: unknown): EvidencePacketV1 {
   const auditId = item.auditId === undefined ? undefined : stringAt(item.auditId, "evidence.auditId", 48, 1);
   if (auditId && !AUDIT_ID.test(auditId)) throw new ContractValidationError("invalid audit ID", "evidence.auditId");
 
+  const capturedAt = numberAt(item.capturedAt, "evidence.capturedAt", 1_500_000_000_000, 4_500_000_000_000);
+  const findingId = item.findingId === undefined
+    ? createFindingId(capturedAt)
+    : stringAt(item.findingId, "evidence.findingId", 64, 1);
+  if (!isFindingId(findingId)) {
+    throw new ContractValidationError("invalid finding ID", "evidence.findingId");
+  }
+
   return {
     schemaVersion: EVIDENCE_SCHEMA_VERSION,
     id: (() => {
@@ -179,8 +188,9 @@ export function parseEvidencePacket(value: unknown): EvidencePacketV1 {
       if (!UUID.test(id)) throw new ContractValidationError("invalid UUID", "evidence.id");
       return id;
     })(),
+    findingId,
     auditId,
-    capturedAt: numberAt(item.capturedAt, "evidence.capturedAt", 1_500_000_000_000, 4_500_000_000_000),
+    capturedAt,
     captureMode,
     observation: stringAt(item.observation, "evidence.observation", 2_000),
     taskContext: stringAt(item.taskContext, "evidence.taskContext", 1_000),

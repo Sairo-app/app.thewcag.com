@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  createFindingId,
   NATIVE_PROTOCOL_VERSION,
   parseNativeRequest,
   type AiFindingDraftV1,
@@ -57,6 +58,7 @@ export function findingFromDraft(
 ): Finding {
   const now = Date.now();
   return {
+    id: evidence.findingId || createFindingId(now),
     key: evidence.id,
     title: draft.title,
     wcag: draft.wcag.map((mapping) => mapping.criterion).join(", "),

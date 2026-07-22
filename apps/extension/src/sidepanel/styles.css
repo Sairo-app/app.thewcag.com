@@ -311,6 +311,11 @@ fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 .draft-source strong { font-size: 11px; }
 .draft-source span { color: var(--muted); font-size: 10px; }
 .draft-source-ai { border-color: #d8a57d; background: #fffaf1; }
+.finding-identity { width: 100%; min-width: 0; padding: 9px 10px; display: grid; grid-template-columns: 1fr auto; gap: 3px 8px; align-items: center; text-align: left; border: 1px solid var(--line); border-radius: 9px; color: inherit; background: var(--surface); }
+.finding-identity:hover { border-color: #c98755; background: #fffaf1; }
+.finding-identity span { color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.finding-identity code { min-width: 0; overflow: hidden; font: 10px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.finding-identity svg { grid-column: 2; grid-row: 1 / span 2; color: var(--orange); }
 
 .affected-users { margin-top: 20px; }
 .affected-users > div { display: flex; flex-wrap: wrap; gap: 6px; }

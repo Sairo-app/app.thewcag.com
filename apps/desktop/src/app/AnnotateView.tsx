@@ -9,6 +9,10 @@ import {
 } from "react";
 import { contrastRatio, rgbToHex } from "@accessibility-build/a11y-core";
 import {
+  compactFindingId,
+  createFindingId,
+} from "@accessibility-build/audit-contracts";
+import {
   ArrowDownRight,
   ArrowLeft,
   ArrowUUpLeft,
@@ -301,6 +305,7 @@ export function AnnotateView() {
       return;
     }
     if (tool === "badge") {
+      const createdAt = Date.now();
       addShape({
         kind: "badge",
         x1: p.x,
@@ -311,6 +316,7 @@ export function AnnotateView() {
         severity: "major",
         issueType: "contrast",
         note: ISSUE_TYPES[0].template,
+        findingId: createFindingId(createdAt),
       });
       return;
     }
@@ -545,6 +551,7 @@ export function AnnotateView() {
         ISSUE_TYPES.find((item) => item.id === shape.issueType) ||
         ISSUE_TYPES.at(-1)!;
       return {
+        id: shape.findingId || createFindingId(),
         key: `${id}-${shape.id}`,
         title: shape.note?.split(".")[0] || `${issue.label} issue ${index + 1}`,
         wcag: issue.sc || "Needs review",
@@ -555,17 +562,38 @@ export function AnnotateView() {
         createdAt: Date.now(),
       };
     });
-    await desktop.invoke("store:add-findings", {
+    const saved = await desktop.invoke<Finding[]>("store:add-findings", {
       items,
       auditId: capture?.auditId,
     });
+    const identities = new Map(saved.map((finding) => [finding.key, finding.id]));
+    const nextDocument: AnnotationDoc = {
+      ...doc,
+      shapes: doc.shapes.map((shape) => {
+        if (shape.kind !== "badge") return shape;
+        const findingId = identities.get(`${id}-${shape.id}`);
+        return findingId && findingId !== shape.findingId
+          ? { ...shape, findingId }
+          : shape;
+      }),
+    };
+    if (nextDocument.shapes.some((shape, index) => shape !== doc.shapes[index])) {
+      setDoc(nextDocument);
+      await desktop.invoke("capture:save-document", {
+        id,
+        json: JSON.stringify(nextDocument),
+      });
+    }
     show(
       `${items.length} finding${items.length === 1 ? "" : "s"} added to the audit`,
     );
   }
   async function reviewReport() {
     await save(false);
-    await desktop.invoke("workspace:navigate", { tool: "share" });
+    await desktop.invoke("workspace:navigate", {
+      tool: capture?.auditId ? "share" : "screenshot",
+      captureId: capture?.auditId ? undefined : id,
+    });
   }
 
   const selectedShape = useMemo(
@@ -737,6 +765,29 @@ export function AnnotateView() {
               </div>
               {selectedShape.kind === "badge" ? (
                 <>
+                  <div className="finding-identity-card">
+                    <span>Finding ID</span>
+                    <code title={selectedShape.findingId}>
+                      {selectedShape.findingId
+                        ? compactFindingId(selectedShape.findingId)
+                        : "Allocating identity"}
+                    </code>
+                    <button
+                      type="button"
+                      aria-label="Copy finding ID"
+                      disabled={!selectedShape.findingId}
+                      onClick={() => {
+                        if (selectedShape.findingId) {
+                          void desktop.invoke("clipboard:write-text", {
+                            text: selectedShape.findingId,
+                          });
+                          show("Finding ID copied");
+                        }
+                      }}
+                    >
+                      <Clipboard size={15} />
+                    </button>
+                  </div>
                   <Field label="Issue type">
                     <select
                       value={selectedShape.issueType || "other"}
@@ -862,8 +913,9 @@ export function AnnotateView() {
                 </div>
               </dl>
               <p>
-                Select an annotation to edit its details. Issue badges become
-                structured audit findings.
+                {capture?.auditId
+                  ? "Select an annotation to edit its details. Issue badges become structured audit findings."
+                  : "Select an annotation to edit its details. Issue badges and notes are included when you share this screenshot."}
               </p>
               {doc.shapes.length ? (
                 <div
@@ -891,15 +943,21 @@ export function AnnotateView() {
             </div>
           )}
           <div className="inspector-footer">
+            {capture?.auditId ? (
+              <Button
+                variant="primary"
+                disabled={!doc.shapes.some((shape) => shape.kind === "badge")}
+                onClick={() => void addFindings()}
+              >
+                Add issues to audit
+              </Button>
+            ) : null}
             <Button
-              variant="primary"
-              disabled={!doc.shapes.some((shape) => shape.kind === "badge")}
-              onClick={() => void addFindings()}
+              variant={capture?.auditId ? "secondary" : "primary"}
+              icon={ShareNetwork}
+              onClick={() => void reviewReport()}
             >
-              Add issues to audit
-            </Button>
-            <Button icon={ShareNetwork} onClick={() => void reviewReport()}>
-              Review report
+              {capture?.auditId ? "Review report" : "Share screenshot"}
             </Button>
           </div>
         </aside>

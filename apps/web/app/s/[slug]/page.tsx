@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { reports, users, type ReportIssue } from "@/lib/schema";
+import { compactFindingId } from "@accessibility-build/audit-contracts";
 import { SITE_URL } from "@/lib/reports";
 import { publicImageUrl } from "@/lib/r2";
 import { auth } from "@/auth";
@@ -54,7 +55,9 @@ export async function generateMetadata({
   const count = shot.issues.length;
   const description =
     shot.description ||
-    `${count} accessibility ${count === 1 ? "issue" : "issues"} annotated in the TheWCAG desktop app.`;
+    (count
+      ? `${count} accessibility ${count === 1 ? "issue" : "issues"} annotated in the TheWCAG desktop app.`
+      : "An annotated screenshot shared from the TheWCAG desktop app.");
   return {
     title: shot.title,
     description,
@@ -133,7 +136,7 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
             </Link>
           )}
           <span className="shrink-0 text-[10px] font-medium uppercase tracking-wider text-muted">
-            Accessibility report
+            {shot.issues.length ? "Accessibility report" : "Shared screenshot"}
           </span>
         </div>
       </header>
@@ -159,7 +162,9 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
                 <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
                   <span className="inline-flex items-center gap-1">
                     <FlagIcon size={13} />
-                    {issues.length} {issues.length === 1 ? "issue" : "issues"}
+                    {issues.length
+                      ? `${issues.length} ${issues.length === 1 ? "issue" : "issues"}`
+                      : "Standalone screenshot"}
                   </span>
                   <span className="inline-flex items-center gap-1">
                     <CalendarIcon size={13} />
@@ -196,7 +201,7 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
                 aria-label="Findings"
               >
                 {issues.map((issue) => (
-                  <li key={issue.n} className="report-finding flex gap-3 rounded-lg border border-border bg-card p-3">
+                  <li key={issue.id || issue.n} className="report-finding flex gap-3 rounded-lg border border-border bg-card p-3">
                     <span
                       className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-xs font-bold text-white"
                       style={{ backgroundColor: SEVERITY_COLOR[issue.severity] ?? SEVERITY_COLOR.major }}
@@ -205,6 +210,14 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
                       {issue.n}
                     </span>
                     <div className="min-w-0">
+                      {issue.id && (
+                        <code
+                          className="mb-1 block break-all font-mono text-[10px] text-muted"
+                          title={issue.id}
+                        >
+                          {compactFindingId(issue.id)}
+                        </code>
+                      )}
                       <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
                         {issue.sc && (
                           <span className="rounded border border-border px-1.5 py-0.5 font-mono text-[11px] text-muted">
@@ -235,7 +248,7 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
                 href="/download"
                 className="report-cta mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
               >
-                Audit with TheWCAG
+                Capture and share with TheWCAG
                 <ArrowRightIcon size={16} />
               </Link>
             )}

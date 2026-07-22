@@ -74,6 +74,7 @@ export const desktopDevices = pgTable(
 
 // ---- Shared reports (image blob lives in R2; metadata here) ----
 export interface ReportIssue {
+  id: string;
   n: number;
   sc?: string;
   label: string;
@@ -98,6 +99,13 @@ export const reports = pgTable(
   },
   (t) => ({ userIdx: index("report_user_idx").on(t.userId) }),
 );
+
+// Append-only global registry. Report deletion never releases a finding ID.
+// The ID itself carries no customer or finding content.
+export const findingIdentities = pgTable("finding_identity", {
+  id: text("id").primaryKey(),
+  firstSeenAt: timestamp("first_seen_at").defaultNow().notNull(),
+});
 
 // AI usage metadata deliberately excludes evidence, screenshots, prompts, and
 // generated finding content. It exists only for abuse protection, quota

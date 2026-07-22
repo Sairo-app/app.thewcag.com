@@ -145,13 +145,13 @@ export function registerIpc(services: Services): void {
     const request = asObject(payload);
     const mode = modeOf(request.mode);
     const auditId = typeof request.auditId === "string" ? stringField(request, "auditId", 48) : undefined;
-    return services.captureCoordinator.begin(mode, auditId);
+    return services.captureCoordinator.begin(mode, auditId, request.standalone === true);
   });
 
   register("capture:fullscreen", (_event, payload) => {
     const value = payload ? asObject(payload) : {};
     const auditId = typeof value.auditId === "string" ? stringField(value, "auditId", 48) : undefined;
-    return services.captureCoordinator.fullscreen(auditId);
+    return services.captureCoordinator.fullscreen(auditId, value.standalone === true);
   });
 
   register("capture:create", async (_event, payload) => {
@@ -168,7 +168,10 @@ export function registerIpc(services: Services): void {
 
   register("capture:list", (_event, payload) => {
     const value = payload ? asObject(payload) : {};
-    return services.captures.list(typeof value.auditId === "string" ? stringField(value, "auditId", 48) : undefined);
+    return services.captures.list(
+      typeof value.auditId === "string" ? stringField(value, "auditId", 48) : undefined,
+      value.unscoped === true,
+    );
   });
   register("capture:open", (_event, payload) => {
     const id = stringField(asObject(payload), "id", 100);
@@ -182,7 +185,10 @@ export function registerIpc(services: Services): void {
   });
   register("capture:save-document", async (_event, payload) => {
     const value = asObject(payload);
-    await services.captures.saveDocument(stringField(value, "id", 100), stringField(value, "json", 8 * 1024 * 1024));
+    const id = stringField(value, "id", 100);
+    await services.captures.saveDocument(id, stringField(value, "json", 8 * 1024 * 1024));
+    const entry = await services.captures.describe(id);
+    if (entry) services.windows.sendToMain("capture:saved", entry);
   });
   register("capture:save-thumbnail", async (_event, payload) => {
     const value = asObject(payload);
@@ -234,10 +240,16 @@ export function registerIpc(services: Services): void {
   });
   register("audit:activate", (_event, payload) => services.captureCoordinator.activateAudit(stringField(asObject(payload), "auditId", 48)));
   register("workspace:navigate", (event, payload) => {
-    const tool = stringField(asObject(payload), "tool", 24);
-    const allowed: WorkspaceTool[] = ["plan", "inspect", "evidence", "review", "share", "vision", "palette", "settings", "capture", "checklist"];
+    const value = asObject(payload);
+    const tool = stringField(value, "tool", 24);
+    const allowed: WorkspaceTool[] = ["plan", "inspect", "evidence", "review", "share", "screenshot", "vision", "palette", "settings", "capture", "checklist"];
     if (!allowed.includes(tool as WorkspaceTool)) throw new Error("Unsupported workspace destination");
     services.windows.navigate(tool as WorkspaceTool);
+    if (tool === "screenshot" && typeof value.captureId === "string") {
+      services.windows.sendToMain("screenshot:share", {
+        captureId: stringField(value, "captureId", 100),
+      });
+    }
     if (viewFromUrl(event.sender.getURL()) !== "main") currentWindow(event).close();
   });
 

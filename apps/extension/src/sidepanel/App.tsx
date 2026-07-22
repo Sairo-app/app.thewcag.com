@@ -21,6 +21,7 @@ import {
 import {
   parseAiFindingDraft,
   parseEvidencePacket,
+  compactFindingId,
   type AffectedUser,
   type AiFindingDraftV1,
   type AuditSummaryV1,
@@ -538,6 +539,20 @@ export function App({ surface }: { surface: ExtensionSurface }) {
               <Sparkle size={18} weight="fill" />
               <div><strong>{draft.provenance.source === "ai" ? "AI-assisted draft" : "Local structured draft"}</strong><span>Suggested until you save it</span></div>
             </div>
+
+            <button
+              type="button"
+              className="finding-identity"
+              title={evidence.findingId}
+              onClick={() => {
+                void navigator.clipboard.writeText(evidence.findingId);
+                setStatus({ text: "Finding ID copied.", tone: "success" });
+              }}
+            >
+              <span>Immutable finding ID</span>
+              <code>{compactFindingId(evidence.findingId)}</code>
+              <Copy size={14} />
+            </button>
 
             <Field label="Issue title" value={draft.title} onChange={(title) => patchDraft({ title })} />
             <Field label="Issue description" value={draft.description} onChange={(description) => patchDraft({ description })} multiline />

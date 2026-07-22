@@ -17,6 +17,7 @@ describe("complete audit export", () => {
       auditor: "Audit team",
     };
     const finding: Finding = {
+      id: "WCG-F-20260722-00000-00000-00000-00000-000006",
       key: "finding-1",
       reference: "F-014",
       title: "Button has no accessible name",
@@ -55,6 +56,7 @@ describe("complete audit export", () => {
     expect(output).toContain("ready for retest");
     expect(output).toContain("Payment dialog");
     expect(output).toContain("F-014");
+    expect(output).toContain(finding.id);
     expect(output).toContain("Duplicated from: F-003");
     expect(output).toContain("Saved payment dialog");
     expect(output).toContain("release candidate exposes the control name");

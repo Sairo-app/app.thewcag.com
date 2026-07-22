@@ -12,6 +12,7 @@ function evidence(): EvidencePacketV1 {
   return {
     schemaVersion: EVIDENCE_SCHEMA_VERSION,
     id: "3c977290-cb66-4bbd-a68b-72b770828b39",
+    findingId: "WCG-F-20260722-00000-00000-00000-00000-000003",
     auditId: "aud-checkout1",
     capturedAt: 1_800_000_000_000,
     captureMode: "element",
@@ -83,6 +84,7 @@ describe("native extension protocol", () => {
   it("preserves structured fields when converting a draft", () => {
     const finding = findingFromDraft(evidence(), draft());
     expect(finding.schemaVersion).toBe(2);
+    expect(finding.id).toBe(evidence().findingId);
     expect(finding.actualResult).toMatch(/screen reader/i);
     expect(finding.wcagMappings?.[0].criterion).toBe("4.1.2");
   });

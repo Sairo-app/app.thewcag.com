@@ -76,7 +76,8 @@ export class CaptureRepository {
     };
   }
 
-  async list(auditId?: string): Promise<CaptureEntry[]> {
+  async list(auditId?: string, unscopedOnly = false): Promise<CaptureEntry[]> {
+    if (auditId && unscopedOnly) throw new Error("Choose either an audit or standalone captures");
     if (auditId) assertAuditId(auditId);
     await this.initialize();
     const names = await readdir(this.directory);
@@ -86,7 +87,7 @@ export class CaptureRepository {
       .filter((id) => CAPTURE_ID.test(id));
     const entries = await Promise.all(ids.map((id) => this.describe(id)));
     return entries.filter((entry): entry is CaptureEntry => Boolean(entry))
-      .filter((entry) => !auditId || entry.auditId === auditId)
+      .filter((entry) => unscopedOnly ? !entry.auditId : !auditId || entry.auditId === auditId)
       .sort((a, b) => b.modifiedAt - a.modifiedAt)
       .slice(0, 100);
   }

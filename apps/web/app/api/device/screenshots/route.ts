@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { reports } from "@/lib/schema";
+import { findingIdentities, reports } from "@/lib/schema";
 import { verifyDeviceToken } from "@/lib/device-auth";
 import { decodePngBase64, generateSlug, isUniqueViolation, sanitizeReportIssues, SITE_URL } from "@/lib/reports";
 import { deleteImage, putImage } from "@/lib/r2";
@@ -73,6 +73,12 @@ export async function POST(req: NextRequest) {
         const currentUsed = Number(row?.total ?? 0);
         if (currentUsed + decoded.buffer.length > STORAGE_QUOTA_BYTES) {
           throw new StorageQuotaError(currentUsed);
+        }
+        if (issues.length) {
+          await tx
+            .insert(findingIdentities)
+            .values(issues.map((issue) => ({ id: issue.id })))
+            .onConflictDoNothing();
         }
         await tx.insert(reports).values({
           slug,

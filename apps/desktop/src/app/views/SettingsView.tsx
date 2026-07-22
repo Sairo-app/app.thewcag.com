@@ -579,7 +579,7 @@ export function SettingsView({
                 key === "inspect"
                   ? "Inspect contrast"
                   : key === "capture"
-                    ? "Capture region"
+                    ? "Standalone screenshot"
                     : "Toggle vision lens"
               }
             >

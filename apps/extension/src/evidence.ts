@@ -1,5 +1,7 @@
 import {
   AI_DRAFT_SCHEMA_VERSION,
+  compactFindingId,
+  createFindingId,
   EVIDENCE_SCHEMA_VERSION,
   parseAiFindingDraft,
   parseEvidencePacket,
@@ -494,10 +496,12 @@ export async function createEvidencePacket(
   screenshotDataUrl: string,
 ): Promise<EvidencePacketV1> {
   const image = await createMarkedCrop(screenshotDataUrl, selection);
+  const capturedAt = Date.now();
   return parseEvidencePacket({
     schemaVersion: EVIDENCE_SCHEMA_VERSION,
     id: crypto.randomUUID(),
-    capturedAt: Date.now(),
+    findingId: createFindingId(capturedAt),
+    capturedAt,
     captureMode: selection.target.kind,
     observation: "",
     taskContext: "",
@@ -552,6 +556,7 @@ export function findingMarkdown(evidence: EvidencePacketV1, draft: AiFindingDraf
   return [
     `# ${draft.title}`,
     "",
+    `**Finding ID:** ${evidence.findingId}`,
     `**Severity:** ${draft.severity}`,
     `**WCAG:** ${wcag}`,
     `**Page:** ${evidence.page.url || "Withheld"}`,
