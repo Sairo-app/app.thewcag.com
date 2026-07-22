@@ -231,6 +231,9 @@ export function ShareView({
     const findingsWithoutEvidence = findings.filter(
       (finding) => !findingHasEvidence(finding, availableCaptureIds),
     ).length;
+    const findingsPendingReview = findings.filter(
+      (finding) => finding.reviewState === "pending",
+    ).length;
     const recordReady =
       plan.complete === plan.total &&
       sampleComplete &&
@@ -239,7 +242,8 @@ export function ShareView({
       unlinkedFailures === 0 &&
       undocumentedNA === 0 &&
       incompleteFindings === 0 &&
-      findingsWithoutEvidence === 0;
+      findingsWithoutEvidence === 0 &&
+      findingsPendingReview === 0;
     const conclusionReady =
       audit.executiveSummary.trim() &&
       audit.limitations.trim() &&
@@ -256,6 +260,7 @@ export function ShareView({
       undocumentedNA,
       incompleteFindings,
       findingsWithoutEvidence,
+      findingsPendingReview,
       sampleComplete,
       sampleCount: sampleItems.length,
       testRunsComplete,
@@ -565,6 +570,21 @@ export function ShareView({
                 {delivery.incompleteFindings
                   ? `${delivery.incompleteFindings} included findings need detail`
                   : "Included findings have core audit details"}
+              </small>
+            </span>
+          </div>
+          <div data-ready={delivery.findingsPendingReview === 0}>
+            {delivery.findingsPendingReview === 0 ? (
+              <CheckCircle size={18} weight="fill" />
+            ) : (
+              <WarningCircle size={18} weight="fill" />
+            )}
+            <span>
+              <strong>Auditor review</strong>
+              <small>
+                {delivery.findingsPendingReview
+                  ? `${delivery.findingsPendingReview} browser findings need review`
+                  : "No browser intake is awaiting an auditor decision"}
               </small>
             </span>
           </div>

@@ -3,7 +3,8 @@
 TheWCAG ships one product across three deliberately separated surfaces:
 
 - The Chrome extension owns user-initiated webpage selection, contextual visual
-  and semantic evidence capture, payload review, and draft editing.
+  and semantic evidence capture, the auditor observation, payload review, and
+  optional draft editing.
 - The Electron app owns local screen capture, contrast inspection, annotation,
   audit state, browser-evidence persistence, the native extension bridge, the
   vision lens, native shortcuts, encrypted device and AI-provider credentials,
@@ -26,9 +27,10 @@ with the service over HTTPS only when a connected feature is requested.
    when the application starts.
 3. Chrome permits only the allowlisted extension origin to start that host.
 4. Each request and response uses a versioned, size-bounded JSON contract.
-5. The native host exposes audit summaries, stores approved evidence and
-   confirmed findings, and forwards generation requests without revealing the
-   account bearer token to Chrome.
+5. The native host exposes audit summaries, stores approved evidence in the
+   normal capture repository, queues an unconfirmed finding for desktop review,
+   and forwards generation requests without revealing the account bearer token
+   to Chrome.
 
 If the desktop app is unavailable, the extension still captures evidence and can
 create a local structured draft. Audit persistence and all provider-backed AI
@@ -89,9 +91,13 @@ packet to the desktop native host, which uses the provider selected in Settings:
 All paths use a constrained JSON schema, replace model-supplied WCAG names and
 levels with the versioned local catalog, and validate the complete draft against
 the shared audit contract. Withheld screenshots, element text, and page addresses
-are omitted before the request is built. The editable draft returns through the
-desktop to the extension for human review. Nothing is saved as a finding until the
-  auditor confirms it.
+are omitted before the request is built. The primary extension action stores the
+draft in the desktop as **Needs review**; if provider-backed authoring is
+unavailable, the native host creates a bounded local draft instead. A generated
+mapping, severity, status, or impact never becomes an auditor decision until the
+auditor opens and saves the finding in the desktop review workflow. The optional
+extension-side editor remains available when an auditor deliberately wants to
+confirm the full draft before saving.
 
 ## Subscription and billing
 

@@ -191,6 +191,32 @@ describe("complete audit export", () => {
     );
   });
 
+  it("labels an unreviewed browser intake instead of presenting it as an auditor decision", () => {
+    const finding: Finding = {
+      key: "browser-intake",
+      reference: "F-001",
+      title: "Checkout button needs review",
+      wcag: "4.1.2",
+      severity: "major",
+      status: "open",
+      reviewState: "pending",
+      note: "Captured in the browser extension.",
+      createdAt: 1,
+    };
+    const input = {
+      audit: createAuditProject("Browser intake review"),
+      findings: [finding],
+      captures: [],
+      checklist: {},
+      sampleItems: [],
+      testRuns: [],
+      generatedAt: new Date("2026-07-21T00:00:00.000Z"),
+    };
+
+    expect(buildAuditMarkdown(input)).toContain("Auditor review: Required");
+    expect(buildAuditHtml(input)).toContain("Needs auditor review");
+  });
+
   it("uses sequential headings and scoped table headers in the accessible report", () => {
     const audit = createAuditProject("Accessible report structure");
     const output = buildAuditHtml({

@@ -3,6 +3,7 @@ import {
   AI_DRAFT_SCHEMA_VERSION,
   EVIDENCE_SCHEMA_VERSION,
   NATIVE_PROTOCOL_VERSION,
+  createLocalFindingDraft,
   parseAiFindingDraft,
   parseEvidencePacket,
   parseNativeRequest,
@@ -150,5 +151,36 @@ describe("audit contracts", () => {
       draft: draft(),
     });
     expect(parsed.type).toBe("finding:save");
+  });
+
+  it("parses a bounded browser intake request and strips non-contract fields", () => {
+    const parsed = parseNativeRequest({
+      protocolVersion: NATIVE_PROTOCOL_VERSION,
+      requestId: "e1f6ebf8-8f42-4373-a3d2-3ea5b64f0ac7",
+      type: "finding:queue",
+      auditId: "aud-checkout1",
+      evidence: { ...evidence(), ignoredAuditContent: "must not cross the boundary" },
+      unexpected: "discarded",
+    });
+    expect(parsed).toMatchObject({ type: "finding:queue", auditId: "aud-checkout1" });
+    if (parsed.type === "finding:queue") {
+      expect("unexpected" in parsed).toBe(false);
+      expect("ignoredAuditContent" in parsed.evidence).toBe(false);
+    }
+  });
+
+  it("creates an explicitly unconfirmed local review draft from captured evidence", () => {
+    const packet = evidence();
+    packet.checks[0].id = "interactive-name";
+    const local = createLocalFindingDraft(packet, 1_800_000_000_500);
+    expect(local).toMatchObject({
+      severity: "major",
+      provenance: { source: "local", generatedAt: 1_800_000_000_500 },
+    });
+    expect(local.wcag).toEqual([
+      expect.objectContaining({ criterion: "4.1.2", name: "Name, Role, Value", level: "A" }),
+    ]);
+    expect(local.affectedUsers).toEqual(expect.arrayContaining(["screen-reader", "voice-control"]));
+    expect(local.manualChecks.join(" ")).toMatch(/confirm.*WCAG mapping.*severity/i);
   });
 });

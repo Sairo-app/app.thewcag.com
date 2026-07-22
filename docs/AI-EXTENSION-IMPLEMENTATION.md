@@ -5,8 +5,9 @@
 The Chrome extension shortens the slowest part of an accessibility audit:
 turning an observed barrier into consistent, reviewable evidence. An auditor
 selects an element or visual region, explains the problem in their own words,
-reviews the exact data that may be sent for generation, and receives a
-structured finding draft. The desktop application remains the system of record.
+reviews the exact data that may be sent, and queues a structured finding draft
+with its screenshot and context in desktop. The desktop application remains the
+system of record and the place where the auditor confirms the decision.
 
 This is human-guided finding authoring, not automated conformance
 certification. Deterministic results and captured facts remain distinguishable
@@ -21,8 +22,8 @@ The production foundation is implemented across all three runtimes:
   runtime validation and tests.
 - Chrome quick-capture popup, optional expanded side-panel workspace, on-demand
   isolated picker, element and region selection, marked high-DPI crop,
-  deterministic checks, payload controls, local recovery, complete structured
-  draft editing, and Markdown export.
+  deterministic checks, payload controls, local recovery, one-action desktop
+  review queue, optional structured draft editing, and Markdown export.
 - Electron native-host registration, exact extension-ID allowlisting, audit
   discovery, authenticated generation forwarding, local evidence persistence,
   `FindingV2`, and rich finding/evidence review.
@@ -50,11 +51,14 @@ omission is already available before generation.
 8. Review the evidence payload, omit any sensitive section, and explicitly
    approve AI processing. Interactive screenshot redaction follows during
    release hardening.
-9. Generate a schema-constrained draft with title, description, actual result,
+9. Send the approved packet to desktop. Generate a schema-constrained draft with title, description, actual result,
    expected result, impact, affected users, severity, WCAG mapping,
-   recommendation, example fix, reproduction steps, and confidence.
-10. Review or edit each field. Low-confidence fields stay visibly unresolved.
-11. Confirm and save the evidence plus finding into the selected local audit.
+   recommendation, example fix, reproduction steps, and confidence. Fall back to
+   the local deterministic draft if the selected provider is unavailable.
+10. Save the screenshot in the normal capture repository, attach it to the
+    finding, and mark the finding **Needs review**.
+11. Review or edit each field in desktop. Low-confidence fields stay visibly
+    unresolved until the auditor saves the finding as reviewed.
 
 If the desktop application is unavailable, the extension still supports local
 capture and PNG or Markdown export. AI generation and audit persistence require
@@ -74,7 +78,7 @@ flowchart LR
     API --> Model[Configurable model provider]
     Model --> API
     API --> Host
-    Host --> Review[Extension review]
+    Host --> Review[Desktop Needs review queue]
     Review --> Local
 ```
 

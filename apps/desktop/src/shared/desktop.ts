@@ -299,6 +299,8 @@ export interface Finding {
   wcag: string;
   severity: "blocker" | "major" | "minor";
   status: "open" | "retest" | "fixed" | "accepted";
+  /** Extension and automated intakes remain pending until an auditor opens and saves them. */
+  reviewState?: "pending" | "reviewed";
   note: string;
   location?: string;
   owner?: string;

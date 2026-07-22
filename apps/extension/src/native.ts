@@ -81,3 +81,20 @@ export async function saveDesktopFinding(
   if (!response.ok || response.type !== "finding:saved") throw new Error(response.ok ? "TheWCAG desktop returned an unexpected response." : response.message);
   return response.findingKey;
 }
+
+export async function queueDesktopFinding(
+  auditId: string,
+  evidence: EvidencePacketV1,
+): Promise<{ findingKey: string; draftSource: "local" | "ai" }> {
+  const response = await sendNative({
+    protocolVersion: NATIVE_PROTOCOL_VERSION,
+    requestId: crypto.randomUUID(),
+    type: "finding:queue",
+    auditId,
+    evidence,
+  });
+  if (!response.ok || response.type !== "finding:queued") {
+    throw new Error(response.ok ? "TheWCAG desktop returned an unexpected response." : response.message);
+  }
+  return { findingKey: response.findingKey, draftSource: response.draftSource };
+}

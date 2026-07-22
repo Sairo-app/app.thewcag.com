@@ -2,7 +2,12 @@ import { createEvidencePacket } from "./evidence";
 import { isProtectedBrowserPage, pageAccessMessage } from "./page-access";
 import { runIssuePicker } from "./picker";
 import { isExtensionRequest, type ExtensionResponse } from "./shared/messages";
-import { CAPTURE_TAB_STORAGE_KEY, DRAFT_STORAGE_KEY, EVIDENCE_STORAGE_KEY } from "./shared/storage";
+import {
+  CAPTURE_TAB_STORAGE_KEY,
+  DRAFT_STORAGE_KEY,
+  EVIDENCE_STORAGE_KEY,
+  QUEUED_FINDING_STORAGE_KEY,
+} from "./shared/storage";
 
 void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => undefined);
 
@@ -119,7 +124,7 @@ async function capture(mode: "element" | "region"): Promise<ExtensionResponse> {
       [EVIDENCE_STORAGE_KEY]: evidence,
       [CAPTURE_TAB_STORAGE_KEY]: tab.id,
     });
-    await chrome.storage.local.remove(DRAFT_STORAGE_KEY);
+    await chrome.storage.local.remove([DRAFT_STORAGE_KEY, QUEUED_FINDING_STORAGE_KEY]);
     await markAction(tab.id, "1", "#d9480f");
     await notifyPage(tab.id, "success", "Open TheWCAG from the toolbar to review the marked capture.");
     return { ok: true, evidence };

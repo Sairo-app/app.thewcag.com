@@ -46,24 +46,24 @@ Checklist decision keys are configured separately in Settings. Their defaults ar
 
 ### Chrome evidence extension
 
-The Manifest V3 extension turns a browser observation into structured audit evidence without claiming automated conformance. The toolbar opens a compact popup for quick capture. The optional side panel is a separate, expanded workspace for reviewing evidence, controlling the approved payload, editing a generated draft, and saving the confirmed result.
+The Manifest V3 extension turns a browser observation into a reviewable desktop issue without claiming automated conformance. The toolbar opens a compact popup for quick capture. The optional side panel lets the auditor describe the issue, inspect and control the evidence payload, and send it to the selected desktop audit as **Needs review**. Full draft editing remains available as an optional extension-side path.
 
 The capture flow is:
 
 1. Open the toolbar popup on the page being audited.
-2. Choose **Select element** for one control, image, or text target, or **Select region** for a barrier spanning multiple elements.
+2. Choose **Component** for one control, image, or text target, or **Region** for a barrier spanning multiple elements.
 3. Mark the target on the webpage. The service worker creates a contextual screenshot with the selected control or region highlighted and stores the evidence even after Chrome closes the popup.
-4. Reopen the popup when the toolbar badge shows `1`, then choose **Review in workspace**.
+4. Reopen the popup when the toolbar badge shows `1`, then choose **Add issue details**.
 5. Inspect the contextual marked screenshot, selector, semantic context, deterministic signals, and the complete bounded payload.
 6. Describe the observed behavior and optional task context. Choose whether the screenshot, element text, and sanitized page address may be included.
-7. Create a local structured draft or, when the paired desktop app is connected, generate an AI-assisted draft with TheWCAG, OpenAI, Claude, or OpenRouter.
-8. Confirm the title, description, actual and expected results, user impact, affected users, severity, WCAG mappings, recommendation, example fix, and reproduction steps before saving into an audit.
+7. Choose **Send to desktop review**. The native host stores the screenshot in the normal capture repository, links it to a bounded finding draft, and logs the record as **Needs review**.
+8. Open **Findings** in the desktop app and confirm the title, actual and expected results, user impact, affected users, severity, WCAG mappings, recommendation, and reproduction steps. No external or generated value silently becomes an auditor decision.
 
 | Mode | Available behavior |
 |---|---|
 | Extension only | Element and region capture, marked high-DPI crop, deterministic checks, local persistence, local structured draft, Markdown export, and copy |
-| Extension plus desktop | Lists local audits, saves confirmed findings and evidence into the selected audit, and keeps the device credential outside Chrome |
-| Extension plus desktop and configured AI | Sends only the user-approved payload through the selected provider and returns a schema-validated, editable finding draft |
+| Extension plus desktop | Lists local audits, stores approved screenshots and context, queues findings for review, and keeps the device credential outside Chrome |
+| Extension plus desktop and configured AI | Sends only the user-approved payload through the selected provider and stores its schema-validated draft as unconfirmed; a local deterministic draft is used when no provider is configured |
 
 The extension requests temporary `activeTab` access only after a toolbar action. It does not request permanent access to every website. Regular `http` and `https` pages, including localhost, are supported. Chrome-owned pages such as `chrome://settings`, DevTools, the Chrome Web Store, and other protected browser surfaces cannot be inspected by extensions.
 
@@ -121,7 +121,7 @@ Native services live in `apps/desktop/electron/`; the renderer sees only the all
 
 - Desktop captures are stored in the OS application-data directory as a raw PNG, an editable JSON annotation document, and an annotated thumbnail.
 - Audit context, findings, checklist results, palettes, activity, and report history are isolated per audit in local JSON files.
-- Browser evidence is sanitized and retained locally until the auditor explicitly approves generation. The extension can omit its screenshot, element text, or sanitized page address from the approved payload.
+- Browser evidence is sanitized and retained locally until the auditor explicitly approves sending it to desktop review or optional generation. The extension can omit its screenshot, element text, or sanitized page address from the approved payload.
 - Form values and passwords are not extracted as semantic fields. The selected screenshot may still contain visible page content, which is why users can inspect and omit it before generation. Cookies, browser storage, authentication headers, network bodies, clipboard contents, browser history, executable page code, URL credentials, query parameters, and fragments are not collected.
 - The desktop device token is stored in macOS Keychain or Windows Credential Manager. Only its SHA-256 hash is stored in Postgres.
 - User-supplied OpenAI, Anthropic, and OpenRouter keys are encrypted by the operating system credential service. Keys remain in the Electron main process, are never returned to the renderer or extension, and are sent only to their selected provider.

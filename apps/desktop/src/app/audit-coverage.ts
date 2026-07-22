@@ -31,6 +31,7 @@ export interface AuditCoverageRow {
   findings: Finding[];
   findingsWithEvidence: number;
   findingsWithoutEvidence: number;
+  findingsPendingReview: number;
   criteria: string[];
   state: AuditCoverageState;
   gap: string;
@@ -72,9 +73,16 @@ function coverageState(
   runs: AuditTestRun[],
   traceCount: number,
   findingsWithoutEvidence: number,
+  findingsPendingReview: number,
 ): Pick<AuditCoverageRow, "state" | "gap"> {
   if (sample.status === "blocked" || runs.some((run) => run.status === "blocked")) {
     return { state: "blocked", gap: sample.notes.trim() || "Testing is blocked." };
+  }
+  if (findingsPendingReview) {
+    return {
+      state: "gap",
+      gap: `${findingsPendingReview} browser finding${findingsPendingReview === 1 ? " needs" : "s need"} auditor review.`,
+    };
   }
   if (sample.status === "complete") {
     if (runs.some((run) => !auditTestRunComplete(run))) {
@@ -125,6 +133,9 @@ export function buildAuditCoverage(input: {
       findingHasEvidence(finding, availableCaptureIds),
     ).length;
     const findingsWithoutEvidence = findings.length - findingsWithEvidence;
+    const findingsPendingReview = findings.filter(
+      (finding) => finding.reviewState === "pending",
+    ).length;
     const findingKeys = new Set(findings.map((finding) => finding.key));
     const criteria = new Set(findings.flatMap(criteriaForFinding));
     Object.entries(input.checklist).forEach(([criterion, entry]) => {
@@ -137,7 +148,13 @@ export function buildAuditCoverage(input: {
       }
     });
     const traceCount = testRuns.length + captures.length + findings.length + criteria.size;
-    const state = coverageState(sample, testRuns, traceCount, findingsWithoutEvidence);
+    const state = coverageState(
+      sample,
+      testRuns,
+      traceCount,
+      findingsWithoutEvidence,
+      findingsPendingReview,
+    );
     return {
       sample,
       testRuns,
@@ -145,6 +162,7 @@ export function buildAuditCoverage(input: {
       findings,
       findingsWithEvidence,
       findingsWithoutEvidence,
+      findingsPendingReview,
       criteria: [...criteria].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
       ...state,
     };

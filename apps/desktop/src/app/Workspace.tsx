@@ -105,14 +105,19 @@ const STAGES: {
   { id: "share", label: "Deliver", number: "04", icon: FileText },
 ];
 
-const CAPTURE_LIBRARY = { id: "evidence" as const, label: "Findings & captures", icon: SquaresFour };
+const CAPTURE_LIBRARY = {
+  id: "evidence" as const,
+  label: "Findings",
+  title: "Findings and capture library",
+  icon: SquaresFour,
+};
 
-const UTILITIES: { id: WorkspaceUtility; label: string; icon: IconType }[] = [
-  { id: "program", label: "Program", icon: ChartBarHorizontal },
-  { id: "captures", label: "Standalone captures", icon: Camera },
-  { id: "vision", label: "Vision lens", icon: Aperture },
-  { id: "palette", label: "Palette", icon: Palette },
-  { id: "settings", label: "Settings", icon: GearSix },
+const UTILITIES: { id: WorkspaceUtility; label: string; title: string; icon: IconType }[] = [
+  { id: "program", label: "Program", title: "Program dashboard", icon: ChartBarHorizontal },
+  { id: "captures", label: "Captures", title: "Standalone capture library", icon: Camera },
+  { id: "vision", label: "Vision", title: "Vision lens", icon: Aperture },
+  { id: "palette", label: "Palette", title: "Color palette", icon: Palette },
+  { id: "settings", label: "Settings", title: "Settings", icon: GearSix },
 ];
 
 const TITLES: Record<Route, { title: string; description: string }> = {
@@ -221,6 +226,7 @@ function FirstRunExperience({
   onCreateBlank,
   onImport,
   onOpenCaptureLibrary,
+  onOpenExtensionGuide,
   onStartSample,
 }: {
   busy: boolean;
@@ -228,6 +234,7 @@ function FirstRunExperience({
   onCreateBlank: () => void;
   onImport: () => void;
   onOpenCaptureLibrary: () => void;
+  onOpenExtensionGuide: () => void;
   onStartSample: () => void;
 }) {
   return (
@@ -264,6 +271,9 @@ function FirstRunExperience({
             </button>
             <button type="button" className="text-action" disabled={busy} onClick={onOpenCaptureLibrary}>
               Open screenshot-only capture library
+            </button>
+            <button type="button" className="text-action" disabled={busy} onClick={onOpenExtensionGuide}>
+              Capture a website issue with the extension
             </button>
           </div>
           {message ? <p className="first-run-message" role="status">{message}</p> : null}
@@ -381,9 +391,9 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
   const auditWorkspace = useAuditWorkspace();
   const navigationSize = usePersistedPanelSize(
     "layout-navigation-width-v1",
-    176,
-    152,
-    240,
+    160,
+    144,
+    220,
   );
   const inspectorSize = usePersistedPanelSize(
     "layout-audit-inspector-width-v1",
@@ -947,6 +957,9 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
           );
         }}
         onOpenCaptureLibrary={() => setStandaloneCaptureLibrary(true)}
+        onOpenExtensionGuide={() => void desktop.invoke("shell:open-external", {
+          url: "https://app.thewcag.com/getting-started#browser-extension",
+        })}
         onStartSample={() => void startGuidedSample()}
       />
     );
@@ -1106,7 +1119,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
         >
           <img src="./logo.png" alt="TheWCAG" draggable={false} />
         </button>
-        <div className="rail-audit-label">Audit workflow</div>
+        <div className="rail-audit-label">Audit</div>
         <nav>
           {STAGES.map(({ id, label, number, icon: Icon }) => (
             <button
@@ -1127,7 +1140,8 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
             className="stage-link optional-records-link"
             data-active={active === CAPTURE_LIBRARY.id}
             aria-current={active === CAPTURE_LIBRARY.id ? "page" : undefined}
-            title="Optional findings and capture library"
+            aria-label={CAPTURE_LIBRARY.title}
+            title={CAPTURE_LIBRARY.title}
             onClick={() => navigate(CAPTURE_LIBRARY.id)}
           >
             <span className="stage-number">—</span>
@@ -1138,13 +1152,14 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
         </nav>
         <div className="rail-utilities">
           <span>Utilities</span>
-          {UTILITIES.map(({ id, label, icon: Icon }) => (
+          {UTILITIES.map(({ id, label, title, icon: Icon }) => (
             <button
               key={id}
               className="utility-link"
               data-active={active === id}
               aria-current={active === id ? "page" : undefined}
-              title={label}
+              aria-label={title}
+              title={title}
               onClick={() => navigate(id)}
             >
               <Icon size={18} weight={active === id ? "duotone" : "regular"} />
@@ -1158,9 +1173,9 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
         label="Resize audit navigation"
         side="right"
         size={navigationSize.size}
-        min={152}
-        max={240}
-        initial={176}
+        min={144}
+        max={220}
+        initial={160}
         onSize={navigationSize.setSize}
         onCommit={navigationSize.commit}
       />

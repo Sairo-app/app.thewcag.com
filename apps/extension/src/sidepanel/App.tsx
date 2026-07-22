@@ -42,6 +42,7 @@ import {
   hasDesktopPermission,
   listDesktopAudits,
   pingDesktop,
+  queueDesktopFinding,
   requestDesktopPermission,
   saveDesktopFinding,
 } from "../native";
@@ -51,6 +52,7 @@ import {
   CAPTURE_TAB_STORAGE_KEY,
   DRAFT_STORAGE_KEY,
   EVIDENCE_STORAGE_KEY,
+  QUEUED_FINDING_STORAGE_KEY,
 } from "../shared/storage";
 
 type StatusMessage = { text: string; tone: "neutral" | "success" | "danger" } | null;
@@ -137,6 +139,10 @@ export function App({ surface }: { surface: ExtensionSurface }) {
   const [capturing, setCapturing] = useState<EvidenceCaptureMode | null>(null);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [queuedFinding, setQueuedFinding] = useState<{
+    key: string;
+    source: "local" | "ai";
+  } | null>(null);
   const [status, setStatus] = useState<StatusMessage>(null);
   const [desktopState, setDesktopState] = useState<DesktopState>("checking");
   const [desktopVersion, setDesktopVersion] = useState("");
@@ -159,6 +165,7 @@ export function App({ surface }: { surface: ExtensionSurface }) {
           DRAFT_STORAGE_KEY,
           AUDIT_STORAGE_KEY,
           CAPTURE_TAB_STORAGE_KEY,
+          QUEUED_FINDING_STORAGE_KEY,
         ]);
         if (cancelled) return;
         const restoredEvidence = stored[EVIDENCE_STORAGE_KEY]
@@ -172,11 +179,20 @@ export function App({ surface }: { surface: ExtensionSurface }) {
             EVIDENCE_STORAGE_KEY,
             DRAFT_STORAGE_KEY,
             CAPTURE_TAB_STORAGE_KEY,
+            QUEUED_FINDING_STORAGE_KEY,
           ]);
           setStatus({ text: "The previous capture expired after 24 hours and was removed from local extension storage.", tone: "neutral" });
         } else {
           setEvidence(restoredEvidence);
           if (stored[DRAFT_STORAGE_KEY]) setDraft(parseAiFindingDraft(stored[DRAFT_STORAGE_KEY]));
+          const queued = stored[QUEUED_FINDING_STORAGE_KEY] as Record<string, unknown> | undefined;
+          if (
+            queued &&
+            typeof queued.key === "string" &&
+            (queued.source === "local" || queued.source === "ai")
+          ) {
+            setQueuedFinding({ key: queued.key, source: queued.source });
+          }
         }
         const storedAudit = typeof stored[AUDIT_STORAGE_KEY] === "string" ? stored[AUDIT_STORAGE_KEY] : "";
         selectedAuditRef.current = storedAudit;
@@ -190,7 +206,12 @@ export function App({ surface }: { surface: ExtensionSurface }) {
         }
         await checkDesktop(false, storedAudit);
       } catch {
-        await chrome.storage.local.remove([EVIDENCE_STORAGE_KEY, DRAFT_STORAGE_KEY, CAPTURE_TAB_STORAGE_KEY]);
+        await chrome.storage.local.remove([
+          EVIDENCE_STORAGE_KEY,
+          DRAFT_STORAGE_KEY,
+          CAPTURE_TAB_STORAGE_KEY,
+          QUEUED_FINDING_STORAGE_KEY,
+        ]);
         if (!cancelled) setStatus({ text: "The saved capture could not be restored. Start a new capture.", tone: "danger" });
       }
     })();
@@ -216,6 +237,16 @@ export function App({ surface }: { surface: ExtensionSurface }) {
           const tabId = typeof next === "number" ? next : null;
           setCapturedTabId(tabId);
           if (tabId !== null) void chrome.action.setBadgeText({ tabId, text: "" }).catch(() => undefined);
+        }
+        if (changes[QUEUED_FINDING_STORAGE_KEY]) {
+          const next = changes[QUEUED_FINDING_STORAGE_KEY].newValue as Record<string, unknown> | undefined;
+          setQueuedFinding(
+            next &&
+              typeof next.key === "string" &&
+              (next.source === "local" || next.source === "ai")
+              ? { key: next.key, source: next.source }
+              : null,
+          );
         }
       } catch {
         setStatus({ text: "The saved capture could not be restored. Start a new capture.", tone: "danger" });
@@ -296,7 +327,8 @@ export function App({ surface }: { surface: ExtensionSurface }) {
       const packet = response.evidence;
       setEvidence(packet);
       setDraft(null);
-      setStatus({ text: "Evidence captured locally. Review it before generating a draft.", tone: "success" });
+      setQueuedFinding(null);
+      setStatus({ text: "Component captured. Describe the issue, then send it to review.", tone: "success" });
     } catch (error) {
       setStatus({ text: displayError(error), tone: "danger" });
     } finally {
@@ -347,6 +379,38 @@ export function App({ surface }: { surface: ExtensionSurface }) {
     }
   }
 
+  async function queueForReview() {
+    if (!evidence || !selectedAudit) return;
+    if (evidence.observation.trim().length < 8) {
+      setStatus({ text: "Describe what happened before sending this issue for review.", tone: "danger" });
+      return;
+    }
+    setSaving(true);
+    try {
+      const approved = applyConsent(evidence, { includeScreenshot, includeElementText, includeUrl });
+      const scoped = parseEvidencePacket({ ...approved, auditId: selectedAudit });
+      const queued = await queueDesktopFinding(selectedAudit, scoped);
+      setEvidence(scoped);
+      setDraft(null);
+      setQueuedFinding({ key: queued.findingKey, source: queued.draftSource });
+      await chrome.storage.local.set({
+        [EVIDENCE_STORAGE_KEY]: scoped,
+        [QUEUED_FINDING_STORAGE_KEY]: {
+          key: queued.findingKey,
+          source: queued.draftSource,
+        },
+      });
+      setStatus({
+        text: `Issue sent to ${audits.find((audit) => audit.id === selectedAudit)?.project || "the desktop audit"}. It is in Needs review and no auditor decision was applied.`,
+        tone: "success",
+      });
+    } catch (error) {
+      setStatus({ text: displayError(error), tone: "danger" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function saveFinding() {
     if (!evidence || !draft || !selectedAudit) return;
     if (!draft.wcag.length) {
@@ -371,9 +435,15 @@ export function App({ surface }: { surface: ExtensionSurface }) {
     }
     setEvidence(null);
     setDraft(null);
+    setQueuedFinding(null);
     setCapturedTabId(null);
     setStatus(null);
-    await chrome.storage.local.remove([EVIDENCE_STORAGE_KEY, DRAFT_STORAGE_KEY, CAPTURE_TAB_STORAGE_KEY]);
+    await chrome.storage.local.remove([
+      EVIDENCE_STORAGE_KEY,
+      DRAFT_STORAGE_KEY,
+      CAPTURE_TAB_STORAGE_KEY,
+      QUEUED_FINDING_STORAGE_KEY,
+    ]);
   }
 
   function addWcagMapping() {
@@ -449,7 +519,7 @@ export function App({ surface }: { surface: ExtensionSurface }) {
           <img src="/logo.png" alt="" />
           <div>
             <strong>TheWCAG</strong>
-            <span>{surface === "popup" ? "Quick capture" : "Evidence workspace"}</span>
+            <span>{surface === "popup" ? "Quick capture" : "Issue capture"}</span>
           </div>
         </div>
         <div className="header-actions">
@@ -474,7 +544,27 @@ export function App({ surface }: { surface: ExtensionSurface }) {
       ) : null}
 
       <main id="extension-main" tabIndex={-1}>
-        {surface === "popup" && evidence ? (
+        {queuedFinding && evidence ? (
+          <section className="queued-view" aria-labelledby="queued-heading">
+            <CheckCircle size={34} weight="fill" aria-hidden="true" />
+            <span className="step">Desktop review queue</span>
+            <h1 id="queued-heading">Issue sent for review</h1>
+            <p>
+              The screenshot, component context, and your observation were saved with the finding.
+              {queuedFinding.source === "ai" ? " The desktop prepared an AI-assisted draft." : " A local structured draft was prepared."}
+              {" "}An auditor must still confirm every field.
+            </p>
+            <div className="target-summary">
+              <div className="target-icon"><Code size={18} /></div>
+              <div><span>Queued component</span><strong>{targetLabel}</strong><code>{evidence.target.selector || evidence.target.structuralPath || "Visual region"}</code></div>
+            </div>
+            <div className="action-stack">
+              <button className="button button-primary button-full" onClick={() => void reset()}>
+                <Plus size={18} /> Capture another issue
+              </button>
+            </div>
+          </section>
+        ) : surface === "popup" && evidence ? (
           <section className="popup-ready" aria-labelledby="popup-ready-heading">
             <div className="section-heading">
               <div>
@@ -507,7 +597,7 @@ export function App({ surface }: { surface: ExtensionSurface }) {
             </p>
             <div className="action-stack popup-actions">
               <button className="button button-primary button-full" onClick={openWorkspace}>
-                <ArrowSquareOut size={18} /> Review in workspace
+                <ArrowSquareOut size={18} /> Add issue details
               </button>
               <button className="button button-secondary button-full" onClick={() => void reset()}>
                 <ArrowCounterClockwise size={18} /> Start another capture
@@ -517,18 +607,18 @@ export function App({ surface }: { surface: ExtensionSurface }) {
         ) : !evidence ? (
           <section className="start-view" aria-labelledby="start-heading">
             <div className="intro-icon"><Crosshair size={24} weight="duotone" /></div>
-            <h1 id="start-heading">Mark the barrier, not the whole page.</h1>
-            <p>Select the exact element or region. TheWCAG captures its visual and semantic context without reading form values or browser data.</p>
+            <h1 id="start-heading">Capture the affected component.</h1>
+            <p>Select a component or region, describe what happened, and send its screenshot and context to desktop review.</p>
 
             <div className="capture-actions">
               <button className="capture-card capture-primary" disabled={capturing !== null} onClick={() => void startCapture("element")}>
                 <span className="capture-card-icon"><MouseSimple size={21} /></span>
-                <span><strong>{capturing === "element" ? "Select on page" : "Select element"}</strong><small>Best for controls, text, and images</small></span>
+                <span><strong>{capturing === "element" ? "Select on page" : "Component"}</strong><small>Controls, text, or images</small></span>
                 <Crosshair size={19} />
               </button>
               <button className="capture-card" disabled={capturing !== null} onClick={() => void startCapture("region")}>
                 <span className="capture-card-icon"><Selection size={21} /></span>
-                <span><strong>{capturing === "region" ? "Drag on page" : "Select region"}</strong><small>Use when the barrier spans several elements</small></span>
+                <span><strong>{capturing === "region" ? "Drag on page" : "Region"}</strong><small>Several related elements</small></span>
                 <Selection size={19} />
               </button>
             </div>
@@ -553,7 +643,7 @@ export function App({ surface }: { surface: ExtensionSurface }) {
         ) : !draft ? (
           <section className="evidence-view" aria-labelledby="evidence-heading">
             <div className="section-heading">
-              <div><span className="step">Evidence 01</span><h1 id="evidence-heading">Review what was captured</h1></div>
+              <div><span className="step">Issue capture</span><h1 id="evidence-heading">Describe the issue</h1></div>
               <button className="icon-button" onClick={() => void reset()} aria-label="Discard capture"><ArrowCounterClockwise size={18} /></button>
             </div>
 
@@ -619,7 +709,7 @@ export function App({ surface }: { surface: ExtensionSurface }) {
 
             {desktopState === "connected" && audits.length ? (
               <label className="field">
-                <span>Save into audit</span>
+                <span>Audit</span>
                 <select value={selectedAudit} onChange={(event) => {
                   selectedAuditRef.current = event.target.value;
                   setSelectedAudit(event.target.value);
@@ -631,16 +721,32 @@ export function App({ surface }: { surface: ExtensionSurface }) {
             ) : null}
 
             <fieldset className="payload-options">
-              <legend>Include in generation</legend>
-              <label><input type="checkbox" checked={includeScreenshot} onChange={(event) => setIncludeScreenshot(event.target.checked)} /><ImageSquare size={17} /><span><strong>Screenshot</strong><small>Context view with the selected target highlighted</small></span></label>
-              <label><input type="checkbox" checked={includeElementText} onChange={(event) => setIncludeElementText(event.target.checked)} /><Code size={17} /><span><strong>Element text</strong><small>Name, labels, and DOM excerpt</small></span></label>
-              <label><input type="checkbox" checked={includeUrl} onChange={(event) => setIncludeUrl(event.target.checked)} /><ArrowSquareOut size={17} /><span><strong>Page context</strong><small>Title and address, with query and fragment removed</small></span></label>
+              <legend>Send with issue</legend>
+              <label><input type="checkbox" checked={includeScreenshot} onChange={(event) => setIncludeScreenshot(event.target.checked)} /><ImageSquare size={17} /><span><strong>Screenshot</strong><small>Marked context image</small></span></label>
+              <label><input type="checkbox" checked={includeElementText} onChange={(event) => setIncludeElementText(event.target.checked)} /><Code size={17} /><span><strong>Component data</strong><small>Name, role, and selector</small></span></label>
+              <label><input type="checkbox" checked={includeUrl} onChange={(event) => setIncludeUrl(event.target.checked)} /><ArrowSquareOut size={17} /><span><strong>Page</strong><small>Title and address</small></span></label>
             </fieldset>
 
-            <div className="consent-copy"><ShieldCheck size={18} /><p>Generation starts only after this action. The selected payload will be recorded locally with its approval time.</p></div>
-            <button className="button button-primary button-full" onClick={() => void generateDraft()} disabled={generating}>
-              <MagicWand size={18} weight="fill" /> {generating ? "Preparing draft" : desktopState === "connected" ? "Generate finding draft" : "Create local draft"}
-            </button>
+            <div className="consent-copy"><ShieldCheck size={18} /><p>Nothing is sent until you choose the action below. Desktop drafts stay in Needs review until an auditor confirms them.</p></div>
+            {desktopState === "connected" && selectedAudit ? (
+              <div className="action-stack compact-actions">
+                <button className="button button-primary button-full" onClick={() => void queueForReview()} disabled={saving}>
+                  <Desktop size={18} weight="fill" /> {saving ? "Sending issue" : "Send to desktop review"}
+                </button>
+                <button className="button button-quiet button-full" onClick={() => void generateDraft()} disabled={generating}>
+                  <MagicWand size={18} /> {generating ? "Preparing draft" : "Edit draft here instead"}
+                </button>
+              </div>
+            ) : (
+              <div className="action-stack compact-actions">
+                <button className="button button-primary button-full" onClick={() => void generateDraft()} disabled={generating}>
+                  <MagicWand size={18} weight="fill" /> {generating ? "Preparing draft" : "Create local draft"}
+                </button>
+                <button className="button button-quiet button-full" onClick={() => void checkDesktop(true)} disabled={desktopState === "checking"}>
+                  <Desktop size={18} /> Connect desktop
+                </button>
+              </div>
+            )}
           </section>
         ) : (
           <section className="draft-view" aria-labelledby="draft-heading">

@@ -165,4 +165,161 @@ describe("native extension protocol", () => {
     expect(addFindings).not.toHaveBeenCalled();
     expect(set).not.toHaveBeenCalled();
   });
+
+  it("queues browser evidence as a pending finding without applying an auditor decision", async () => {
+    const addFindings = vi.fn().mockResolvedValue(undefined);
+    const set = vi.fn().mockResolvedValue(undefined);
+    const get = async <T,>(key: string, fallback: T): Promise<T> => {
+      if (key === "audits-v2") return [{
+        id: "aud-checkout1",
+        project: "Checkout",
+        target: "example.com",
+        scope: "Checkout",
+        standard: "WCAG 2.2 AA",
+        auditor: "Auditor",
+        startedAt: "2026-07-21",
+        updatedAt: 10,
+        createdAt: 1,
+      }] as T;
+      return fallback;
+    };
+    const packet = evidence();
+    packet.image = {
+      mimeType: "image/png",
+      dataUrl: "data:image/png;base64,iVBORw0KGgo=",
+      width: 320,
+      height: 180,
+      sourceWidth: 640,
+      sourceHeight: 360,
+    };
+    const createCapture = vi.fn().mockResolvedValue({
+      id: "cap-browser-12345678",
+      auditId: "aud-checkout1",
+      title: "Browser evidence · button",
+      createdAt: 1,
+      modifiedAt: 1,
+      issues: 0,
+      width: 320,
+      height: 180,
+      assetUrl: "thewcag-asset://capture/cap-browser-12345678?kind=raw",
+      thumbnailUrl: null,
+    });
+    const response = await handleNativeRequest({
+      protocolVersion: NATIVE_PROTOCOL_VERSION,
+      requestId: "e1f6ebf8-8f42-4373-a3d2-3ea5b64f0ac7",
+      type: "finding:queue",
+      auditId: "aud-checkout1",
+      evidence: packet,
+    }, {
+      store: { get, set, addFindings, remove: vi.fn() },
+      ai: { generateFinding: vi.fn().mockResolvedValue(draft()) },
+      captures: { create: createCapture, delete: vi.fn() },
+      appVersion: "3.0.0",
+    });
+
+    expect(response).toEqual(expect.objectContaining({
+      ok: true,
+      type: "finding:queued",
+      findingKey: evidence().id,
+      draftSource: "ai",
+    }));
+    expect(addFindings).toHaveBeenCalledWith([
+      expect.objectContaining({
+        key: evidence().id,
+        reviewState: "pending",
+        status: "open",
+        location: "https://example.com/checkout",
+        evidenceId: evidence().id,
+        evidenceCaptureIds: ["cap-browser-12345678"],
+        captureId: "cap-browser-12345678",
+      }),
+    ], "aud-checkout1");
+    expect(set).toHaveBeenCalledWith(`evidence-${evidence().id}`, expect.objectContaining({
+      auditId: "aud-checkout1",
+      observation: evidence().observation,
+    }));
+    expect(createCapture).toHaveBeenCalledWith(
+      packet.image.dataUrl,
+      "Browser evidence · button",
+      "aud-checkout1",
+    );
+  });
+
+  it("falls back to a bounded local draft when managed authoring is unavailable", async () => {
+    const addFindings = vi.fn().mockResolvedValue(undefined);
+    const get = async <T,>(key: string, fallback: T): Promise<T> => {
+      if (key === "audits-v2") return [{
+        id: "aud-checkout1",
+        project: "Checkout",
+        target: "example.com",
+        scope: "Checkout",
+        standard: "WCAG 2.2 AA",
+        auditor: "Auditor",
+        startedAt: "2026-07-21",
+        updatedAt: 10,
+        createdAt: 1,
+      }] as T;
+      return fallback;
+    };
+    const packet = evidence();
+    packet.checks = [{
+      id: "interactive-name",
+      outcome: "fail",
+      title: "Interactive control has no accessible name",
+      description: "The selected button has no accessible name.",
+      wcag: ["4.1.2"],
+      impact: "major",
+    }];
+    const response = await handleNativeRequest({
+      protocolVersion: NATIVE_PROTOCOL_VERSION,
+      requestId: "e1f6ebf8-8f42-4373-a3d2-3ea5b64f0ac7",
+      type: "finding:queue",
+      auditId: "aud-checkout1",
+      evidence: packet,
+    }, {
+      store: {
+        get,
+        set: vi.fn().mockResolvedValue(undefined),
+        addFindings,
+        remove: vi.fn().mockResolvedValue(undefined),
+      },
+      ai: { generateFinding: vi.fn().mockRejectedValue(new Error("No provider configured")) },
+      appVersion: "3.0.0",
+    });
+
+    expect(response).toEqual(expect.objectContaining({
+      ok: true,
+      type: "finding:queued",
+      draftSource: "local",
+    }));
+    expect(addFindings).toHaveBeenCalledWith([
+      expect.objectContaining({
+        reviewState: "pending",
+        wcag: "4.1.2",
+        affectedUsers: expect.arrayContaining(["screen-reader", "voice-control"]),
+      }),
+    ], "aud-checkout1");
+  });
+
+  it("rejects an unapproved browser payload before privileged work", async () => {
+    const packet = evidence();
+    delete packet.consent;
+    const generateFinding = vi.fn();
+    const addFindings = vi.fn();
+    const response = await handleNativeRequest({
+      protocolVersion: NATIVE_PROTOCOL_VERSION,
+      requestId: "e1f6ebf8-8f42-4373-a3d2-3ea5b64f0ac7",
+      type: "finding:queue",
+      auditId: "aud-checkout1",
+      evidence: packet,
+    }, {
+      store: { get: vi.fn(), set: vi.fn(), addFindings, remove: vi.fn() },
+      ai: { generateFinding },
+      appVersion: "3.0.0",
+    });
+
+    expect(response).toEqual(expect.objectContaining({ ok: false, code: "invalid-request" }));
+    expect(generateFinding).not.toHaveBeenCalled();
+    expect(addFindings).not.toHaveBeenCalled();
+  });
 });

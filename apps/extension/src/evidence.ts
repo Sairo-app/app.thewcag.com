@@ -1,9 +1,7 @@
 import {
-  AI_DRAFT_SCHEMA_VERSION,
   EVIDENCE_SCHEMA_VERSION,
-  parseAiFindingDraft,
+  createLocalFindingDraft,
   parseEvidencePacket,
-  type AffectedUser,
   type AiFindingDraftV1,
   type DeterministicCheckV1,
   type EvidenceConsentV1,
@@ -11,8 +9,6 @@ import {
   type EvidencePacketV1,
   type EvidenceRect,
   type EvidenceTargetV1,
-  type FindingSeverity,
-  type WcagMappingV1,
 } from "@accessibility-build/audit-contracts";
 import type { CapturedSelection } from "./shared/messages";
 
@@ -23,14 +19,6 @@ export interface CropGeometry {
   outputHeight: number;
   scale: number;
 }
-
-const WCAG_DETAILS: Record<string, { name: string; level: "A" | "AA" }> = {
-  "1.1.1": { name: "Non-text Content", level: "A" },
-  "2.1.1": { name: "Keyboard", level: "A" },
-  "2.4.3": { name: "Focus Order", level: "A" },
-  "2.5.8": { name: "Target Size (Minimum)", level: "AA" },
-  "4.1.2": { name: "Name, Role, Value", level: "A" },
-};
 
 export function calculateCropGeometry(
   bounds: EvidenceRect,
@@ -382,111 +370,8 @@ export function runDeterministicChecks(target: EvidenceTargetV1): DeterministicC
   return checks;
 }
 
-function sentence(value: string, fallback: string): string {
-  const clean = value.replace(/\s+/g, " ").trim();
-  if (!clean) return fallback;
-  return (clean.match(/^.*?[.!?](?:\s|$)/)?.[0] || clean).slice(0, 240).replace(/[.!?]+$/, "");
-}
-
-function affectedUsersFor(checks: DeterministicCheckV1[]): AffectedUser[] {
-  const output = new Set<AffectedUser>();
-  if (checks.some((check) => check.id === "interactive-name" || check.id === "image-alternative")) {
-    output.add("screen-reader");
-    output.add("voice-control");
-  }
-  if (checks.some((check) => check.id === "custom-control-keyboard" || check.id === "positive-tabindex")) {
-    output.add("keyboard");
-    output.add("motor");
-  }
-  if (checks.some((check) => check.id === "target-size")) {
-    output.add("motor");
-    output.add("low-vision");
-  }
-  if (!output.size) output.add("other");
-  return [...output];
-}
-
-function severityFor(checks: DeterministicCheckV1[]): FindingSeverity {
-  if (checks.some((check) => check.impact === "blocker")) return "blocker";
-  if (checks.some((check) => check.impact === "major")) return "major";
-  return "minor";
-}
-
-function mappingsFor(checks: DeterministicCheckV1[]): WcagMappingV1[] {
-  const criteria = new Map<string, DeterministicCheckV1>();
-  for (const check of checks) {
-    for (const criterion of check.wcag) if (!criteria.has(criterion)) criteria.set(criterion, check);
-  }
-  return [...criteria].map(([criterion, check]) => ({
-    criterion,
-    level: WCAG_DETAILS[criterion]?.level ?? "A",
-    name: WCAG_DETAILS[criterion]?.name ?? "WCAG success criterion",
-    rationale: check.description,
-    confidence: check.outcome === "fail" ? "high" : "medium",
-  }));
-}
-
 export function createLocalDraft(evidence: EvidencePacketV1): AiFindingDraftV1 {
-  const primary = evidence.checks.find((check) => check.outcome === "fail") ?? evidence.checks[0];
-  const role = evidence.target.role || evidence.target.tagName || "element";
-  const observed = sentence(evidence.observation, primary?.title || `Review the selected ${role}`);
-  const mappings = mappingsFor(evidence.checks);
-  const draft: AiFindingDraftV1 = {
-    schemaVersion: AI_DRAFT_SCHEMA_VERSION,
-    title: primary?.title || observed,
-    description: evidence.observation.trim() || `The selected ${role} requires accessibility review.`,
-    actualResult: evidence.observation.trim() || primary?.description || `The selected ${role} does not provide the expected accessible behavior.`,
-    expectedResult: primary?.id === "interactive-name"
-      ? `The ${role} should expose a concise accessible name that describes its purpose.`
-      : `The ${role} should support the expected accessible semantics and interaction without creating a barrier.`,
-    userImpact: primary?.id === "interactive-name"
-      ? `People using a screen reader or voice control may be unable to identify or operate the ${role}.`
-      : `Affected users may be unable to understand or operate this part of the interface reliably.`,
-    affectedUsers: affectedUsersFor(evidence.checks),
-    severity: severityFor(evidence.checks),
-    severityRationale: evidence.taskContext.trim()
-      ? `The issue affects the task “${evidence.taskContext.trim()}”. Confirm task criticality and whether a practical workaround exists.`
-      : "Confirm task criticality, frequency, reach, and whether a practical workaround exists before finalizing severity.",
-    wcag: mappings,
-    recommendation: primary?.id === "interactive-name"
-      ? `Provide a visible text label or another programmatic name. Prefer native HTML and verify the final name in the browser accessibility tree.`
-      : `Review the captured semantics and behavior, use native HTML where possible, and verify the change with keyboard and assistive technology.`,
-    exampleFix: primary?.id === "interactive-name" && role === "button"
-      ? `<button type="button">Describe the action</button>`
-      : "",
-    reproductionSteps: [
-      `Open ${evidence.page.title || "the captured page"}.`,
-      `Locate the selected ${role}${evidence.target.accessibleName ? ` named “${evidence.target.accessibleName}”` : ""}.`,
-      evidence.observation.trim() || "Inspect the element with the relevant assistive technology and confirm the captured behavior.",
-    ],
-    confidence: primary?.outcome === "fail" ? "medium" : "low",
-    fieldConfidence: [
-      {
-        field: "wcag",
-        confidence: mappings.some((mapping) => mapping.confidence === "high") ? "high" : "medium",
-        reason: mappings.length ? "Based on deterministic selected-element evidence." : "No deterministic WCAG mapping was available.",
-      },
-      {
-        field: "severity",
-        confidence: "low",
-        reason: "Task importance, frequency, reach, and workaround availability require auditor judgment.",
-      },
-    ],
-    assumptions: evidence.observation.trim() ? [] : ["The issue behavior was inferred from captured element context."],
-    manualChecks: [
-      "Confirm the behavior with the relevant keyboard or assistive-technology workflow.",
-      "Confirm the WCAG mapping and severity before saving the finding.",
-    ],
-    provenance: {
-      source: "local",
-      model: "deterministic-draft",
-      modelVersion: "1",
-      promptVersion: "local-v1",
-      knowledgeVersion: "wcag-2.2",
-      generatedAt: Date.now(),
-    },
-  };
-  return parseAiFindingDraft(draft);
+  return createLocalFindingDraft(evidence);
 }
 
 export async function createEvidencePacket(

@@ -11,7 +11,7 @@ import { breadcrumbJsonLd, createPageMetadata, SITE_URL } from "@/lib/seo";
 export const metadata: Metadata = createPageMetadata({
   title: "Getting Started with TheWCAG: Your First Audit",
   description:
-    "Complete a guided four-stage WCAG audit: plan scope, inspect and attach evidence to findings, review decisions, and deliver an accessible report.",
+    "Capture a website issue from the browser extension or complete a guided four-stage WCAG audit in the desktop app, with evidence kept beside each finding.",
   path: "/getting-started",
   keywords: [
     "TheWCAG getting started",
@@ -24,6 +24,7 @@ export const metadata: Metadata = createPageMetadata({
 
 const GUIDE_STEPS = [
   { id: "install", label: "Start locally" },
+  { id: "browser-extension", label: "Capture from the browser" },
   { id: "plan", label: "Plan the audit" },
   { id: "inspect", label: "Inspect and add evidence" },
   { id: "review", label: "Review decisions" },
@@ -33,6 +34,7 @@ const GUIDE_STEPS = [
 
 const howToSteps = [
   ["Install TheWCAG and open the guided sample", "Download the desktop app, launch the bundled local sample, or create a named local audit."],
+  ["Choose the browser or desktop starting path", "For a live website, select a component with the optional browser extension, describe the observed issue, approve its evidence payload, and send it to the desktop review queue."],
   ["Plan the evaluation", "Document the scope, methodology, environments, assistive technologies, representative sample, and guided test runs."],
   ["Inspect and attach evidence to findings", "Perform each manual test, record observations, and capture annotated evidence directly inside finding authoring."],
   ["Review findings and WCAG decisions", "Confirm finding details, remediation state, external-ticket changes, and every applicable WCAG criterion decision."],
@@ -116,7 +118,7 @@ export default function GettingStartedPage() {
           <span className="guide-eyebrow">First-time guide · four stages · local sample included</span>
           <h1 id="guide-title">Run your first audit with confidence.</h1>
           <p>
-            Follow the current TheWCAG desktop workflow from a bundled, network-free sample to a reviewable report. The screenshots below come from the current macOS build; the Windows build follows the same four-stage structure with platform-specific shortcut labels.
+            Start from the browser component where a website problem appears, or follow the normal desktop workflow from a bundled, network-free sample. Both paths meet in the same reviewable local finding record. The screenshots below come from the current macOS build; Windows follows the same four-stage structure with platform-specific shortcut labels.
           </p>
           <div className="guide-actions">
             <GuideDownloadLink className="button button--primary"><DownloadIcon size={17} />Download TheWCAG</GuideDownloadLink>
@@ -156,15 +158,36 @@ export default function GettingStartedPage() {
                 <li><strong>Install the desktop app.</strong><span>Use the Windows or macOS installer from the download page, then launch TheWCAG from the normal application shortcut.</span></li>
                 <li><strong>Choose Guided sample audit.</strong><span>Use the demo when you want to learn the real controls without a network connection or client data. Choose Create blank audit when you are ready for real work.</span></li>
                 <li><strong>Name real work precisely.</strong><span>Include the product and release, such as “Customer portal · July release”, so exports and follow-up audits remain understandable.</span></li>
-                <li><strong>Add browser capture only when useful.</strong><span>The <Link href="/chrome-accessibility-extension">Chrome extension</Link> is optional and adds bounded semantic page context to visual evidence.</span></li>
+                <li><strong>Add browser capture when useful.</strong><span>The <Link href="/chrome-accessibility-extension">Chrome extension</Link> is an optional faster entry point for live websites: select the affected component, describe the issue, then send it to the desktop review queue.</span></li>
               </ol>
               <aside className="guide-note"><strong>Only need screenshots?</strong><p>Choose Open screenshot-only capture library. You can capture, annotate, copy, and export without creating an audit or finding. The audit workflow does not block this standalone path.</p></aside>
               <aside className="guide-note"><strong>Privacy first</strong><p>Local audits, exports, packages, screenshots, and AI providers configured with your own key work without signing in. Hosted report links and TheWCAG-managed AI are explicit online services.</p></aside>
               <DoneWhen>The Guided sample audit or a clearly named real audit is open and the four audit stages are visible.</DoneWhen>
             </section>
 
+            <section id="browser-extension" className="guide-section">
+              <div className="guide-step-heading"><span>02</span><div><p>Optional website path</p><h2>Capture the issue where you find it</h2></div></div>
+              <p>
+                When you are testing a live website, the extension can shorten the trip from observation to finding. Keep the desktop app open, select the component or region in the page, write what happened, and approve the bounded evidence that will accompany the issue.
+              </p>
+              <ol className="guide-instructions">
+                <li><strong>Connect the extension to the desktop app.</strong><span>Choose the local audit that should receive the issue. The extension uses the allowlisted local desktop connector; it does not send the screenshot or page context to a website API.</span></li>
+                <li><strong>Select Component or Region.</strong><span>Component captures one control, text node, or image. Region captures several related elements. Both choices create a marked context screenshot.</span></li>
+                <li><strong>Describe the observed behavior.</strong><span>Write the issue detail while the page is still in front of you. Add the task context when it helps another person reproduce the barrier.</span></li>
+                <li><strong>Review what will be attached.</strong><span>Independently approve the screenshot, component name/role/selector data, and page title/address. You can withhold any of them before sending.</span></li>
+                <li><strong>Send to desktop review.</strong><span>The desktop stores the evidence, prepares a bounded draft, and logs the finding as Needs review. No WCAG mapping, severity, status, or auditor decision is silently confirmed.</span></li>
+                <li><strong>Finish the decision in Findings.</strong><span>Open the queued record, verify its actual and expected results, user impact, severity, WCAG mapping, and evidence, then save it as reviewed.</span></li>
+              </ol>
+              <aside className="guide-note"><strong>The normal process still works</strong><p>You can begin in Plan or Inspect, author the finding in the desktop editor, and choose Add evidence there. The extension is a faster website intake path, not a requirement and not a replacement for auditor review.</p></aside>
+              <aside className="guide-note guide-note--warning"><strong>Signals are not decisions</strong><p>Captured checks and generated language are supporting information. A pending browser intake blocks a complete delivery record until an auditor opens and confirms it.</p></aside>
+              <div className="guide-actions">
+                <Link href="/chrome-accessibility-extension" className="button button--secondary">Set up the browser extension <ArrowRightIcon size={16} /></Link>
+              </div>
+              <DoneWhen>The browser issue appears in the selected desktop audit under Needs review with its approved screenshot and component context attached.</DoneWhen>
+            </section>
+
             <section id="plan" className="guide-section">
-              <div className="guide-step-heading"><span>02</span><div><p>Stage 1 of 4</p><h2>Build an audit-ready plan</h2></div></div>
+              <div className="guide-step-heading"><span>03</span><div><p>Stage 1 of 4</p><h2>Build an audit-ready plan</h2></div></div>
               <p>
                 Define the decision the audit must support before testing begins. The built-in scoper can propose representative coverage from a bounded public-page inspection, but you must confirm the template, sample, exclusions, and every conformance decision.
               </p>
@@ -192,7 +215,7 @@ export default function GettingStartedPage() {
             </section>
 
             <section id="inspect" className="guide-section">
-              <div className="guide-step-heading"><span>03</span><div><p>Stage 2 of 4</p><h2>Inspect and attach evidence in context</h2></div></div>
+              <div className="guide-step-heading"><span>04</span><div><p>Stage 2 of 4</p><h2>Inspect and attach evidence in context</h2></div></div>
               <p>
                 Test the rendered interface people actually receive. Run each manual script, record the observation, create a finding when you observe a barrier, and use Add evidence inside that finding so the capture returns to the record it supports.
               </p>
@@ -218,7 +241,7 @@ export default function GettingStartedPage() {
             </section>
 
             <section id="review" className="guide-section">
-              <div className="guide-step-heading"><span>04</span><div><p>Stage 3 of 4</p><h2>Review decisions, remediation, and tickets</h2></div></div>
+              <div className="guide-step-heading"><span>05</span><div><p>Stage 3 of 4</p><h2>Review decisions, remediation, and tickets</h2></div></div>
               <p>
                 Review is where evidence becomes an auditor decision. Confirm each finding, work through all applicable WCAG 2.2 A and AA criteria, and keep unresolved or untested work explicit. Automated and deterministic results remain supporting signals.
               </p>
@@ -243,7 +266,7 @@ export default function GettingStartedPage() {
             </section>
 
             <section id="deliver" className="guide-section">
-              <div className="guide-step-heading"><span>05</span><div><p>Stage 4 of 4</p><h2>Deliver an accessible, bounded report</h2></div></div>
+              <div className="guide-step-heading"><span>06</span><div><p>Stage 4 of 4</p><h2>Deliver an accessible, bounded report</h2></div></div>
               <p>
                 Deliver separates a focused evidence report from a complete audit. Resolve the readiness results, write the conclusion and limitations, choose the audience sections, and export or publish only what the reviewed record supports.
               </p>
@@ -266,7 +289,7 @@ export default function GettingStartedPage() {
             </section>
 
             <section id="after-delivery" className="guide-section">
-              <div className="guide-step-heading"><span>06</span><div><p>After the report</p><h2>Retest, preserve, and learn from owned data</h2></div></div>
+              <div className="guide-step-heading"><span>07</span><div><p>After the report</p><h2>Retest, preserve, and learn from owned data</h2></div></div>
               <p>
                 Delivery is not the end of remediation. Keep the stable finding open through ready-for-retest and verified-fixed states, attach after evidence, and use owned local audit history to review operational patterns without turning them into a conformance score.
               </p>

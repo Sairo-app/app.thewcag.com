@@ -54,10 +54,11 @@ import {
 } from "../FindingEditorDialog";
 
 type Tab = "captures" | "findings";
-type BuiltInFindingView = "all" | "blockers" | "retest" | "missing-mapping" | "overdue";
+type BuiltInFindingView = "all" | "needs-review" | "blockers" | "retest" | "missing-mapping" | "overdue";
 
 const BUILT_IN_FINDING_VIEWS: Array<{ id: BuiltInFindingView; label: string }> = [
   { id: "all", label: "All findings" },
+  { id: "needs-review", label: "Needs review" },
   { id: "blockers", label: "Blockers" },
   { id: "retest", label: "Retest queue" },
   { id: "missing-mapping", label: "Missing WCAG mapping" },
@@ -246,6 +247,7 @@ export function EvidenceView({
         source: "manual" as const,
       }),
       ...value,
+      reviewState: "reviewed",
       title: value.title.trim(),
       wcag: value.wcag.trim(),
       location: value.location.trim(),
@@ -549,6 +551,7 @@ export function EvidenceView({
       createdAt: now,
       modifiedAt: now,
       source: "manual",
+      reviewState: "reviewed",
     };
     const next = [duplicate, ...findings];
     try {
@@ -628,6 +631,7 @@ export function EvidenceView({
     () =>
       findings
         .filter((item) =>
+          (findingViewId !== "needs-review" || item.reviewState === "pending") &&
           (findingViewId !== "blockers" || item.severity === "blocker") &&
           (findingViewId !== "retest" || item.status === "retest") &&
           (findingViewId !== "missing-mapping" || !item.wcag.trim() || /needs/i.test(item.wcag)) &&
@@ -658,7 +662,7 @@ export function EvidenceView({
         }),
     [findingSeverity, findingSort, findingStatus, findingViewId, findings, query],
   );
-  const openCount = findings.filter((item) => item.status === "open").length;
+  const pendingReviewCount = findings.filter((item) => item.reviewState === "pending").length;
   const selectedVisible = filteredFindings.filter((item) =>
     selectedFindings.has(item.key),
   );
@@ -913,8 +917,8 @@ export function EvidenceView({
             <>
               <div className="finding-summary">
                 <div>
-                  <strong>{openCount}</strong>
-                  <span>open</span>
+                  <strong>{pendingReviewCount}</strong>
+                  <span>needs review</span>
                 </div>
                 <div>
                   <strong>
@@ -981,6 +985,9 @@ export function EvidenceView({
                     <span>
                       <span className="finding-reference">{item.reference}</span>
                       <strong>{item.title}</strong>
+                      {item.reviewState === "pending" ? (
+                        <span className="finding-review-state">Needs review</span>
+                      ) : null}
                       <small>
                         {[item.location, item.note].filter(Boolean).join(" · ") || "No location or implementation note"}
                       </small>
@@ -1056,11 +1063,13 @@ export function EvidenceView({
                   <section className="finding-detail" id={`finding-detail-${item.key}`} aria-label={`Details for ${item.title}`}>
                     <div className="finding-detail-meta">
                       <span>
-                        {item.reference} · {item.source === "ai"
-                          ? "AI-assisted draft, auditor confirmed"
-                          : item.source === "manual"
-                            ? "Manually documented finding"
-                            : "Structured browser evidence"}
+                        {item.reference} · {item.reviewState === "pending"
+                          ? "Browser intake awaiting auditor review"
+                          : item.source === "ai"
+                            ? "AI-assisted draft, auditor confirmed"
+                            : item.source === "manual"
+                              ? "Manually documented finding"
+                              : "Structured browser evidence"}
                         {item.duplicateOf ? ` · Duplicated from ${item.duplicateOf}` : ""}
                       </span>
                       {item.confidence ? <span className={`finding-confidence finding-confidence-${item.confidence}`}>{item.confidence} confidence</span> : null}

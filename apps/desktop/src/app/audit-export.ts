@@ -159,6 +159,9 @@ export function buildAuditMarkdown(input: AuditExportInput): string {
   const findingsWithoutEvidence = findings.filter(
     (finding) => !findingHasEvidence(finding, availableCaptureIds),
   ).length;
+  const findingsPendingReview = findings.filter(
+    (finding) => finding.reviewState === "pending",
+  ).length;
   const unassignedCaptureCount = captures.filter((capture) => !assignedCaptureIds.has(capture.id)).length;
   const applicableCriteria = WCAG_CRITERIA.filter(
     (criterion) => audit.standard === "WCAG 2.2 AA" || criterion.level === "A",
@@ -291,6 +294,7 @@ export function buildAuditMarkdown(input: AuditExportInput): string {
           statuses.open ||
           statuses.retest ||
           findingsWithoutEvidence ||
+          findingsPendingReview ||
           !audit.executiveSummary.trim() ||
           !audit.limitations.trim() ||
           !audit.completedAt
@@ -328,6 +332,7 @@ export function buildAuditMarkdown(input: AuditExportInput): string {
         `- Criterion: ${value(finding.wcag, "Needs mapping")}`,
         `- Severity: ${finding.severity}`,
         `- Status: ${finding.status}`,
+        `- Auditor review: ${finding.reviewState === "pending" ? "Required" : "Complete"}`,
         `- Location: ${value(finding.location)}`,
         `- Evidence captures: ${findingEvidenceCaptureIds(finding)
           .map((captureId) => captures.find((capture) => capture.id === captureId)?.title)
@@ -528,6 +533,9 @@ export function buildAuditHtml(input: AuditExportInput): string {
   const findingsWithoutEvidence = findings.filter(
     (finding) => !findingHasEvidence(finding, availableCaptureIds),
   ).length;
+  const findingsPendingReview = findings.filter(
+    (finding) => finding.reviewState === "pending",
+  ).length;
   const undocumentedNA = applicable.some((criterion) => {
     const entry = checklist[criterion.sc];
     return entry?.result === "na" && !entry.note.trim();
@@ -544,6 +552,7 @@ export function buildAuditHtml(input: AuditExportInput): string {
           undocumentedNA ||
           activeFindings.length ||
           findingsWithoutEvidence ||
+          findingsPendingReview ||
           !audit.executiveSummary.trim() ||
           !audit.limitations.trim() ||
           !audit.completedAt
@@ -613,6 +622,7 @@ export function buildAuditHtml(input: AuditExportInput): string {
               <div class="finding-tags">
                 <span class="tag severity-${finding.severity}">${escapeHtml(finding.severity, "")}</span>
                 <span class="tag">${escapeHtml(statusLabel[finding.status], "")}</span>
+                ${finding.reviewState === "pending" ? '<span class="tag">Needs auditor review</span>' : ""}
                 <span class="tag">${criterion
                   ? `<a href="${wcagUnderstandingUrl(criterion.name)}">WCAG ${escapeHtml(criterion.sc, "")}: ${escapeHtml(criterion.name, "")}</a>`
                   : `WCAG ${escapeHtml(finding.wcag, "Needs mapping")}`}</span>

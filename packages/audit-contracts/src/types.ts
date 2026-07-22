@@ -176,6 +176,13 @@ export type NativeRequestV1 =
       auditId: string;
       evidence: EvidencePacketV1;
       draft: AiFindingDraftV1;
+    }
+  | {
+      protocolVersion: typeof NATIVE_PROTOCOL_VERSION;
+      requestId: string;
+      type: "finding:queue";
+      auditId: string;
+      evidence: EvidencePacketV1;
     };
 
 export type NativeResponseV1 =
@@ -206,6 +213,14 @@ export type NativeResponseV1 =
       ok: true;
       type: "finding:saved";
       findingKey: string;
+    }
+  | {
+      protocolVersion: typeof NATIVE_PROTOCOL_VERSION;
+      requestId: string;
+      ok: true;
+      type: "finding:queued";
+      findingKey: string;
+      draftSource: "local" | "ai";
     }
   | {
       protocolVersion: typeof NATIVE_PROTOCOL_VERSION;

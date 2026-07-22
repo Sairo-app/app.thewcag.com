@@ -134,6 +134,50 @@ describe("audit coverage", () => {
     expect(coverage.gaps).toBe(1);
     expect(coverage.unassigned.testRuns).toHaveLength(1);
   });
+
+  it("keeps a browser intake visible as a review gap even when evidence is linked", () => {
+    const capture = {
+      id: "browser-cap",
+      auditId: "aud-a1234567",
+      sampleItemId: "checkout",
+      title: "Browser issue context",
+      createdAt: 1,
+      modifiedAt: 1,
+      issues: 0,
+      width: 1,
+      height: 1,
+      assetUrl: "capture://raw",
+      thumbnailUrl: null,
+    } satisfies CaptureEntry;
+    const finding: Finding = {
+      key: "browser-finding",
+      sampleItemId: "checkout",
+      title: "Checkout control needs review",
+      wcag: "4.1.2",
+      severity: "major",
+      status: "open",
+      reviewState: "pending",
+      note: "Queued by the browser extension.",
+      evidenceCaptureIds: [capture.id],
+      captureId: capture.id,
+      createdAt: 1,
+    };
+    const coverage = buildAuditCoverage({
+      sampleItems: [sample("checkout", "complete")],
+      testRuns: [run("run-1", "complete", "checkout")],
+      captures: [capture],
+      findings: [finding],
+      checklist: {},
+    });
+
+    expect(coverage.rows[0]).toMatchObject({
+      state: "gap",
+      findingsWithEvidence: 1,
+      findingsPendingReview: 1,
+    });
+    expect(coverage.rows[0].gap).toMatch(/needs auditor review/i);
+    expect(coverage.complete).toBe(0);
+  });
 });
 
 describe("next guided audit session", () => {

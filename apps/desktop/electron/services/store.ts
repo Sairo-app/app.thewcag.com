@@ -35,7 +35,9 @@ export function mergeFindings(existing: Finding[], incoming: unknown): Finding[]
       status: ["open", "retest", "fixed", "accepted"].includes(finding.status ?? "")
         ? finding.status as Finding["status"]
         : "open",
+      reviewState: finding.reviewState === "pending" ? "pending" : "reviewed",
       note: typeof finding.note === "string" ? finding.note.slice(0, 5_000) : "",
+      location: typeof finding.location === "string" ? finding.location.slice(0, 2_048) : "",
       evidenceCaptureIds: Array.isArray(finding.evidenceCaptureIds)
         ? [...new Set(finding.evidenceCaptureIds)]
             .filter((captureId): captureId is string => typeof captureId === "string" && Boolean(captureId.trim()))
@@ -44,6 +46,17 @@ export function mergeFindings(existing: Finding[], incoming: unknown): Finding[]
           ? [finding.captureId]
           : undefined,
       captureId: typeof finding.captureId === "string" ? finding.captureId : undefined,
+      statusHistory: Array.isArray(finding.statusHistory)
+        ? finding.statusHistory
+            .filter((entry) =>
+              Boolean(entry) &&
+              ["open", "retest", "fixed", "accepted"].includes(entry.status) &&
+              typeof entry.changedAt === "number" &&
+              Number.isFinite(entry.changedAt),
+            )
+            .slice(-5_000)
+            .map((entry) => ({ status: entry.status, changedAt: entry.changedAt }))
+        : undefined,
       createdAt: typeof finding.createdAt === "number" ? finding.createdAt : Date.now(),
     };
     if (finding.schemaVersion === 2) {

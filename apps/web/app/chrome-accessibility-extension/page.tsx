@@ -11,7 +11,7 @@ const SETUP_GUIDE = "https://github.com/Sairo-app/app.thewcag.com#chrome-extensi
 export const metadata: Metadata = createPageMetadata({
   title: "Chrome Accessibility Extension for Audit Evidence",
   description:
-    "Mark an accessibility issue on a webpage, capture contextual screenshot and semantic evidence, draft a structured WCAG finding, and save it to TheWCAG desktop.",
+    "Select an inaccessible component, describe the issue, attach contextual screenshot and semantic evidence, and send it to TheWCAG desktop for auditor review.",
   path: "/chrome-accessibility-extension",
   keywords: [
     "Chrome accessibility extension",
@@ -24,11 +24,11 @@ export const metadata: Metadata = createPageMetadata({
 
 const FLOW = [
   ["Mark the barrier", "Choose one element or drag around a region on a regular webpage. The extension receives temporary access only after your action."],
-  ["Review the evidence", "Inspect the contextual screenshot, orange target marker, sanitized selector, accessible name, role, state, nearby heading, and bounded DOM excerpt."],
   ["Describe what happened", "Add the behavior you observed and the task the user was trying to complete. Deterministic checks remain separate from your conclusion."],
-  ["Control the payload", "Include or withhold the screenshot, element text, and sanitized page address before any AI request leaves the computer."],
-  ["Confirm the finding", "Review and edit the title, actual and expected results, impact, severity, affected users, WCAG mapping, resolution, and reproduction steps."],
-  ["Save to the audit", "The desktop bridge writes the confirmed evidence and finding into the selected local audit without exposing its account credential to Chrome."],
+  ["Review the evidence", "Inspect the contextual screenshot, orange target marker, sanitized selector, accessible name, role, state, nearby heading, and bounded DOM excerpt."],
+  ["Control the payload", "Include or withhold the screenshot, component data, and sanitized page address before sending the issue."],
+  ["Send to desktop review", "The local desktop connector stores the approved evidence, prepares a bounded draft, and logs the finding as Needs review in the selected audit."],
+  ["Confirm the auditor decision", "In desktop Findings, verify the actual and expected results, impact, severity, affected users, WCAG mapping, resolution, and reproduction steps. Nothing is silently confirmed."],
 ] as const;
 
 const FAQ = [
@@ -83,9 +83,9 @@ export default function ChromeAccessibilityExtensionPage() {
         }}
       />
       <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-16">
-        <h1>Chrome evidence capture for accessibility auditors</h1>
+        <h1>Capture a website issue where you find it</h1>
         <p>
-          TheWCAG&apos;s Chrome extension turns a browser observation into reviewable audit evidence. It captures page context and semantics around the control you selected, then helps create a structured finding without pretending that automation made the final decision.
+          TheWCAG&apos;s Chrome extension turns a browser observation into a desktop review item. Select the affected component, write the issue while the page is in front of you, and send its approved screenshot and semantic context to the local audit—without pretending that automation made the final decision.
         </p>
 
         <div className="release-note mt-8" role="note">
@@ -119,7 +119,7 @@ export default function ChromeAccessibilityExtensionPage() {
         </section>
 
         <section aria-labelledby="capture-flow-heading">
-          <h2 id="capture-flow-heading">From selected control to confirmed finding</h2>
+          <h2 id="capture-flow-heading">From selected control to desktop review</h2>
           <ol className="audit-software-workflow mt-6">
             {FLOW.map(([title, body], index) => (
               <li key={title}>
@@ -148,9 +148,9 @@ export default function ChromeAccessibilityExtensionPage() {
         <section aria-labelledby="connection-heading">
           <h2 id="connection-heading">How the extension, desktop app, and website connect</h2>
           <div className="connection-map mt-6">
-            <div><strong>Chrome extension</strong><p>Captures the selected webpage evidence and presents the draft for review.</p></div>
+            <div><strong>Chrome extension</strong><p>Captures the selected webpage evidence, your observation, and the exact payload you approve.</p></div>
             <span aria-hidden="true">→</span>
-            <div><strong>Desktop app</strong><p>Owns the audit, validates native messages, stores evidence locally, and keeps the account token out of Chrome.</p></div>
+            <div><strong>Desktop app</strong><p>Validates the message, stores the screenshot and context locally, and queues a finding for auditor review.</p></div>
             <span aria-hidden="true">→</span>
             <div><strong>Website service</strong><p>Handles browser sign-in, authorized AI generation, optional report publishing, downloads, and account management.</p></div>
           </div>
