@@ -3,7 +3,7 @@ import { createHmac } from "node:crypto";
 import type { Subscription } from "dodopayments/resources/subscriptions";
 import { deriveEffectiveEntitlements } from "./entitlements";
 import { isAllowedDodoHostedUrl, resetDodoClientForTests } from "./dodo";
-import { planForChoice, planForProduct } from "./plans";
+import { billingConfigured, planForChoice, planForProduct, validateLiveBillingConfiguration } from "./plans";
 import { normalizeDodoSubscription, reportRetentionDeleteAt } from "./status";
 import { isReportAvailable, reportAvailabilityForSubscription } from "./subscriptions";
 import { billingWebhookErrorCode, verifyDodoWebhook, webhookPayloadHash, webhookRemoteObjectId } from "./webhooks";
@@ -102,6 +102,32 @@ describe("billing plans and authorization", () => {
       expect(result.features.hostedReports.enabled).toBe(false);
     },
   );
+});
+
+describe("production billing configuration", () => {
+  beforeEach(() => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://app.thewcag.com");
+    vi.stubEnv("R2_PUBLIC_URL", "");
+    vi.stubEnv("DODO_PAYMENTS_API_KEY", "");
+    vi.stubEnv("DODO_PAYMENTS_WEBHOOK_KEY", "");
+    vi.stubEnv("DODO_PAYMENTS_BUSINESS_ID", "");
+    vi.stubEnv("DODO_PRO_MONTHLY_PRODUCT_ID", "");
+    vi.stubEnv("DODO_PRO_ANNUAL_PRODUCT_ID", "");
+    vi.stubEnv("DODO_PAYMENTS_ENVIRONMENT", "live_mode");
+    vi.stubEnv("BILLING_RECONCILE_SECRET", "");
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("starts with billing not configured when only the environment default is present", () => {
+    expect(billingConfigured()).toBe(false);
+    expect(() => validateLiveBillingConfiguration()).not.toThrow();
+  });
+
+  it("rejects a genuinely partial billing configuration", () => {
+    vi.stubEnv("DODO_PAYMENTS_API_KEY", "partial_api_key");
+    expect(() => validateLiveBillingConfiguration()).toThrow("Dodo Payments is partially configured");
+  });
 });
 
 describe("subscription and report lifecycle", () => {

@@ -86,8 +86,17 @@ export function validateLiveBillingConfiguration(): void {
   if (process.env.R2_PUBLIC_URL?.trim()) {
     throw new Error("R2_PUBLIC_URL is not supported. Hosted report storage must remain private.");
   }
-  const anyDodoValue = Object.keys(process.env).some((key) => key.startsWith("DODO_") && Boolean(process.env[key]));
-  if (!anyDodoValue) return;
+  // The Compose production default sets the target environment even when the
+  // optional billing integration is disabled. Treat credentials/product IDs,
+  // rather than that selector alone, as evidence that Dodo is being enabled.
+  const anyDodoCredential = [
+    process.env.DODO_PAYMENTS_API_KEY,
+    process.env.DODO_PAYMENTS_WEBHOOK_KEY,
+    process.env.DODO_PAYMENTS_BUSINESS_ID,
+    process.env.DODO_PRO_MONTHLY_PRODUCT_ID,
+    process.env.DODO_PRO_ANNUAL_PRODUCT_ID,
+  ].some((value) => Boolean(value?.trim()));
+  if (!anyDodoCredential) return;
   if (!billingConfigured()) {
     throw new Error("Dodo Payments is partially configured. Set the API key, webhook key, business ID, and both Pro product IDs.");
   }
