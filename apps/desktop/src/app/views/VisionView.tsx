@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Aperture,
   ArrowSquareOut,
@@ -17,6 +17,20 @@ const MODES = ["Original", "Protanopia", "Deuteranopia", "Tritanopia"];
 export function VisionView() {
   const [open, setOpen] = useState(false);
   const [message, show] = useTransientMessage();
+
+  useEffect(() => {
+    let active = true;
+    void desktop.invoke<boolean>("lens:state")
+      .then((next) => {
+        if (active) setOpen(next);
+      })
+      .catch(() => undefined);
+    const stop = desktop.on<boolean>("lens:changed", setOpen);
+    return () => {
+      active = false;
+      stop();
+    };
+  }, []);
 
   async function toggle() {
     try {

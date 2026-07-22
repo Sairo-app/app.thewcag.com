@@ -49,23 +49,38 @@ export function ReviewView({
   const [message, show] = useTransientMessage();
 
   useEffect(() => {
+    let cancelled = false;
+    setFindings([]);
+    setChecklist({});
+    setCaptures([]);
+    setSampleItems([]);
+    setTestRuns([]);
     void Promise.all([
       getStored<Finding[]>(auditStoreKey(audit.id, "findings"), []),
       getStored<ChecklistState>(auditStoreKey(audit.id, "checklist"), {}),
       listCaptures(audit.id),
       getStored<AuditSampleItem[]>(auditStoreKey(audit.id, "sampleItems"), []),
       getStored<AuditTestRun[]>(auditStoreKey(audit.id, "testRuns"), []),
-    ]).then(([nextFindings, nextChecklist, nextCaptures, nextSampleItems, nextTestRuns]) => {
-      const normalized = normalizeFindingReferences(nextFindings);
-      setFindings(normalized.findings);
-      if (normalized.changed) {
-        void setStored(auditStoreKey(audit.id, "findings"), normalized.findings);
-      }
-      setChecklist(nextChecklist);
-      setCaptures(nextCaptures);
-      setSampleItems(nextSampleItems);
-      setTestRuns(nextTestRuns);
-    });
+    ])
+      .then(([nextFindings, nextChecklist, nextCaptures, nextSampleItems, nextTestRuns]) => {
+        if (cancelled) return;
+        const normalized = normalizeFindingReferences(nextFindings);
+        setFindings(normalized.findings);
+        if (normalized.changed) {
+          void setStored(auditStoreKey(audit.id, "findings"), normalized.findings)
+            .catch((error) => show(messageFromError(error), true));
+        }
+        setChecklist(nextChecklist);
+        setCaptures(nextCaptures);
+        setSampleItems(nextSampleItems);
+        setTestRuns(nextTestRuns);
+      })
+      .catch((error) => {
+        if (!cancelled) show(messageFromError(error), true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [audit.id]);
 
   async function exportAudit() {

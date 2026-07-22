@@ -24,8 +24,8 @@ The core audit workflow remains local-first. AI output is always a draft, WCAG m
 | On-screen contrast picker | Samples foreground and background pixels from any application or monitor, displays the WCAG 2.x ratio and AA/AAA verdicts, reports signed APCA Lc, and suggests nearby passing colors. |
 | Capture and annotation | Captures a region or full screen into a re-editable local document. Tools include issue badges, arrows, boxes, target measurement, contrast probes, focus-order markers, solid or pixel redaction, text, and non-destructive crop-to-new-capture. |
 | Color-vision lens | Shows the screen beneath a protected, always-on-top window with protanopia, deuteranopia, tritanopia, or achromatopsia simulation, adjustable severity, split view, zoom, low-acuity blur, low-contrast simulation, and PNG export. |
-| Audit workspace | Treats each project as an isolated audit with its own evaluation goal, scope, structured representative sample, exclusions, browser and device matrix, assistive-technology coverage, captures, findings, checklist, conclusions, reports, and activity history. The five-stage Plan, Inspect, Evidence, Review, and Deliver workflow keeps the next required action and delivery state visible. Built-in and personal templates make approved matrices repeatable, while integrity-checked audit packages move the complete local record between computers. |
-| Guided testing | Provides reusable, step-by-step scripts for authentication, checkout, forms, media, downloadable documents, and design-system components. Each run records observations and planned, in-progress, blocked, or complete state alongside the representative sample. |
+| Audit workspace | Treats each project as an isolated audit with its own evaluation goal, scope, structured representative sample, exclusions, browser and device matrix, assistive-technology coverage, captures, findings, checklist, conclusions, reports, and activity history. The five-stage Plan, Inspect, Evidence, Review, and Deliver workflow keeps the next required action and delivery state visible. A built-in scoper can inspect up to nine bounded public same-origin HTML pages, group representative templates, detect feature signals, recommend one of eight reviewable templates, create an exact-URL sample and guided test matrix, and block inspection until the core plan is ready. A read-only coverage map connects each sample to tests, evidence, findings, and mapped WCAG decisions while keeping unassigned legacy work visible. Personal templates make approved matrices repeatable, while integrity-checked audit packages move the complete local record between computers. Discovery does not sign in, submit forms, leave the final origin, or make a conformance decision; the auditor must confirm every suggestion. |
+| Guided testing | Provides a focused Inspect session and reusable scripts for authentication, checkout, forms, media, downloadable documents, and design-system components. One action selects the next sample and run; the session keeps the exact location, required step observations, notes, status, contextual capture, and finding authoring together. Sample, run, capture, finding, and WCAG links survive export and import. |
 | Findings register | Supports AI-assisted and manual findings with stable human-readable references, location, linked capture, before-and-after comparison, repeated-component occurrences, affected-user groups, severity rationale, WCAG mapping, remediation owner, ticket, target date, accepted-risk rationale, and retest records. Built-in and personal views, duplication, multi-select triage, undoable bulk owner/status/severity/date changes, sorting, editing, recovery, and selected-item Markdown export keep remediation queues manageable. |
 | WCAG checklist | Tracks the criteria applicable to the selected WCAG 2.2 Level A or AA target by POUR principle. Each criterion includes informative manual test prompts, a direct W3C Understanding reference, pass, fail, or reasoned not-applicable decisions, notes, progress, filters, failure-to-finding linkage, contextual CSV or Markdown exports, keyboard-first row navigation, configurable decision keys, and undo. |
 | Palette matrix | Accepts up to 16 hex colors, persists the palette, calculates every foreground/background pair, visualizes AA-normal and AA-large/UI thresholds, and copies the matrix as CSV. |
@@ -295,13 +295,21 @@ R2_ENDPOINT=http://localhost:9000
 R2_ACCESS_KEY_ID=minioadmin
 R2_SECRET_ACCESS_KEY=minioadmin
 R2_BUCKET=thewcag-reports
-R2_PUBLIC_URL=http://localhost:9000/thewcag-reports
 ADMIN_EMAILS=
 OPENAI_API_KEY=
 OPENAI_FINDING_MODEL=gpt-5.6-terra
 AI_SAFETY_SALT=replace-with-a-separate-random-secret
-AI_GENERATIONS_PER_HOUR=30
-AI_GENERATIONS_PER_DAY=200
+DODO_PAYMENTS_API_KEY=
+DODO_PAYMENTS_WEBHOOK_KEY=
+DODO_PAYMENTS_BUSINESS_ID=
+DODO_PAYMENTS_ENVIRONMENT=test_mode
+DODO_PRO_MONTHLY_PRODUCT_ID=
+DODO_PRO_ANNUAL_PRODUCT_ID=
+BILLING_RECONCILE_SECRET=replace-with-a-separate-32-character-secret
+PRO_AI_GENERATIONS_PER_PERIOD=150
+PRO_AI_GENERATIONS_PER_HOUR=20
+PRO_HOSTED_REPORT_LIMIT=100
+PRO_STORAGE_QUOTA_BYTES=1073741824
 ```
 
 Create the development bucket, then start the website:
@@ -335,13 +343,16 @@ node --env-file=.env.local scripts/dev-seed.mjs
 | `R2_ACCESS_KEY_ID` | Report storage | Object-storage access key. |
 | `R2_SECRET_ACCESS_KEY` | Report storage | Object-storage secret. |
 | `R2_BUCKET` | Report storage | Bucket name; production defaults conceptually to `thewcag-reports` but explicit configuration is validated before use. |
-| `R2_PUBLIC_URL` | Production delivery | Public R2 custom domain or managed URL. If absent, the app streams objects through its image routes. |
 | `ADMIN_EMAILS` | Admin | Comma-separated, case-insensitive list allowed to access `/admin`; unset means no admins. |
 | `OPENAI_API_KEY` | Optional AI authoring | Server-only provider credential. If absent, the endpoint reports unavailable and the extension keeps its local draft. |
 | `OPENAI_FINDING_MODEL` | Optional AI authoring | Configurable structured multimodal model, defaulting to `gpt-5.6-terra`. Change only after representative accessibility-finding evaluations. |
 | `AI_SAFETY_SALT` | AI privacy | Separate secret used to derive a stable, non-reversible provider safety identifier from the device record. |
-| `AI_GENERATIONS_PER_HOUR` | AI limits | Per-account rolling hourly generation limit. |
-| `AI_GENERATIONS_PER_DAY` | AI limits | Per-account rolling daily generation limit. |
+| `DODO_PAYMENTS_API_KEY`, `DODO_PAYMENTS_WEBHOOK_KEY`, `DODO_PAYMENTS_BUSINESS_ID` | Pro billing | Server-only Dodo API, signature, and business identifiers. |
+| `DODO_PAYMENTS_ENVIRONMENT` | Pro billing | `test_mode` locally/staging and `live_mode` in production. |
+| `DODO_PRO_MONTHLY_PRODUCT_ID`, `DODO_PRO_ANNUAL_PRODUCT_ID` | Pro billing | Allowlisted recurring Dodo products. |
+| `BILLING_RECONCILE_SECRET` | Billing operations | Strong bearer secret for the scheduled reconciliation and retention route. |
+| `PRO_AI_GENERATIONS_PER_PERIOD`, `PRO_AI_GENERATIONS_PER_HOUR` | Pro allowance | Managed-AI billing-period and abuse limits. |
+| `PRO_HOSTED_REPORT_LIMIT`, `PRO_STORAGE_QUOTA_BYTES` | Pro allowance | Hosted report count and private-object-storage caps. |
 
 Desktop and extension builds also use:
 
@@ -366,7 +377,7 @@ It currently performs:
 3. Desktop storage, native-host, and native-protocol tests.
 4. Website payload, device-connect, AI schema, and brand-logo validation tests.
 5. Node release-version and updater-manifest tests.
-6. TypeScript validation for contracts, extension, desktop, and website.
+6. Repository-wide ESLint checks plus TypeScript validation for contracts, extension, desktop, and website.
 7. Extension and Electron production builds.
 8. The Next.js production build and route generation.
 
@@ -422,8 +433,8 @@ Production desktop releases are tag-driven. Before tagging:
 5. Create and push the exact `v<desktop-version>` tag.
 
 ```sh
-git tag -a v3.0.3 -m "TheWCAG v3.0.3"
-git push origin v3.0.3
+git tag -a v3.0.4 -m "TheWCAG v3.0.4"
+git push origin v3.0.4
 ```
 
 The release workflow first rejects a tag that does not exactly match the desktop package version and refuses to publish unless all mandatory Apple signing and notarization credentials plus the valid repository variable `THEWCAG_EXTENSION_ID` are present. It then:
@@ -458,6 +469,8 @@ Changes should preserve keyboard access, visible focus, semantic names and state
 - [SKILL.md](SKILL.md): repository-specific implementation and verification workflow.
 - [CHANGELOG.md](CHANGELOG.md): shipped versions and unreleased changes.
 - [docs/AUDITOR-PRODUCT-ROADMAP.md](docs/AUDITOR-PRODUCT-ROADMAP.md): phased plan for a complete auditor workflow, integrations, collaboration, reporting, evidence, and enterprise controls.
+- [docs/SAAS-DODO-PAYMENTS-PLAN.md](docs/SAAS-DODO-PAYMENTS-PLAN.md): implementation-ready Free/Pro SaaS, entitlement, Dodo Payments subscription, webhook, retention, testing, and rollout plan.
+- [docs/BILLING-OPERATIONS.md](docs/BILLING-OPERATIONS.md): Dodo catalog, deployment, reconciliation, retention, incident, and launch operations.
 - [docs/RELEASING.md](docs/RELEASING.md): production signing and release operations.
 - [docs/SITE-INTEGRATION.md](docs/SITE-INTEGRATION.md): current desktop, website, authentication, publishing, and download integration.
 - [docs/AI-EXTENSION-IMPLEMENTATION.md](docs/AI-EXTENSION-IMPLEMENTATION.md): browser evidence architecture, contracts, privacy boundaries, phased delivery, and acceptance criteria.

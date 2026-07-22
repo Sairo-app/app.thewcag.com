@@ -240,7 +240,7 @@ h1 { font-size: clamp(23px, 7vw, 30px); line-height: 1.08; letter-spacing: -.035
 
 .field { display: grid; gap: 6px; margin-top: 17px; }
 .field > span, fieldset > legend { color: var(--ink); font-size: 11px; font-weight: 700; }
-.field input, .field textarea, .field select, .wcag-card input, .wcag-card textarea {
+.field input, .field textarea, .field select, .wcag-card input, .wcag-card textarea, .wcag-card select {
   width: 100%;
   min-height: 42px;
   padding: 10px 11px;
@@ -319,9 +319,11 @@ fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 .affected-users input { position: absolute; inline-size: 1px; block-size: 1px; clip: rect(0 0 0 0); clip-path: inset(50%); overflow: hidden; white-space: nowrap; }
 
 .wcag-card { margin-top: 7px; padding: 9px; display: grid; gap: 7px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
-.wcag-card-top { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 6px; }
-.wcag-card-top .confidence { grid-column: 1 / -1; justify-self: start; }
-.wcag-card input, .wcag-card textarea { min-height: 36px; padding: 7px 8px; font-size: 10px; }
+.wcag-card-top { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 6px; }
+.wcag-card-top .confidence { justify-self: start; }
+.wcag-card-top .button { width: auto; min-height: 34px; padding: 6px 8px; }
+.wcag-card input, .wcag-card textarea, .wcag-card select { min-height: 36px; padding: 7px 8px; font-size: 10px; }
+.wcag-card strong { font-size: 11px; line-height: 1.4; }
 .wcag-card textarea { min-height: 62px; }
 .manual-checks { margin-top: 18px; padding: 12px; display: grid; gap: 7px; border: 1px solid #d9c9aa; border-radius: 10px; background: #fff9ed; }
 .manual-checks > strong { font-size: 11px; }

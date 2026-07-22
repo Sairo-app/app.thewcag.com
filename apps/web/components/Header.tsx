@@ -15,10 +15,12 @@ import {
 } from "@/components/icons";
 
 const MOBILE_NAV = [
+  ["/getting-started", "Getting started", <BookIcon key="getting-started" size={16} />],
   ["/accessibility-audit-software", "Audit software", <BookIcon key="software" size={16} />],
   ["/chrome-accessibility-extension", "Chrome extension", <ContrastIcon key="extension" size={16} />],
+  ["/pricing", "Pricing", <BookIcon key="pricing" size={16} />],
   ["/#platforms", "Mac and Windows", <CropIcon key="platforms" size={16} />],
-  ["/wcag-contrast", "Guides", <EyeIcon key="resources" size={16} />],
+  ["/wcag-contrast", "Contrast guide", <EyeIcon key="resources" size={16} />],
 ] as const;
 
 export async function Header() {
@@ -46,6 +48,8 @@ export async function Header() {
               <div className="account-menu__panel">
                 <p>{session?.user?.email}</p>
                 {admin && <Link href="/admin">Admin</Link>}
+                <Link href="/account">Account and devices</Link>
+                <Link href="/pricing">Plans and pricing</Link>
                 <Link href="/screenshots"><ImageIcon size={15} />My reports</Link>
                 <Link href="/brand">Report branding</Link>
                 <form action={async () => { "use server"; await signOut({ redirectTo: "/" }); }}>
@@ -70,6 +74,8 @@ export async function Header() {
               {signedIn ? (
                 <>
                   {admin && <Link href="/admin" className="site-menu__link">Admin</Link>}
+                  <Link href="/account" className="site-menu__link">Account and devices</Link>
+                  <Link href="/pricing" className="site-menu__link">Plans and pricing</Link>
                   <Link href="/screenshots" className="site-menu__link"><ImageIcon size={16} />My reports</Link>
                   <form action={async () => { "use server"; await signOut({ redirectTo: "/" }); }}>
                     <button type="submit" className="site-menu__link"><LogOutIcon size={16} />Sign out</button>

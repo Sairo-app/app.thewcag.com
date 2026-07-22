@@ -21,8 +21,10 @@ import {
 } from "@phosphor-icons/react";
 import type { OverlayResult, WorkspaceStage } from "../../shared/desktop";
 import { desktop } from "../api";
+import type { AuditSessionSelection } from "../audit-coverage";
 import { auditStoreKey, type RecordAuditActivity } from "../audits";
 import { Button, Segmented, StatusBadge, Toast } from "../components";
+import { GuidedAuditSession } from "../GuidedAuditSession";
 import {
   messageFromError,
   useStoredState,
@@ -49,10 +51,12 @@ function cleanHex(input: string, fallback: string) {
 
 export function InspectView({
   auditId,
+  initialSession,
   onNavigate,
   recordActivity,
 }: {
   auditId: string;
+  initialSession: AuditSessionSelection | null;
   onNavigate: (stage: WorkspaceStage) => void;
   recordActivity: RecordAuditActivity;
 }) {
@@ -109,26 +113,34 @@ export function InspectView({
   }
 
   async function saveFinding() {
-    await desktop.invoke("store:add-findings", {
-      auditId,
-      items: [
-        {
-          key: crypto.randomUUID(),
-          title: `Contrast ${verdict.ratio.toFixed(2)}:1`,
-          wcag: MODES[mode].sc,
-          severity: passes ? "minor" : verdict.ratio < 3 ? "major" : "minor",
-          status: "open",
-          note: `${fg} on ${bg} ${passes ? "passes" : "fails"} ${MODES[mode].label.toLowerCase()} at ${target}:1.`,
-          createdAt: Date.now(),
-        },
-      ],
-    });
-    await recordActivity({
-      kind: "finding",
-      title: "Contrast finding saved",
-      detail: `${verdict.ratio.toFixed(2)}:1, ${MODES[mode].sc}`,
-    });
-    show("Finding saved to evidence");
+    if (passes) {
+      show("This pair passes the selected requirement, so no open finding was created.");
+      return;
+    }
+    try {
+      await desktop.invoke("store:add-findings", {
+        auditId,
+        items: [
+          {
+            key: crypto.randomUUID(),
+            title: `Contrast ${verdict.ratio.toFixed(2)}:1`,
+            wcag: MODES[mode].sc,
+            severity: verdict.ratio < 3 ? "major" : "minor",
+            status: "open",
+            note: `${fg} on ${bg} fails ${MODES[mode].label.toLowerCase()} at ${target}:1.`,
+            createdAt: Date.now(),
+          },
+        ],
+      });
+      await recordActivity({
+        kind: "finding",
+        title: "Contrast finding saved",
+        detail: `${verdict.ratio.toFixed(2)}:1, ${MODES[mode].sc}`,
+      });
+      show("Finding saved to evidence");
+    } catch (error) {
+      show(messageFromError(error), true);
+    }
   }
 
   const checks = useMemo(
@@ -158,6 +170,12 @@ export function InspectView({
   return (
     <div className="inspect-layout">
       <Toast message={message} />
+      <GuidedAuditSession
+        auditId={auditId}
+        initialSession={initialSession}
+        onNavigate={onNavigate}
+        recordActivity={recordActivity}
+      />
       <section
         className="contrast-stage"
         style={{ backgroundColor: bg, color: fg }}

@@ -115,6 +115,7 @@ export function EvidenceView({
   } | null>(null);
   const bulkUndoRef = useRef<{ findings: Finding[]; label: string } | null>(null);
   const findingsWriteQueue = useRef<Promise<void>>(Promise.resolve());
+  const refreshVersion = useRef(0);
   const findingsKey = auditStoreKey(auditId, "findings");
   const findingViewsKey = auditStoreKey(auditId, "findingViews");
 
@@ -126,11 +127,13 @@ export function EvidenceView({
   }
 
   async function refresh() {
+    const version = ++refreshVersion.current;
     const [nextCaptures, storedFindings, nextViews] = await Promise.all([
       listCaptures(auditId),
       getStored<Finding[]>(findingsKey, []),
       getStored<FindingSavedView[]>(findingViewsKey, []),
     ]);
+    if (version !== refreshVersion.current) return;
     const normalized = normalizeFindingReferences(storedFindings);
     setCaptures(nextCaptures);
     setFindings(normalized.findings);
@@ -212,7 +215,12 @@ export function EvidenceView({
         : item,
     );
     setFindings(next);
-    await persistFindings(next);
+    try {
+      await persistFindings(next);
+    } catch (error) {
+      setFindings(findings);
+      show(messageFromError(error), true);
+    }
   }
 
   async function saveFinding(value: FindingEditorValue) {
@@ -261,42 +269,61 @@ export function EvidenceView({
     const next = existing
       ? findings.map((item) => item.key === existing.key ? nextFinding : item)
       : [nextFinding, ...findings];
-    setFindings(next);
-    await persistFindings(next);
-    await recordActivity({
-      kind: "finding",
-      title: existing ? "Finding updated" : "Manual finding created",
-      detail: nextFinding.title,
-    });
-    setEditingFinding(undefined);
-    show(existing ? "Finding updated" : "Finding created");
+    try {
+      await persistFindings(next);
+      setFindings(next);
+      setEditingFinding(undefined);
+      try {
+        await recordActivity({
+          kind: "finding",
+          title: existing ? "Finding updated" : "Manual finding created",
+          detail: nextFinding.title,
+        });
+      } catch (error) {
+        show(
+          `${existing ? "Finding updated" : "Finding created"}, but its activity entry could not be saved: ${messageFromError(error)}`,
+          true,
+        );
+        return;
+      }
+      show(existing ? "Finding updated" : "Finding created");
+    } catch (error) {
+      show(messageFromError(error), true);
+    }
   }
 
   async function removeFinding(key: string) {
     const index = findings.findIndex((item) => item.key === key);
     if (index < 0) return;
     const next = findings.filter((item) => item.key !== key);
-    setFindings(next);
     const checklistKey = auditStoreKey(auditId, "checklist");
-    const checklist = await getStored<Record<string, { result: string; note: string; findingKey?: string }>>(
-      checklistKey,
-      {},
-    );
-    const links = Object.entries(checklist)
-      .filter(([, entry]) => entry.findingKey === key)
-      .map(([criterion]) => criterion);
-    const nextChecklist = Object.fromEntries(
-      Object.entries(checklist).map(([criterion, entry]) => [
-        criterion,
-        entry.findingKey === key ? { ...entry, findingKey: undefined } : entry,
-      ]),
-    );
-    deletedRef.current = { item: findings[index], index, links };
-    await Promise.all([
-      persistFindings(next),
-      setStored(checklistKey, nextChecklist),
-    ]);
-    show("Finding removed. Use Undo below to restore it.");
+    try {
+      const checklist = await getStored<Record<string, { result: string; note: string; findingKey?: string }>>(
+        checklistKey,
+        {},
+      );
+      const links = Object.entries(checklist)
+        .filter(([, entry]) => entry.findingKey === key)
+        .map(([criterion]) => criterion);
+      const nextChecklist = Object.fromEntries(
+        Object.entries(checklist).map(([criterion, entry]) => [
+          criterion,
+          entry.findingKey === key ? { ...entry, findingKey: undefined } : entry,
+        ]),
+      );
+      await setStored(checklistKey, nextChecklist);
+      try {
+        await persistFindings(next);
+      } catch (error) {
+        await setStored(checklistKey, checklist).catch(() => undefined);
+        throw error;
+      }
+      deletedRef.current = { item: findings[index], index, links };
+      setFindings(next);
+      show("Finding removed. Use Undo below to restore it.");
+    } catch (error) {
+      show(messageFromError(error), true);
+    }
   }
 
   async function undoFinding() {

@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { desc, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { desktopDevices, reports, users } from "@/lib/schema";
+import { billingSubscriptions, billingWebhookEvents, desktopDevices, reports, users } from "@/lib/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,7 @@ function formatDate(d: Date | null): string {
 }
 
 export default async function AdminOverview() {
-  const [[userAgg], [reportAgg], [deviceAgg], recentUsers, recentReports] = await Promise.all([
+  const [[userAgg], [reportAgg], [deviceAgg], [proAgg], [webhookFailureAgg], recentUsers, recentReports] = await Promise.all([
     db.select({ n: sql<number>`count(*)::int` }).from(users),
     db
       .select({
@@ -29,7 +29,9 @@ export default async function AdminOverview() {
     db
       .select({ n: sql<number>`count(*)::int` })
       .from(desktopDevices)
-      .where(isNull(desktopDevices.revokedAt)),
+      .where(and(isNull(desktopDevices.revokedAt), gt(desktopDevices.expiresAt, new Date()))),
+    db.select({ n: sql<number>`count(distinct ${billingSubscriptions.userId})::int` }).from(billingSubscriptions).where(and(eq(billingSubscriptions.status, "active"), gt(billingSubscriptions.currentPeriodEnd, new Date()))),
+    db.select({ n: sql<number>`count(*)::int` }).from(billingWebhookEvents).where(eq(billingWebhookEvents.status, "failed")),
     db
       .select({ email: users.email, verified: users.emailVerified, brand: users.brandName })
       .from(users)
@@ -48,11 +50,13 @@ export default async function AdminOverview() {
     { label: "Total views", value: String(reportAgg.views), href: "/admin/reports" },
     { label: "Storage used", value: formatBytes(Number(reportAgg.bytes)), href: "/admin/reports" },
     { label: "Active devices", value: String(deviceAgg.n), href: "/admin/users" },
+    { label: "Active Pro", value: String(proAgg.n), href: "/admin/users" },
+    { label: "Failed webhooks", value: String(webhookFailureAgg.n), href: "/admin" },
   ];
 
   return (
     <div className="space-y-8">
-      <section aria-label="Key metrics" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <section aria-label="Key metrics" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
         {KPIS.map((k) => (
           <Link key={k.label} href={k.href} className="card block p-4 transition-shadow hover:shadow-md">
             <p className="text-xs font-medium uppercase tracking-wide text-muted">{k.label}</p>

@@ -44,7 +44,6 @@ import {
   SEVERITY_COLORS,
   type AnnotationDoc,
   type IssueId,
-  type Severity,
   type Shape,
   type Tool,
 } from "../lib/annotate/model";
@@ -202,7 +201,8 @@ export function AnnotateView() {
       }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
         event.preventDefault();
-        event.shiftKey ? redoOnce() : undoOnce();
+        if (event.shiftKey) redoOnce();
+        else undoOnce();
       }
       if (event.key === "Escape") {
         setDraft(null);
@@ -234,12 +234,17 @@ export function AnnotateView() {
   }
   function point(event: ReactPointerEvent): Point {
     const rect = event.currentTarget.getBoundingClientRect();
+    const width = image?.naturalWidth || 1;
+    const height = image?.naturalHeight || 1;
     return {
-      x:
-        ((event.clientX - rect.left) / rect.width) * (image?.naturalWidth || 1),
-      y:
-        ((event.clientY - rect.top) / rect.height) *
-        (image?.naturalHeight || 1),
+      x: Math.max(
+        0,
+        Math.min(width - 1, ((event.clientX - rect.left) / Math.max(rect.width, 1)) * width),
+      ),
+      y: Math.max(
+        0,
+        Math.min(height - 1, ((event.clientY - rect.top) / Math.max(rect.height, 1)) * height),
+      ),
     };
   }
   function commit(next: AnnotationDoc) {
@@ -381,6 +386,9 @@ export function AnnotateView() {
   }
   async function pointerUp(event: ReactPointerEvent<HTMLCanvasElement>) {
     if (!drag) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
     const end = point(event);
     if (tool === "select" && drag.shape) {
       setUndo((items) => [
@@ -418,7 +426,7 @@ export function AnnotateView() {
       return;
     }
     if (draft) {
-      let next = { ...draft, id: doc.nextId, x2: end.x, y2: end.y };
+      const next = { ...draft, id: doc.nextId, x2: end.x, y2: end.y };
       if (Math.hypot(next.x2 - next.x1, next.y2 - next.y1) > 3) {
         if (next.kind === "probe" && baseRef.current) {
           const ctx = baseRef.current.getContext("2d", {
@@ -540,6 +548,10 @@ export function AnnotateView() {
   }
   async function addFindings() {
     const badges = doc.shapes.filter((shape) => shape.kind === "badge");
+    if (!badges.length) {
+      show("Add at least one issue marker before creating findings.", true);
+      return;
+    }
     const items: Finding[] = badges.map((shape, index) => {
       const issue =
         ISSUE_TYPES.find((item) => item.id === shape.issueType) ||
@@ -555,13 +567,17 @@ export function AnnotateView() {
         createdAt: Date.now(),
       };
     });
-    await desktop.invoke("store:add-findings", {
-      items,
-      auditId: capture?.auditId,
-    });
-    show(
-      `${items.length} finding${items.length === 1 ? "" : "s"} added to the audit`,
-    );
+    try {
+      await desktop.invoke("store:add-findings", {
+        items,
+        auditId: capture?.auditId,
+      });
+      show(
+        `${items.length} finding${items.length === 1 ? "" : "s"} added to the audit`,
+      );
+    } catch (error) {
+      show(messageFromError(error), true);
+    }
   }
   async function reviewReport() {
     await save(false);
@@ -683,7 +699,11 @@ export function AnnotateView() {
               aria-label={`Annotation canvas with ${doc.shapes.length} annotations. Select an annotation from the list or use arrow keys to move the selected annotation.`}
               onPointerDown={pointerDown}
               onPointerMove={pointerMove}
-              onPointerUp={(event) => void pointerUp(event)}
+              onPointerUp={(event) => void pointerUp(event).catch((error) => {
+                setDrag(null);
+                show(messageFromError(error), true);
+              })}
+              onPointerCancel={() => setDrag(null)}
               data-tool={tool}
             />
           </div>

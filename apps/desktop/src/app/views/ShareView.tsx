@@ -22,7 +22,7 @@ import type {
   WorkspaceStage,
 } from "../../shared/desktop";
 import { desktop, getStored, listCaptures, setStored } from "../api";
-import { auditPlanProgress } from "../audit-plan";
+import { auditPlanProgress, auditTestRunComplete } from "../audit-plan";
 import { auditStoreKey, type RecordAuditActivity } from "../audits";
 import { Button, Field, StatusBadge, Toast } from "../components";
 import { WCAG_CRITERIA } from "../data/wcag";
@@ -98,6 +98,20 @@ export function ShareView({
   const reportsKey = auditStoreKey(audit.id, "reports");
 
   useEffect(() => {
+    let cancelled = false;
+    setCaptures([]);
+    setFindings([]);
+    setChecklist({});
+    setSampleItems([]);
+    setTestRuns([]);
+    setReports([]);
+    setCaptureId("");
+    setTitle(`${audit.project} accessibility report`);
+    setDescription(
+      audit.scope || `Accessibility review for ${audit.target || audit.project}.`,
+    );
+    setAttested(false);
+    setPublishedUrl("");
     void Promise.all([
       listCaptures(audit.id),
       getStored<Finding[]>(auditStoreKey(audit.id, "findings"), []),
@@ -116,6 +130,7 @@ export function ShareView({
         nextReports,
         nextAccount,
       ]) => {
+        if (cancelled) return;
         setCaptures(nextCaptures);
         const normalized = normalizeFindingReferences(nextFindings);
         setFindings(normalized.findings);
@@ -130,13 +145,19 @@ export function ShareView({
         setTestRuns(nextTestRuns);
         setReports(nextReports);
         setAccount(nextAccount);
-        setCaptureId((current) => current || nextCaptures[0]?.id || "");
+        setCaptureId(nextCaptures[0]?.id || "");
       })
-      .catch((error) => show(messageFromError(error), true));
-    return desktop.on(
+      .catch((error) => {
+        if (!cancelled) show(messageFromError(error), true);
+      });
+    const stopAccount = desktop.on(
       "account:changed",
       () => void desktop.invoke<Account>("auth:account").then(setAccount),
     );
+    return () => {
+      cancelled = true;
+      stopAccount();
+    };
   }, [audit.id]);
 
   const selectedCapture =
@@ -183,8 +204,11 @@ export function ShareView({
     ).length;
     const sampleComplete =
       sampleItems.length > 0 &&
-      sampleItems.every((item) => item.status === "complete");
-    const testRunsComplete = testRuns.every((run) => run.status === "complete");
+      sampleItems.every(
+        (item) => item.status === "complete" && item.location.trim(),
+      );
+    const testRunsComplete =
+      testRuns.length > 0 && testRuns.every(auditTestRunComplete);
     const incompleteFindings = activeFindings.filter(
       (finding) =>
         !finding.wcag.trim() ||
@@ -238,7 +262,8 @@ export function ShareView({
       description.trim() &&
       attested &&
       includedFindings.length &&
-      account.signedIn,
+      account.signedIn &&
+      account.features?.hostedReports.enabled,
   );
 
   async function signIn() {
@@ -261,7 +286,7 @@ export function ShareView({
     const completedAt =
       conclusion === "meets-target" || conclusion === "does-not-meet-target"
         ? audit.completedAt || new Date().toISOString().slice(0, 10)
-        : audit.completedAt;
+        : "";
     onAuditChange({ conclusion, completedAt });
     try {
       await recordActivity({
@@ -310,7 +335,8 @@ export function ShareView({
       };
       const next = [report, ...reports].slice(0, 40);
       setReports(next);
-      await Promise.all([
+      setPublishedUrl(url);
+      const followUp = await Promise.allSettled([
         setStored(reportsKey, next),
         desktop.invoke("clipboard:write-text", { text: url }),
         recordActivity({
@@ -320,8 +346,13 @@ export function ShareView({
           url,
         }),
       ]);
-      setPublishedUrl(url);
-      show("Report published. Link copied to clipboard.");
+      const failed = followUp.filter((result) => result.status === "rejected").length;
+      show(
+        failed
+          ? `Report published, but ${failed} local follow-up ${failed === 1 ? "action" : "actions"} failed. The share link is available below.`
+          : "Report published. Link copied to clipboard.",
+        failed > 0,
+      );
     } catch (error) {
       show(messageFromError(error), true);
     } finally {
@@ -624,7 +655,11 @@ export function ShareView({
           <Field label="Evidence capture">
             <select
               value={captureId}
-              onChange={(event) => setCaptureId(event.target.value)}
+              onChange={(event) => {
+                setCaptureId(event.target.value);
+                setAttested(false);
+                setPublishedUrl("");
+              }}
             >
               {captures.map((capture) => (
                 <option key={capture.id} value={capture.id}>
@@ -738,10 +773,24 @@ export function ShareView({
                 Sign in
               </Button>
             </div>
+          ) : !account.features?.hostedReports.enabled ? (
+            <div className="sign-in-callout">
+              <LockKey size={20} weight="duotone" />
+              <div>
+                <strong>Pro is required for hosted links</strong>
+                <p>Local reports and exports remain free and stay on this computer.</p>
+              </div>
+              <Button
+                icon={ArrowSquareOut}
+                onClick={() => void desktop.invoke("shell:open-external", { url: account.actions?.upgradeUrl || "https://app.thewcag.com/pricing" })}
+              >
+                View Pro
+              </Button>
+            </div>
           ) : (
             <div className="signed-in-line">
               <Check size={16} weight="bold" />
-              <span>Publishing as {account.email}</span>
+              <span>Publishing as {account.email} · {account.features.hostedReports.active} of {account.features.hostedReports.limit} hosted reports</span>
             </div>
           )}
           <Button
@@ -765,6 +814,8 @@ export function ShareView({
             <p className="publish-hint">
               This capture has no included findings.
             </p>
+          ) : account.signedIn && !account.features?.hostedReports.enabled ? (
+            <p className="publish-hint">Choose Pro to create a hosted share link, or export the report locally for free.</p>
           ) : null}
         </aside>
       </div>

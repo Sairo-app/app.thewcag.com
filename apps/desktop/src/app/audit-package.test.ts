@@ -54,4 +54,80 @@ describe("audit packages", () => {
       "invalid finding records",
     );
   });
+
+  it("round trips a confirmed scoper profile and rejects malformed profiles", async () => {
+    const source = payload();
+    source.audit.scopeProfile = {
+      version: 1,
+      targetType: "web-product",
+      featureIds: ["authentication", "forms", "components"],
+      templateId: "web-product-aa",
+      confidence: "high",
+      reasons: ["Selected by the auditor."],
+      confirmedAt: Date.now(),
+    };
+    await expect(parseAuditPackage(await serializeAuditPackage(source))).resolves.toEqual(source);
+
+    source.audit.scopeProfile.targetType = "unknown" as never;
+    await expect(serializeAuditPackage(source)).rejects.toThrow("invalid scope profile");
+  });
+
+  it("bounds scope-profile metadata before importing it", async () => {
+    const source = payload();
+    source.audit.scopeProfile = {
+      version: 1,
+      targetType: "web-product",
+      featureIds: ["forms", "forms"],
+      templateId: "web-product-aa",
+      confidence: "medium",
+      reasons: ["Detected a web application."],
+      confirmedAt: Date.now(),
+    };
+    await expect(serializeAuditPackage(source)).rejects.toThrow("invalid scope profile");
+
+    source.audit.scopeProfile.featureIds = ["forms"];
+    source.audit.scopeProfile.reasons = ["x".repeat(501)];
+    await expect(serializeAuditPackage(source)).rejects.toThrow("invalid scope profile");
+  });
+
+  it("round trips coverage links and rejects oversized context identifiers", async () => {
+    const source = payload();
+    source.sections.sampleItems = [{
+      id: "sample-checkout",
+      kind: "flow",
+      label: "Checkout",
+      location: "/checkout",
+      status: "in-progress",
+      notes: "",
+      createdAt: 1,
+      modifiedAt: 1,
+    }];
+    source.sections.testRuns = [{
+      id: "run-forms",
+      scriptId: "forms",
+      sampleItemId: "sample-checkout",
+      title: "Forms and validation",
+      category: "forms",
+      status: "in-progress",
+      steps: [{ id: "step-1", label: "Submit invalid data", complete: true, observation: "Error announced" }],
+      notes: "",
+      createdAt: 1,
+      modifiedAt: 1,
+    }];
+    source.sections.findings = [{
+      key: "finding-1",
+      sampleItemId: "sample-checkout",
+      testRunId: "run-forms",
+      title: "Error is not identified",
+      wcag: "3.3.1",
+      severity: "major",
+      status: "open",
+      note: "",
+      createdAt: 1,
+    }];
+    await expect(parseAuditPackage(await serializeAuditPackage(source))).resolves.toEqual(source);
+
+    source.sections.testRuns[0].sampleItemId = "x".repeat(101);
+    await expect(serializeAuditPackage(source)).rejects.toThrow("invalid guided test records");
+  });
 });

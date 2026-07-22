@@ -1,5 +1,46 @@
 # Changelog
 
+## v3.0.4 - 2026-07-22
+
+**Windows reliability**
+
+- Fixed the installed Windows blank-window failure by retaining Electron's required `en-US` runtime locale and rejecting broken packages during release builds.
+- Added visible startup failure recovery, renderer-process diagnostics, writable per-user Chrome native-host registration, and explicit isolated-profile support for packaged smoke tests.
+
+**Audit planning**
+
+- Added an auditor-controlled scoper with bounded public same-origin page inspection, exact representative URLs, template grouping, explained product-type and feature detection, eight built-in templates, guided test matrices, and a readiness gate before inspection.
+- Added portable, bounded scoper metadata; invalidation after material manual scope changes; local-calendar start dates; safe cross-audit loading; and reset of stale final conclusions when a plan is replaced.
+- Added a read-only Audit Coverage Map that connects each representative sample to guided runs, captures, findings, and mapped WCAG decisions, highlights trace gaps, preserves unassigned legacy work, and opens the relevant existing workflow screen.
+
+**Guided audit sessions**
+
+- Added a focused Inspect session with one-action next-test selection, exact sample location, step observations, run and sample status, contextual evidence capture, and full finding authoring in one workspace.
+- Linked new runs, captures, and findings to their sample and test context without breaking older audits, and preserved those relationships through integrity-checked package export and import.
+- Required every completed guided step to include an observation across planning, session progress, delivery readiness, and exported records.
+
+**Build quality**
+
+- Added repository-wide ESLint, packaging, and scoper regression coverage and made local Windows web builds avoid unsupported standalone symlink creation while preserving Linux and Docker standalone output.
+- Upgraded Drizzle ORM and the PostCSS resolution to patched releases so the production dependency audit has no known vulnerabilities.
+
+**Website onboarding**
+
+- Added a responsive first-time audit guide with seven original screenshots captured from the current Windows desktop application, including the Audit Coverage Map and Guided Audit Session, detailed Plan-to-Deliver instructions, full-size image links, privacy and readiness callouts, HowTo metadata, and navigation/sitemap integration.
+- Reframed the homepage workflow preview with original responsive SVG evidence artwork, focus and WCAG signals, reduced-motion-safe animation, and stable interactive Capture, AI Draft, Review, and Deliver states.
+
+**Optional Pro hosted services**
+
+- Kept the complete local audit workflow, exports, deterministic drafts, and bring-your-own-key AI free while adding one optional Pro plan for managed AI, hosted reports, analytics, storage, and hosted branding.
+- Integrated Dodo Payments hosted checkout and customer portal with signed, bounded, idempotent, order-safe webhooks; allowlisted products; normalized entitlements; checkout/portal rate limits; lifecycle reconciliation; refund/dispute revocation; and billing-first account deletion.
+- Added private report-object delivery, active-link and byte quotas, seven/thirty-day link grace, scheduled retention cleanup, legacy-report migration grace, versioned desktop entitlement states, pricing/account/billing UI, admin billing health, legal disclosures, and an operations runbook.
+
+**Integrity, privacy, and product accuracy**
+
+- Isolated every audit-scoped view during workspace changes, reset publication consent per capture, hardened report-publish follow-up handling, and required exact sample locations plus completed guided runs before a complete-audit conclusion.
+- Bound and structurally validated public screenshot uploads, added expiring and revocable desktop tokens, account/device management, report-view deduplication, stricter security headers, versioned production migrations, and public privacy and terms pages.
+- Corrected public contrast and screenshot documentation so it describes the current Electron workflow instead of shortcuts, zoom behavior, gradient analysis, or verdicts that are not present in the current renderer.
+
 ## v3.0.3 - 2026-07-22
 
 **Auditor-controlled AI providers**

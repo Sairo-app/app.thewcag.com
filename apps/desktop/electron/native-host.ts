@@ -49,7 +49,9 @@ function rawRequestId(value: unknown): string {
 export async function runNativeHost(origin: string): Promise<void> {
   app.name = "TheWCAG";
   app.setName("TheWCAG");
-  app.setPath("userData", join(app.getPath("appData"), "TheWCAG"));
+  if (!app.commandLine.hasSwitch("user-data-dir")) {
+    app.setPath("userData", join(app.getPath("appData"), "TheWCAG"));
+  }
   await app.whenReady();
   app.dock?.hide();
 

@@ -8,6 +8,7 @@ export class CaptureCoordinator {
   private sessionId: string | null = null;
   private firstColor: PickedColor | null = null;
   private activeAuditId: string | undefined;
+  private activeContext: { sampleItemId?: string; testRunId?: string } = {};
 
   constructor(
     private readonly capture: ScreenCaptureService,
@@ -19,8 +20,13 @@ export class CaptureCoordinator {
     this.activeAuditId = auditId;
   }
 
-  async begin(mode: OverlayMode, auditId?: string): Promise<{ sessionId: string }> {
+  async begin(
+    mode: OverlayMode,
+    auditId?: string,
+    context: { sampleItemId?: string; testRunId?: string } = {},
+  ): Promise<{ sessionId: string }> {
     if (auditId) this.activeAuditId = auditId;
+    this.activeContext = context;
     const frames = await this.capture.captureAll();
     this.sessionId = randomUUID();
     this.firstColor = null;
@@ -28,10 +34,19 @@ export class CaptureCoordinator {
     return { sessionId: this.sessionId };
   }
 
-  async fullscreen(auditId?: string) {
+  async fullscreen(
+    auditId?: string,
+    context: { sampleItemId?: string; testRunId?: string } = {},
+  ) {
     if (auditId) this.activeAuditId = auditId;
+    this.activeContext = context;
     const frame = await this.capture.captureDisplayAtCursor();
-    const entry = await this.captures.create(frame.dataUrl, "Full screen capture", this.activeAuditId);
+    const entry = await this.captures.create(
+      frame.dataUrl,
+      "Full screen capture",
+      this.activeAuditId,
+      this.activeContext,
+    );
     this.windows.sendToMain("capture:saved", entry);
     this.windows.openAnnotate(entry.id);
     return entry;
@@ -43,7 +58,12 @@ export class CaptureCoordinator {
     this.firstColor = null;
     this.windows.closeOverlays();
     if (result?.mode === "capture") {
-      const entry = await this.captures.create(result.pngDataUrl, "Area capture", this.activeAuditId);
+      const entry = await this.captures.create(
+        result.pngDataUrl,
+        "Area capture",
+        this.activeAuditId,
+        this.activeContext,
+      );
       this.windows.sendToMain("capture:saved", entry);
       this.windows.openAnnotate(entry.id);
       return entry;

@@ -25,6 +25,7 @@ import { nativeOriginFromArgs, runNativeHost } from "./native-host";
 import { registerNativeMessagingHost } from "./native-host-registration";
 
 const nativeOrigin = nativeOriginFromArgs(process.argv);
+const packagedSmokeTest = process.argv.includes("--thewcag-smoke-test");
 
 if (nativeOrigin) {
   void runNativeHost(nativeOrigin);
@@ -38,7 +39,9 @@ app.name = "TheWCAG";
 app.setName("TheWCAG");
 app.setAppUserModelId("com.thewcag.app");
 app.commandLine.appendSwitch("force-color-profile", "srgb");
-app.setPath("userData", join(app.getPath("appData"), "TheWCAG"));
+if (!app.commandLine.hasSwitch("user-data-dir")) {
+  app.setPath("userData", join(app.getPath("appData"), "TheWCAG"));
+}
 
 const lock = app.requestSingleInstanceLock();
 if (!lock) app.quit();
@@ -81,16 +84,19 @@ app.on("second-instance", (_event, argv) => {
 async function start(): Promise<void> {
   await app.whenReady();
   nativeTheme.themeSource = "light";
-  await registerNativeMessagingHost({
-    platform: process.platform,
-    resourcesPath: process.resourcesPath,
-    executablePath: process.execPath,
-    homePath: app.getPath("home"),
-  }).catch((error) => logFatal(error));
-  if (process.defaultApp && process.argv[1]) {
-    app.setAsDefaultProtocolClient("thewcag", process.execPath, [process.argv[1]]);
-  } else {
-    app.setAsDefaultProtocolClient("thewcag");
+  if (!packagedSmokeTest) {
+    await registerNativeMessagingHost({
+      platform: process.platform,
+      resourcesPath: process.resourcesPath,
+      executablePath: process.execPath,
+      homePath: app.getPath("home"),
+      userDataPath: app.getPath("userData"),
+    }).catch((error) => logFatal(error));
+    if (process.defaultApp && process.argv[1]) {
+      app.setAsDefaultProtocolClient("thewcag", process.execPath, [process.argv[1]]);
+    } else {
+      app.setAsDefaultProtocolClient("thewcag");
+    }
   }
 
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
@@ -102,7 +108,7 @@ async function start(): Promise<void> {
   const captures = new CaptureRepository(userData);
   await Promise.all([store.initialize(), captures.initialize()]);
 
-  const windows = new WindowManager();
+  const windows = new WindowManager((error) => { void logFatal(error); });
   const screenCapture = new ScreenCaptureService();
   const captureCoordinator = new CaptureCoordinator(screenCapture, captures, windows);
   const auth = new AuthService(userData, store);
@@ -157,7 +163,9 @@ async function start(): Promise<void> {
   if (initialLink) pendingLinks.push(initialLink);
   for (const link of pendingLinks.splice(0)) await handleDeepLink(link);
 
-  setTimeout(() => { void updates.check(false); }, 8_000);
+  if (!packagedSmokeTest) {
+    setTimeout(() => { void updates.check(false); }, 8_000);
+  }
 }
 
 app.on("activate", () => services?.windows.showMain());

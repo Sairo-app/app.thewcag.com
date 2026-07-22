@@ -50,7 +50,7 @@ function previewPlatform(): PlatformInfo {
   return {
     platform: mac ? "macos" : "windows",
     arch: "preview",
-    version: "3.0.3-preview",
+    version: "3.0.4-preview",
     windowId: 0,
     view: (new URLSearchParams(location.search).get("view") as PlatformInfo["view"]) || "main",
     reduceMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
@@ -177,6 +177,10 @@ async function previewInvoke<T>(channel: InvokeChannel, payload?: unknown): Prom
     case "capture:open":
     case "lens:toggle":
       throw new Error("This action is available in the installed desktop app.");
+    case "lens:state":
+      return false as T;
+    case "scope:discover":
+      throw new Error("Website scope discovery is available in the installed desktop app.");
     case "capture:assign-unscoped":
     case "audit:activate":
     case "workspace:navigate":

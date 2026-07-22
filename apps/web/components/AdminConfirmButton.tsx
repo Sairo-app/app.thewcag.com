@@ -14,6 +14,7 @@ export function AdminConfirmButton({
   action: () => Promise<void>;
 }) {
   const [armed, setArmed] = useState(false);
+  const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -22,17 +23,14 @@ export function AdminConfirmButton({
   }, []);
 
   if (!armed) {
-    return (
-      <button
-        onClick={() => {
-          setArmed(true);
-          timer.current = setTimeout(() => setArmed(false), 3000);
-        }}
-        className="rounded-md border border-border px-2.5 py-1 text-xs text-muted hover:text-red-700"
-      >
-        {label}
-      </button>
-    );
+    return <span className="inline-flex flex-col items-end gap-1"><button
+      onClick={() => {
+        setError("");
+        setArmed(true);
+        timer.current = setTimeout(() => setArmed(false), 3000);
+      }}
+      className="rounded-md border border-border px-2.5 py-1 text-xs text-muted hover:text-red-700"
+    >{label}</button>{error ? <span role="alert" className="max-w-40 text-right text-xs text-red-700">{error}</span> : null}</span>;
   }
   return (
     <button
@@ -40,8 +38,13 @@ export function AdminConfirmButton({
       onClick={() => {
         if (timer.current) clearTimeout(timer.current);
         startTransition(async () => {
-          await action();
-          setArmed(false);
+          try {
+            await action();
+            setArmed(false);
+          } catch {
+            setError("The action failed. Try again.");
+            setArmed(false);
+          }
         });
       }}
       className="rounded-md bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"

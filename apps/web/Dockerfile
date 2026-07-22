@@ -39,6 +39,8 @@ WORKDIR /app
 COPY --from=build /app/apps/web/.next/standalone ./
 COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=build /app/apps/web/public ./apps/web/public
+COPY --from=build /app/apps/web/drizzle ./apps/web/drizzle
+COPY --from=build /app/apps/web/scripts/migrate.mjs ./apps/web/scripts/migrate.mjs
 EXPOSE 3100
-# Migrations run inside the server on boot (see instrumentation.ts).
-CMD ["node", "apps/web/server.js"]
+# Apply versioned migrations before the application process receives traffic.
+CMD ["sh", "-c", "node apps/web/scripts/migrate.mjs && exec node apps/web/server.js"]

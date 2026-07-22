@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { signIn, auth } from "@/auth";
 import { Header } from "@/components/Header";
 import { MailIcon } from "@/components/icons";
+import { safeCallbackPath } from "@/lib/redirects";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Sign in", robots: { index: false } };
@@ -12,7 +13,7 @@ export default async function SignInPage({
   searchParams: Promise<{ callbackUrl?: string }>;
 }) {
   const sp = await searchParams;
-  const callbackUrl = typeof sp.callbackUrl === "string" ? sp.callbackUrl : "/screenshots";
+  const callbackUrl = safeCallbackPath(sp.callbackUrl);
 
   // Already signed in? Skip the form and go straight to the destination.
   const session = await auth();

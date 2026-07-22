@@ -5,8 +5,9 @@ import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
-import { putImage, deleteImage } from "@/lib/r2";
+import { putImage, deleteImageBestEffort } from "@/lib/r2";
 import { BRAND_LOGO_TYPES, hasValidBrandLogoSignature, validateBrandLogoMeta } from "@/lib/brand";
+import { resolveEntitlements } from "@/lib/billing/entitlements";
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 export type BrandResult = { ok: true } | { ok: false; error: string };
@@ -16,6 +17,10 @@ export async function saveBrand(_prev: BrandResult | null, formData: FormData): 
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return { ok: false, error: "Please sign in again." };
+  const entitlements = await resolveEntitlements(userId);
+  if (!entitlements.features.whiteLabelReports) {
+    return { ok: false, error: "White-label hosted reports require Pro. Your existing branding has not been changed." };
+  }
 
   const name = ((formData.get("name") as string) ?? "").trim().slice(0, 60) || null;
   const colorRaw = ((formData.get("color") as string) ?? "").trim();
@@ -41,10 +46,7 @@ export async function saveBrand(_prev: BrandResult | null, formData: FormData): 
       if (!hasValidBrandLogoSignature(logo.type, buf)) {
         return {
           ok: false,
-          error:
-            logo.type === "image/svg+xml"
-              ? "SVG logos cannot contain scripts, event handlers, embedded data, or external resources."
-              : "The logo contents do not match the selected image format.",
+          error: "The logo contents do not match the selected image format.",
         };
       }
       // Random suffix busts the immutable CDN cache when the logo is replaced.
@@ -67,13 +69,13 @@ export async function saveBrand(_prev: BrandResult | null, formData: FormData): 
   } catch {
     // The database still points at the previous logo. Remove only the newly
     // uploaded orphan and leave the currently published logo intact.
-    if (uploadedLogoKey) await deleteImage(uploadedLogoKey);
+    if (uploadedLogoKey) await deleteImageBestEffort(uploadedLogoKey);
     return { ok: false, error: "Could not save your branding. Your previous branding is still active." };
   }
 
   // Delete the old immutable object only after the database points at the new
   // value (or null), so a failed save can never break existing report logos.
-  if (previousLogoKey && previousLogoKey !== logoKey) await deleteImage(previousLogoKey);
+  if (previousLogoKey && previousLogoKey !== logoKey) await deleteImageBestEffort(previousLogoKey);
 
   revalidatePath("/brand");
   return { ok: true };

@@ -13,12 +13,15 @@ import {
   ImageSquare,
   MagicWand,
   MouseSimple,
+  Plus,
   Selection,
   ShieldCheck,
   Sparkle,
+  Trash,
   Warning,
 } from "@phosphor-icons/react";
 import {
+  WCAG_CRITERIA,
   parseAiFindingDraft,
   parseEvidencePacket,
   type AffectedUser,
@@ -45,6 +48,7 @@ import {
 import type { ExtensionRequest, ExtensionResponse } from "../shared/messages";
 import {
   AUDIT_STORAGE_KEY,
+  CAPTURE_TAB_STORAGE_KEY,
   DRAFT_STORAGE_KEY,
   EVIDENCE_STORAGE_KEY,
 } from "../shared/storage";
@@ -52,6 +56,7 @@ import {
 type StatusMessage = { text: string; tone: "neutral" | "success" | "danger" } | null;
 type DesktopState = "checking" | "connected" | "disconnected";
 type ExtensionSurface = "popup" | "sidepanel";
+const EVIDENCE_RETENTION_MS = 24 * 60 * 60 * 1_000;
 
 const affectedUserLabels: Record<AffectedUser, string> = {
   "screen-reader": "Screen reader",
@@ -141,25 +146,57 @@ export function App({ surface }: { surface: ExtensionSurface }) {
   const [includeElementText, setIncludeElementText] = useState(true);
   const [includeUrl, setIncludeUrl] = useState(true);
   const [currentWindowId, setCurrentWindowId] = useState<number | null>(null);
+  const [capturedTabId, setCapturedTabId] = useState<number | null>(null);
   const statusRef = useRef<HTMLDivElement>(null);
+  const selectedAuditRef = useRef("");
 
   useEffect(() => {
-    void chrome.storage.local.get([EVIDENCE_STORAGE_KEY, DRAFT_STORAGE_KEY, AUDIT_STORAGE_KEY]).then((stored) => {
+    let cancelled = false;
+    void (async () => {
       try {
-        if (stored[EVIDENCE_STORAGE_KEY]) setEvidence(parseEvidencePacket(stored[EVIDENCE_STORAGE_KEY]));
-        if (stored[DRAFT_STORAGE_KEY]) setDraft(parseAiFindingDraft(stored[DRAFT_STORAGE_KEY]));
-        if (typeof stored[AUDIT_STORAGE_KEY] === "string") setSelectedAudit(stored[AUDIT_STORAGE_KEY]);
+        const stored = await chrome.storage.local.get([
+          EVIDENCE_STORAGE_KEY,
+          DRAFT_STORAGE_KEY,
+          AUDIT_STORAGE_KEY,
+          CAPTURE_TAB_STORAGE_KEY,
+        ]);
+        if (cancelled) return;
+        const restoredEvidence = stored[EVIDENCE_STORAGE_KEY]
+          ? parseEvidencePacket(stored[EVIDENCE_STORAGE_KEY])
+          : null;
+        const expired = Boolean(
+          restoredEvidence && Date.now() - restoredEvidence.capturedAt > EVIDENCE_RETENTION_MS,
+        );
+        if (expired) {
+          await chrome.storage.local.remove([
+            EVIDENCE_STORAGE_KEY,
+            DRAFT_STORAGE_KEY,
+            CAPTURE_TAB_STORAGE_KEY,
+          ]);
+          setStatus({ text: "The previous capture expired after 24 hours and was removed from local extension storage.", tone: "neutral" });
+        } else {
+          setEvidence(restoredEvidence);
+          if (stored[DRAFT_STORAGE_KEY]) setDraft(parseAiFindingDraft(stored[DRAFT_STORAGE_KEY]));
+        }
+        const storedAudit = typeof stored[AUDIT_STORAGE_KEY] === "string" ? stored[AUDIT_STORAGE_KEY] : "";
+        selectedAuditRef.current = storedAudit;
+        setSelectedAudit(storedAudit);
+        const storedTabId = !expired && typeof stored[CAPTURE_TAB_STORAGE_KEY] === "number"
+          ? stored[CAPTURE_TAB_STORAGE_KEY]
+          : null;
+        setCapturedTabId(storedTabId);
+        if (storedTabId !== null) {
+          await chrome.action.setBadgeText({ tabId: storedTabId, text: "" }).catch(() => undefined);
+        }
+        await checkDesktop(false, storedAudit);
       } catch {
-        void chrome.storage.local.remove([EVIDENCE_STORAGE_KEY, DRAFT_STORAGE_KEY]);
+        await chrome.storage.local.remove([EVIDENCE_STORAGE_KEY, DRAFT_STORAGE_KEY, CAPTURE_TAB_STORAGE_KEY]);
+        if (!cancelled) setStatus({ text: "The saved capture could not be restored. Start a new capture.", tone: "danger" });
       }
-    });
+    })();
     void chrome.windows.getCurrent().then((currentWindow) => {
       if (typeof currentWindow.id === "number") setCurrentWindowId(currentWindow.id);
     });
-    void chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
-      if (tab?.id !== undefined) return chrome.action.setBadgeText({ tabId: tab.id, text: "" });
-      return undefined;
-    }).catch(() => undefined);
     const handleStorageChange = (
       changes: Record<string, chrome.storage.StorageChange>,
       areaName: chrome.storage.AreaName,
@@ -174,14 +211,26 @@ export function App({ surface }: { surface: ExtensionSurface }) {
           const next = changes[DRAFT_STORAGE_KEY].newValue;
           setDraft(next ? parseAiFindingDraft(next) : null);
         }
+        if (changes[CAPTURE_TAB_STORAGE_KEY]) {
+          const next = changes[CAPTURE_TAB_STORAGE_KEY].newValue;
+          const tabId = typeof next === "number" ? next : null;
+          setCapturedTabId(tabId);
+          if (tabId !== null) void chrome.action.setBadgeText({ tabId, text: "" }).catch(() => undefined);
+        }
       } catch {
         setStatus({ text: "The saved capture could not be restored. Start a new capture.", tone: "danger" });
       }
     };
     chrome.storage.onChanged.addListener(handleStorageChange);
-    void checkDesktop(false);
-    return () => chrome.storage.onChanged.removeListener(handleStorageChange);
+    return () => {
+      cancelled = true;
+      chrome.storage.onChanged.removeListener(handleStorageChange);
+    };
   }, []);
+
+  useEffect(() => {
+    selectedAuditRef.current = selectedAudit;
+  }, [selectedAudit]);
 
   useEffect(() => {
     if (!status) return;
@@ -204,7 +253,7 @@ export function App({ surface }: { surface: ExtensionSurface }) {
     return () => clearTimeout(timeout);
   }, [draft]);
 
-  async function checkDesktop(requestPermission: boolean) {
+  async function checkDesktop(requestPermission: boolean, preferredAuditId = selectedAuditRef.current) {
     setDesktopState("checking");
     try {
       const allowed = requestPermission ? await requestDesktopPermission() : await hasDesktopPermission();
@@ -215,7 +264,10 @@ export function App({ surface }: { surface: ExtensionSurface }) {
       const [version, nextAudits] = await Promise.all([pingDesktop(), listDesktopAudits()]);
       setDesktopVersion(version);
       setAudits(nextAudits);
-      const preferred = selectedAudit || nextAudits.find((audit) => audit.active)?.id || nextAudits[0]?.id || "";
+      const preferred = nextAudits.some((audit) => audit.id === preferredAuditId)
+        ? preferredAuditId
+        : nextAudits.find((audit) => audit.active)?.id || nextAudits[0]?.id || "";
+      selectedAuditRef.current = preferred;
       setSelectedAudit(preferred);
       if (preferred) void chrome.storage.local.set({ [AUDIT_STORAGE_KEY]: preferred });
       setDesktopState("connected");
@@ -228,7 +280,12 @@ export function App({ surface }: { surface: ExtensionSurface }) {
 
   async function startCapture(mode: EvidenceCaptureMode) {
     setCapturing(mode);
-    setStatus({ text: mode === "element" ? "Select an element on the page. Press Escape to cancel." : "Drag around the affected region. Press Escape to cancel.", tone: "neutral" });
+    setStatus({
+      text: mode === "element"
+        ? "Select an element with the pointer, or use Tab or arrow keys and press Enter. Press Escape to cancel."
+        : "Drag around the affected region, or use Tab or arrow keys and press Enter to capture a control region. Press Escape to cancel.",
+      tone: "neutral",
+    });
     try {
       const response = await chromeMessage<ExtensionResponse>({ type: "capture:start", mode });
       if (!response.ok) {
@@ -292,6 +349,10 @@ export function App({ surface }: { surface: ExtensionSurface }) {
 
   async function saveFinding() {
     if (!evidence || !draft || !selectedAudit) return;
+    if (!draft.wcag.length) {
+      setStatus({ text: "Add and confirm at least one WCAG 2.2 criterion before saving the finding.", tone: "danger" });
+      return;
+    }
     setSaving(true);
     try {
       const validated = parseAiFindingDraft(draft);
@@ -305,10 +366,62 @@ export function App({ surface }: { surface: ExtensionSurface }) {
   }
 
   async function reset() {
+    if (capturedTabId !== null) {
+      await chrome.action.setBadgeText({ tabId: capturedTabId, text: "" }).catch(() => undefined);
+    }
     setEvidence(null);
     setDraft(null);
+    setCapturedTabId(null);
     setStatus(null);
-    await chrome.storage.local.remove([EVIDENCE_STORAGE_KEY, DRAFT_STORAGE_KEY]);
+    await chrome.storage.local.remove([EVIDENCE_STORAGE_KEY, DRAFT_STORAGE_KEY, CAPTURE_TAB_STORAGE_KEY]);
+  }
+
+  function addWcagMapping() {
+    if (!draft || draft.wcag.length >= 8) return;
+    const nextCriterion = WCAG_CRITERIA.find(
+      (criterion) => !draft.wcag.some((mapping) => mapping.criterion === criterion.sc),
+    );
+    if (!nextCriterion) return;
+    patchDraft({
+      wcag: [
+        ...draft.wcag,
+        {
+          criterion: nextCriterion.sc,
+          level: nextCriterion.level,
+          name: nextCriterion.name,
+          rationale: "Confirm this criterion applies to the observed behavior.",
+          confidence: "low",
+        },
+      ],
+    });
+  }
+
+  function updateWcagCriterion(index: number, criterionId: string) {
+    if (!draft) return;
+    const criterion = WCAG_CRITERIA.find((item) => item.sc === criterionId);
+    if (!criterion) return;
+    patchDraft({
+      wcag: draft.wcag.map((mapping, mappingIndex) =>
+        mappingIndex === index
+          ? { ...mapping, criterion: criterion.sc, name: criterion.name, level: criterion.level }
+          : mapping,
+      ),
+    });
+  }
+
+  function removeWcagMapping(index: number) {
+    if (!draft) return;
+    patchDraft({ wcag: draft.wcag.filter((_, mappingIndex) => mappingIndex !== index) });
+  }
+
+  async function copyFinding() {
+    if (!evidence || !draft) return;
+    try {
+      await navigator.clipboard.writeText(findingMarkdown(evidence, draft));
+      setStatus({ text: "Finding copied as Markdown.", tone: "success" });
+    } catch (error) {
+      setStatus({ text: displayError(error), tone: "danger" });
+    }
   }
 
   function openWorkspace() {
@@ -507,6 +620,7 @@ export function App({ surface }: { surface: ExtensionSurface }) {
               <label className="field">
                 <span>Save into audit</span>
                 <select value={selectedAudit} onChange={(event) => {
+                  selectedAuditRef.current = event.target.value;
                   setSelectedAudit(event.target.value);
                   void chrome.storage.local.set({ [AUDIT_STORAGE_KEY]: event.target.value });
                 }}>
@@ -581,15 +695,31 @@ export function App({ surface }: { surface: ExtensionSurface }) {
             <section className="wcag-editor" aria-labelledby="wcag-heading">
               <div className="subheading"><h2 id="wcag-heading">WCAG mapping</h2><span>{draft.wcag.length}</span></div>
               {draft.wcag.length ? draft.wcag.map((mapping, index) => (
-                <div className="wcag-card" key={`${mapping.criterion}-${index}`}>
+                <div className="wcag-card" key={index}>
                   <div className="wcag-card-top">
-                    <input aria-label={`WCAG criterion ${index + 1}`} value={mapping.criterion} onChange={(event) => patchDraft({ wcag: draft.wcag.map((item, itemIndex) => itemIndex === index ? { ...item, criterion: event.target.value } : item) })} />
-                    <input aria-label={`WCAG name ${index + 1}`} value={mapping.name} onChange={(event) => patchDraft({ wcag: draft.wcag.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item) })} />
+                    <select aria-label={`WCAG criterion ${index + 1}`} value={mapping.criterion} onChange={(event) => updateWcagCriterion(index, event.target.value)}>
+                      {WCAG_CRITERIA.map((criterion) => (
+                        <option
+                          key={criterion.sc}
+                          value={criterion.sc}
+                          disabled={draft.wcag.some((item, itemIndex) => itemIndex !== index && item.criterion === criterion.sc)}
+                        >
+                          {criterion.sc} {criterion.name} ({criterion.level})
+                        </option>
+                      ))}
+                    </select>
                     <ConfidenceBadge value={mapping.confidence} />
+                    <button type="button" className="button button-quiet" aria-label={`Remove WCAG ${mapping.criterion}`} onClick={() => removeWcagMapping(index)}>
+                      <Trash size={16} /> Remove
+                    </button>
                   </div>
+                  <strong>{mapping.name} · Level {mapping.level}</strong>
                   <textarea aria-label={`WCAG rationale ${index + 1}`} rows={3} value={mapping.rationale} onChange={(event) => patchDraft({ wcag: draft.wcag.map((item, itemIndex) => itemIndex === index ? { ...item, rationale: event.target.value } : item) })} />
                 </div>
               )) : <div className="quiet-callout"><Warning size={18} /><p>No criterion was assigned. Complete a manual review before saving this finding.</p></div>}
+              <button type="button" className="button button-secondary button-full" disabled={draft.wcag.length >= 8} onClick={addWcagMapping}>
+                <Plus size={17} /> Add WCAG criterion
+              </button>
             </section>
 
             <Field label="Suggested resolution" value={draft.recommendation} onChange={(recommendation) => patchDraft({ recommendation })} multiline rows={4} />
@@ -623,10 +753,7 @@ export function App({ surface }: { surface: ExtensionSurface }) {
                 download(`thewcag-${evidence.id.slice(0, 8)}.md`, markdown, "text/markdown;charset=utf-8");
                 setStatus({ text: "Markdown draft exported.", tone: "success" });
               }}><DownloadSimple size={18} /> Export Markdown</button>
-              <button className="button button-quiet button-full" onClick={() => {
-                void navigator.clipboard.writeText(findingMarkdown(evidence, draft));
-                setStatus({ text: "Finding copied as Markdown.", tone: "success" });
-              }}><Copy size={18} /> Copy finding</button>
+              <button className="button button-quiet button-full" onClick={() => void copyFinding()}><Copy size={18} /> Copy finding</button>
               <button className="button button-quiet button-full" onClick={() => setDraft(null)}><ArrowCounterClockwise size={18} /> Back to evidence</button>
             </div>
           </section>

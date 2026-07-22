@@ -63,6 +63,8 @@ export type OverlayResult =
 export interface CaptureEntry {
   id: string;
   auditId?: string;
+  sampleItemId?: string;
+  testRunId?: string;
   title: string;
   createdAt: number;
   modifiedAt: number;
@@ -95,6 +97,55 @@ export interface AuditBrief {
   auditor: string;
   startedAt: string;
   updatedAt: number;
+  scopeProfile?: AuditScopeProfile;
+}
+
+export type AuditTargetType =
+  | "content-site"
+  | "web-product"
+  | "commerce-service"
+  | "release-regression"
+  | "desktop-product"
+  | "mobile-product"
+  | "document-set"
+  | "component-library";
+
+export type AuditScopeFeature =
+  | "authentication"
+  | "checkout"
+  | "forms"
+  | "media"
+  | "documents"
+  | "components";
+
+export interface AuditScopeProfile {
+  version: 1;
+  targetType: AuditTargetType;
+  featureIds: AuditScopeFeature[];
+  templateId: string;
+  confidence: "high" | "medium" | "low";
+  reasons: string[];
+  confirmedAt: number;
+}
+
+export interface AuditScopeDiscoveryPage {
+  url: string;
+  title: string;
+  templateKey: string;
+  signals: string[];
+}
+
+export interface AuditScopeDiscovery {
+  requestedUrl: string;
+  finalUrl: string;
+  title: string;
+  targetType: Extract<AuditTargetType, "content-site" | "web-product" | "commerce-service">;
+  featureIds: AuditScopeFeature[];
+  pages: AuditScopeDiscoveryPage[];
+  discoveredUrlCount: number;
+  templateCount: number;
+  warnings: string[];
+  discoveredAt: number;
 }
 
 export interface AuditSampleItem {
@@ -118,6 +169,7 @@ export interface AuditTestStepResult {
 export interface AuditTestRun {
   id: string;
   scriptId: string;
+  sampleItemId?: string;
   title: string;
   category: "authentication" | "checkout" | "forms" | "media" | "documents" | "components";
   status: "planned" | "in-progress" | "complete" | "blocked";
@@ -142,6 +194,8 @@ export interface AuditTemplate {
   standard: AuditBrief["standard"];
   sampleItems: Array<Pick<AuditSampleItem, "kind" | "label" | "location" | "notes">>;
   testScriptIds: string[];
+  targetType?: AuditTargetType;
+  featureIds?: AuditScopeFeature[];
   createdAt?: number;
 }
 
@@ -174,6 +228,8 @@ export interface PublishedReport {
 export interface Finding {
   key: string;
   reference?: string;
+  sampleItemId?: string;
+  testRunId?: string;
   title: string;
   wcag: string;
   severity: "blocker" | "major" | "minor";
@@ -265,8 +321,24 @@ export interface AppSettings {
 export interface Account {
   signedIn: boolean;
   email?: string;
-  credits?: number;
-  plan?: string;
+  plan?: "free" | "pro";
+  subscription?: {
+    status: "none" | "pending" | "active" | "on_hold" | "cancelled" | "failed" | "expired" | "revoked";
+    renewsAt?: string;
+    endsAt?: string;
+    graceEndsAt?: string;
+    cancelAtPeriodEnd: boolean;
+  };
+  features?: {
+    managedAi: { enabled: boolean; used: number; limit: number; resetsAt?: string };
+    hostedReports: { enabled: boolean; active: number; limit: number };
+    whiteLabelReports: boolean;
+    reportAnalytics: boolean;
+    publishReports: boolean;
+    aiFindingDrafts: boolean;
+  };
+  storage?: { usedBytes: number; quotaBytes: number };
+  actions?: { canUpgrade: boolean; canManageBilling: boolean; upgradeUrl: string; billingUrl?: string };
 }
 
 export type AiProviderId = "thewcag" | "openai" | "anthropic" | "openrouter";
@@ -309,7 +381,8 @@ export type DesktopEvent =
   | "update:state"
   | "shortcut:failed"
   | "notification"
-  | "navigation:tool";
+  | "navigation:tool"
+  | "lens:changed";
 
 export type InvokeChannel =
   | "app:platform"
@@ -335,7 +408,9 @@ export type InvokeChannel =
   | "overlay:ready"
   | "overlay:cancel"
   | "lens:toggle"
+  | "lens:state"
   | "lens:frame"
+  | "scope:discover"
   | "store:get"
   | "store:set"
   | "store:remove"

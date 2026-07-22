@@ -14,6 +14,24 @@ import type { JsonStore } from "./store";
 const DEFAULT_SITE = "https://app.thewcag.com";
 const MAX_IMAGE_BYTES = 4_000_000;
 
+function record(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function nonNegativeNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function safeSiteUrl(value: unknown, site: string): string | undefined {
+  if (typeof value !== "string") return undefined;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:" && parsed.origin === site ? parsed.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function secureEqual(a: string, b: string): boolean {
   const left = Buffer.from(a);
   const right = Buffer.from(b);
@@ -62,7 +80,20 @@ export class AuthService {
   }
 
   async signOut(): Promise<void> {
-    await rm(this.tokenPath, { force: true });
+    const token = await this.readToken();
+    try {
+      if (token) {
+        await fetch(new URL("/api/device/revoke", this.site), {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+          signal: AbortSignal.timeout(10_000),
+        });
+      }
+    } catch {
+      // Local sign-out must still succeed while the service is unavailable.
+    } finally {
+      await rm(this.tokenPath, { force: true });
+    }
   }
 
   async getAccount(): Promise<Account> {
@@ -78,12 +109,52 @@ export class AuthService {
         return { signedIn: false };
       }
       if (!response.ok) return { signedIn: true };
-      const value = await response.json() as Partial<Account>;
+      const value = record(await response.json()) ?? {};
+      const features = record(value.features);
+      const managedAi = record(features?.managedAi);
+      const hostedReports = record(features?.hostedReports);
+      const storage = record(value.storage);
+      const actions = record(value.actions);
+      const subscription = record(value.subscription);
+      const managedUsed = nonNegativeNumber(managedAi?.used);
+      const managedLimit = nonNegativeNumber(managedAi?.limit);
+      const hostedActive = nonNegativeNumber(hostedReports?.active);
+      const hostedLimit = nonNegativeNumber(hostedReports?.limit);
+      const storageUsed = nonNegativeNumber(storage?.usedBytes);
+      const storageQuota = nonNegativeNumber(storage?.quotaBytes);
+      const subscriptionStatus = subscription?.status;
       return {
         signedIn: true,
         email: typeof value.email === "string" ? value.email : undefined,
-        credits: typeof value.credits === "number" ? value.credits : undefined,
-        plan: typeof value.plan === "string" ? value.plan : undefined,
+        plan: value.plan === "pro" ? "pro" : "free",
+        ...(features && managedAi && hostedReports && managedUsed !== null && managedLimit !== null && hostedActive !== null && hostedLimit !== null ? {
+          features: {
+            managedAi: { enabled: managedAi.enabled === true, used: managedUsed, limit: managedLimit, ...(typeof managedAi.resetsAt === "string" ? { resetsAt: managedAi.resetsAt } : {}) },
+            hostedReports: { enabled: hostedReports.enabled === true, active: hostedActive, limit: hostedLimit },
+            whiteLabelReports: features.whiteLabelReports === true,
+            reportAnalytics: features.reportAnalytics === true,
+            publishReports: features.publishReports === true,
+            aiFindingDrafts: features.aiFindingDrafts === true,
+          },
+        } : {}),
+        ...(storageUsed !== null && storageQuota !== null ? { storage: { usedBytes: storageUsed, quotaBytes: storageQuota } } : {}),
+        ...(actions ? {
+          actions: {
+            canUpgrade: actions.canUpgrade === true,
+            canManageBilling: actions.canManageBilling === true,
+            upgradeUrl: safeSiteUrl(actions.upgradeUrl, this.site) ?? new URL("/pricing", this.site).toString(),
+            ...(safeSiteUrl(actions.billingUrl, this.site) ? { billingUrl: safeSiteUrl(actions.billingUrl, this.site) } : {}),
+          },
+        } : {}),
+        ...(subscription && ["none", "pending", "active", "on_hold", "cancelled", "failed", "expired", "revoked"].includes(String(subscriptionStatus)) ? {
+          subscription: {
+            status: subscriptionStatus as NonNullable<Account["subscription"]>["status"],
+            cancelAtPeriodEnd: subscription.cancelAtPeriodEnd === true,
+            ...(typeof subscription.renewsAt === "string" ? { renewsAt: subscription.renewsAt } : {}),
+            ...(typeof subscription.endsAt === "string" ? { endsAt: subscription.endsAt } : {}),
+            ...(typeof subscription.graceEndsAt === "string" ? { graceEndsAt: subscription.graceEndsAt } : {}),
+          },
+        } : {}),
       };
     } catch {
       return { signedIn: true };
@@ -145,6 +216,7 @@ export class AuthService {
       retryAfterSeconds?: number;
     };
     if (!response.ok) {
+      if (response.status === 402) throw new Error(body.message || "Managed AI authoring requires Pro. Local drafts and your own AI key remain available");
       if (response.status === 429) throw new Error(body.message || "AI authoring limit reached. Try again later");
       if (response.status === 503) throw new Error(body.message || "AI authoring is not configured yet");
       throw new Error(body.message || body.error || `AI authoring failed with status ${response.status}`);

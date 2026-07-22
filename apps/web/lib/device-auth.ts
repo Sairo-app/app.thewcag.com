@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { desktopDevices } from "@/lib/schema";
 
@@ -26,7 +26,11 @@ export async function verifyDeviceToken(authHeader: string | null): Promise<Devi
   const [row] = await db
     .select({ id: desktopDevices.id, userId: desktopDevices.userId })
     .from(desktopDevices)
-    .where(and(eq(desktopDevices.tokenHash, tokenHash), isNull(desktopDevices.revokedAt)))
+    .where(and(
+      eq(desktopDevices.tokenHash, tokenHash),
+      isNull(desktopDevices.revokedAt),
+      gt(desktopDevices.expiresAt, new Date()),
+    ))
     .limit(1);
   if (!row) return null;
 
