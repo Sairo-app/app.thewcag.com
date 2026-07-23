@@ -50,8 +50,8 @@ export default function ColorBlindnessSimulatorPage() {
           })),
         }}
       />
-      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-16">
-        <h1 className="text-3xl font-bold tracking-tight">Color Blindness Simulator</h1>
+      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-12">
+        <h1 className="type-title-1 font-bold ">Color Blindness Simulator</h1>
         <p className="mt-3 max-w-2xl text-muted">
           Roughly <strong>1 in 12 men</strong> sees color differently. TheWCAG's lens lets you view
           any app through the most common color-vision deficiencies - live, across your entire
@@ -60,27 +60,27 @@ export default function ColorBlindnessSimulatorPage() {
         <div className="mt-6">
           <Link
             href="/download"
-            className="inline-flex items-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
+            className="inline-flex items-center rounded-lg bg-primary px-4 py-3 type-body font-semibold text-primary-foreground hover:opacity-90"
           >
             Download the free app
           </Link>
         </div>
 
-        <section className="mt-14">
-          <h2 className="text-xl font-bold tracking-tight">Simulated vision types</h2>
+        <section className="mt-12">
+          <h2 className="type-title-2 font-bold ">Simulated vision types</h2>
           <ul className="mt-4 grid gap-3 sm:grid-cols-2">
             {TYPES.map(([t, d]) => (
               <li key={t} className="rounded-lg border border-border p-4">
-                <h3 className="text-sm font-semibold">{t}</h3>
-                <p className="mt-1 text-sm text-muted">{d}</p>
+                <h3 className="type-body font-semibold">{t}</h3>
+                <p className="mt-1 type-body text-muted">{d}</p>
               </li>
             ))}
           </ul>
         </section>
 
-        <section className="mt-14">
-          <h2 className="text-xl font-bold tracking-tight">Why it matters (WCAG 1.4.1)</h2>
-          <p className="mt-3 text-sm text-muted">
+        <section className="mt-12">
+          <h2 className="type-title-2 font-bold ">Why it matters (WCAG 1.4.1)</h2>
+          <p className="mt-3 type-body text-muted">
             Success Criterion 1.4.1 “Use of Color” requires that color is never the only way to
             convey information - think error states, chart series, or required-field markers. Viewing
             your UI through a simulator is the fastest way to spot where color is doing work that a
@@ -92,13 +92,13 @@ export default function ColorBlindnessSimulatorPage() {
           </p>
         </section>
 
-        <section className="mt-14">
-          <h2 className="text-xl font-bold tracking-tight">FAQ</h2>
+        <section className="mt-12">
+          <h2 className="type-title-2 font-bold ">FAQ</h2>
           <dl className="mt-4 space-y-5">
             {FAQ.map((f) => (
               <div key={f.q}>
-                <dt className="text-sm font-semibold">{f.q}</dt>
-                <dd className="mt-1 text-sm text-muted">{f.a}</dd>
+                <dt className="type-body font-semibold">{f.q}</dt>
+                <dd className="mt-1 type-body text-muted">{f.a}</dd>
               </div>
             ))}
           </dl>

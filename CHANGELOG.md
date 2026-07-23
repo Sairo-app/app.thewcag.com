@@ -1,5 +1,30 @@
 # Changelog
 
+## v3.0.8 - 2026-07-23
+
+**Cross-process data integrity and desktop reliability**
+
+- Made findings and identity allocation safe across the desktop application and native-host processes with patch-based IPC writes, on-disk merging, change broadcasts, corrupt-ledger quarantine and rebuild, reserved-key protection, and two-writer regression coverage.
+- Hardened capture, annotation, evidence cleanup, renderer refresh, transient notification, external-link, entitlement, telemetry retry, and audit-reference workflows so cancellations, concurrent edits, stale arrays, transient services, and oversized canvases no longer lose data or fail silently.
+- Replaced unstable render-time finding identities with persistent migration-backed IDs, preserved immutable references in exports, and aligned multi-criterion publishing, payload caps, previews, and server sanitization.
+
+**Secure web deployment and account flows**
+
+- Made production containers reproducible and non-root, fail fast without database configuration, and keep startup and file-driven database migration paths in parity.
+- Reworked desktop authorization into an expiring one-time claim exchange so unclaimed attempts never become active devices or evict valid sessions, with visible desktop failure recovery.
+- Added server-side abuse controls for billing portal creation, report views, and sign-in email delivery; tightened admin authorization and action errors; introduced nonce-based production CSP, unbiased report slugs, opaque brand assets, normalized site URLs, and resilient loading and account states.
+
+**Extension privacy and capture resilience**
+
+- Advanced the Evidence Capture extension to `0.4.0` with bounded recoverable drafts, self-write suppression, reliable draft clearing, native-host timeouts and response validation, idempotent saves, quota feedback, single-writer badges, and exact generated icon assets.
+- Fixed picker click leakage, duplicate injection, shadow-root targeting, iframe omissions, editable-content redaction, accessible-name precedence, privacy-consent stripping, and retryable desktop-to-web error mapping.
+
+**Unified interface system**
+
+- Standardized web, desktop, and extension color, typography, spacing, radius, elevation, motion, focus, and forced-colors behavior on the canonical design tokens.
+- Migrated UI glyphs to wrapped Phosphor icons with a shared four-size scale, regular default weight, semantic fill rules, current-color inheritance, and accessible icon-only controls while preserving genuine brand marks.
+- Updated the desktop release to `3.0.8`; the exact `v3.0.8` tag runs the complete quality gate and produces the macOS and Windows release artifacts.
+
 ## v3.0.7 - 2026-07-22
 
 **Windows Chrome connector**

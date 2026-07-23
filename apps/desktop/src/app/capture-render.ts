@@ -1,6 +1,7 @@
 import type { CaptureEntry } from "../shared/desktop";
 import { parseDoc } from "../lib/annotate/model";
 import { renderDoc } from "../lib/annotate/render";
+import { canvasPngDataUrl, requireCanvas2d } from "../lib/annotate/canvas";
 import { desktop } from "./api";
 
 function loadCaptureImage(entry: CaptureEntry): Promise<HTMLImageElement> {
@@ -26,21 +27,21 @@ export async function renderCaptureDataUrl(
   const source = document.createElement("canvas");
   source.width = image.naturalWidth;
   source.height = image.naturalHeight;
-  renderDoc(source.getContext("2d")!, image, doc?.shapes ?? [], {
+  renderDoc(requireCanvas2d(source), image, doc?.shapes ?? [], {
     selectedId: null,
     forExport: true,
   });
 
   if (!maxWidth || source.width <= maxWidth) {
-    return source.toDataURL("image/png");
+    return canvasPngDataUrl(source);
   }
 
   const output = document.createElement("canvas");
   const scale = maxWidth / source.width;
   output.width = maxWidth;
   output.height = Math.max(1, Math.round(source.height * scale));
-  output.getContext("2d")!.drawImage(source, 0, 0, output.width, output.height);
-  return output.toDataURL("image/png");
+  requireCanvas2d(output).drawImage(source, 0, 0, output.width, output.height);
+  return canvasPngDataUrl(output);
 }
 
 export async function renderCaptureBase64(

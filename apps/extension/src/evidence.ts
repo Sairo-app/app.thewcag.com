@@ -315,14 +315,34 @@ function isNativelyInteractive(target: EvidenceTargetV1): boolean {
   return false;
 }
 
+function fallbackAccessibleNameSource(target: EvidenceTargetV1): "placeholder" | "title" | null {
+  const name = target.accessibleName.trim();
+  if (!name || target.labels.length || target.attributes["aria-label"] || target.attributes.alt) return null;
+  const excerptText = target.domExcerpt.replace(/^<[^>]*>|<\/[^>]+>$/g, "").trim();
+  if (excerptText) return null;
+  if (target.attributes.placeholder?.trim() === name) return "placeholder";
+  if (target.attributes.title?.trim() === name) return "title";
+  return null;
+}
+
 export function runDeterministicChecks(target: EvidenceTargetV1): DeterministicCheckV1[] {
   const checks: DeterministicCheckV1[] = [];
+  const fallbackNameSource = fallbackAccessibleNameSource(target);
   if (hasInteractiveRole(target) && !target.accessibleName) {
     checks.push({
       id: "interactive-name",
       outcome: "fail",
       title: "Interactive control has no accessible name",
       description: `The selected ${target.role || target.tagName} does not expose a name in the captured DOM context.`,
+      wcag: ["4.1.2"],
+      impact: "major",
+    });
+  } else if (hasInteractiveRole(target) && fallbackNameSource) {
+    checks.push({
+      id: "interactive-name",
+      outcome: "needs-review",
+      title: `Interactive control relies on ${fallbackNameSource} text for its name`,
+      description: `The selected ${target.role || target.tagName} appears to be named only by its ${fallbackNameSource}. Confirm the computed name in the accessibility tree and provide a persistent visible label if needed.`,
       wcag: ["4.1.2"],
       impact: "major",
     });
@@ -393,41 +413,54 @@ export async function createEvidencePacket(
     target: selection.target,
     image,
     checks: runDeterministicChecks(selection.target),
-    omissions: [
-      "Form and editable values were not collected",
-      "URL query parameters and fragments were removed",
-      "Cookies, browser storage, network data, and hidden page content were not accessed",
-    ],
+    omissions: captureOmissions(selection),
   });
+}
+
+export function captureOmissions(selection: Pick<CapturedSelection, "omissions">): string[] {
+  return [...new Set([
+    "Form and editable values were not extracted from the DOM; visible values may remain in an included screenshot",
+    "URL query parameters and fragments were removed",
+    "Cookies, browser storage, network data, and hidden page content were not accessed",
+    ...(selection.omissions ?? []),
+  ])];
 }
 
 export function applyConsent(
   evidence: EvidencePacketV1,
   consent: Omit<EvidenceConsentV1, "approvedAt">,
 ): EvidencePacketV1 {
-  const target = consent.includeElementText ? evidence.target : {
-    ...evidence.target,
+  const target: EvidenceTargetV1 = consent.includeElementText ? evidence.target : {
+    kind: evidence.target.kind,
+    tagName: "",
+    role: "",
     accessibleName: "",
     accessibleDescription: "",
     selector: "",
     structuralPath: "",
+    bounds: { x: 0, y: 0, width: 1, height: 1 },
+    marker: { x: 0, y: 0, width: 1, height: 1 },
+    states: [],
     labels: [],
     nearbyHeading: "",
-    domExcerpt: "",
+    landmark: "",
     attributes: {},
+    styles: {},
+    domExcerpt: "",
   };
   const page = consent.includeUrl
     ? evidence.page
-    : { ...evidence.page, title: "", url: "", origin: "" };
+    : { ...evidence.page, title: "", url: "", origin: "", locale: "", browser: "" };
   const omissions = new Set(evidence.omissions);
   if (!consent.includeScreenshot) omissions.add("Screenshot withheld by the auditor");
-  if (!consent.includeElementText) omissions.add("Element text, attributes, and selector withheld by the auditor");
-  if (!consent.includeUrl) omissions.add("Page title and address withheld by the auditor");
+  if (!consent.includeElementText) omissions.add("Component name, role, tag, selector, states, styles, landmark, bounds, HTML context, and derived checks withheld by the auditor");
+  if (!consent.includeUrl) omissions.add("Page title, address, browser/device details, and locale withheld by the auditor");
   return parseEvidencePacket({
     ...evidence,
     target,
     page,
     image: consent.includeScreenshot ? evidence.image : undefined,
+    checks: consent.includeElementText ? evidence.checks : [],
     omissions: [...omissions],
     consent: { ...consent, approvedAt: Date.now() },
   });

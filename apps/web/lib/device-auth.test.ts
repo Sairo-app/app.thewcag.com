@@ -54,7 +54,17 @@ describe("device bearer authentication", () => {
       userId: "user-owner",
       deviceId: "device-current",
     });
-    expect(boundary.updateSet).toHaveBeenCalledWith({ lastSeenAt: expect.any(Date) });
+    expect(boundary.updateSet).toHaveBeenCalledWith({
+      lastSeenAt: expect.any(Date),
+      expiresAt: expect.any(Date),
+    });
+    const update = boundary.updateSet.mock.calls[0]?.[0] as {
+      lastSeenAt: Date;
+      expiresAt: Date;
+    };
+    expect(update.expiresAt.getTime() - update.lastSeenAt.getTime()).toBe(
+      90 * 24 * 60 * 60 * 1_000,
+    );
   });
 
   it("rejects an unknown or wrong-device token", async () => {

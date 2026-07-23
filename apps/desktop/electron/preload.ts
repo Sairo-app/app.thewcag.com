@@ -3,6 +3,7 @@ import type { DesktopBridge, DesktopEvent, InvokeChannel } from "../src/shared/d
 
 const INVOKE_CHANNELS = new Set<InvokeChannel>([
   "app:platform",
+  "annotate:flush-complete",
   "window:minimize",
   "window:toggle-maximize",
   "window:close",
@@ -32,6 +33,7 @@ const INVOKE_CHANNELS = new Set<InvokeChannel>([
   "store:set",
   "store:remove",
   "store:add-findings",
+  "store:mutate-findings",
   "audit:activate",
   "workspace:navigate",
   "settings:get",
@@ -65,16 +67,19 @@ const INVOKE_CHANNELS = new Set<InvokeChannel>([
 ]);
 
 const EVENT_CHANNELS = new Set<DesktopEvent>([
+  "annotate:flush",
   "overlay:init",
   "overlay:progress",
   "capture:result",
   "capture:saved",
+  "capture:cancelled",
   "account:changed",
   "update:state",
   "shortcut:failed",
   "notification",
   "navigation:tool",
   "screenshot:share",
+  "findings:changed",
   "lens:changed",
 ]);
 

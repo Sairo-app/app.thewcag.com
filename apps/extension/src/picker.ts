@@ -8,8 +8,23 @@ import type { CapturedSelection } from "./shared/messages";
 export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<CapturedSelection | null> {
   type Rect = { x: number; y: number; width: number; height: number };
 
+  if (document.querySelector("[data-thewcag-picker]")) return null;
+
   const cleanText = (value: string | null | undefined, max: number): string =>
     (value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+
+  const isEditableContent = (element: Element): boolean =>
+    Boolean((element as HTMLElement).isContentEditable);
+
+  const subtreeText = (element: Element): string => {
+    if (isEditableContent(element) || element.matches("input,textarea,select")) return "";
+    const chunks: string[] = [];
+    for (const node of Array.from(element.childNodes)) {
+      if (node.nodeType === 3) chunks.push(node.textContent || "");
+      else if (node.nodeType === 1) chunks.push(subtreeText(node as Element));
+    }
+    return chunks.join(" ");
+  };
 
   const implicitRole = (element: Element): string => {
     const tag = element.tagName.toLowerCase();
@@ -32,7 +47,10 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
 
   const referencedText = (element: Element, attribute: string): string => {
     const ids = (element.getAttribute(attribute) || "").split(/\s+/).filter(Boolean).slice(0, 8);
-    return cleanText(ids.map((id) => document.getElementById(id)?.textContent || "").join(" "), 500);
+    return cleanText(ids.map((id) => {
+      const referenced = document.getElementById(id);
+      return referenced ? subtreeText(referenced) : "";
+    }).join(" "), 500);
   };
 
   const labelsFor = (element: Element): string[] => {
@@ -41,14 +59,14 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
     if (id) {
       for (const label of document.querySelectorAll("label")) {
         if (label.htmlFor === id) {
-          const value = cleanText(label.textContent, 500);
+          const value = cleanText(subtreeText(label), 500);
           if (value) labels.add(value);
         }
       }
     }
     const wrapping = element.closest("label");
     if (wrapping) {
-      const value = cleanText(wrapping.textContent, 500);
+      const value = cleanText(subtreeText(wrapping), 500);
       if (value) labels.add(value);
     }
     const ariaLabelled = referencedText(element, "aria-labelledby");
@@ -57,6 +75,8 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
   };
 
   const accessibleName = (element: Element, labels: string[]): string => {
+    const labelledBy = referencedText(element, "aria-labelledby");
+    if (labelledBy) return labelledBy;
     const aria = cleanText(element.getAttribute("aria-label"), 500);
     if (aria) return aria;
     if (labels.length) return labels.join(" ").slice(0, 500);
@@ -72,11 +92,19 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
       }
     }
     const content = cleanText([
-      element.textContent,
-      ...Array.from(element.querySelectorAll("img[alt]")).map((image) => image.getAttribute("alt")),
-      ...Array.from(element.querySelectorAll("svg[aria-label]")).map((image) => image.getAttribute("aria-label")),
+      subtreeText(element),
+      ...Array.from(element.querySelectorAll("img[alt]"))
+        .filter((image) => !isEditableContent(image))
+        .map((image) => image.getAttribute("alt")),
+      ...Array.from(element.querySelectorAll("svg[aria-label]"))
+        .filter((image) => !isEditableContent(image))
+        .map((image) => image.getAttribute("aria-label")),
     ].filter(Boolean).join(" "), 500);
     if (content) return content;
+    if (element instanceof HTMLInputElement) {
+      const placeholder = cleanText(element.getAttribute("placeholder"), 500);
+      if (placeholder) return placeholder;
+    }
     return cleanText(element.getAttribute("title"), 500);
   };
 
@@ -127,10 +155,11 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
 
   const safeAttributes = (element: Element): Record<string, string> => {
     const allowed = new Set([
-      "id", "class", "role", "type", "name", "for", "tabindex", "disabled", "required",
+      "id", "class", "role", "type", "name", "for", "alt", "tabindex", "disabled", "required",
       "checked", "selected", "multiple", "readonly", "aria-label", "aria-labelledby",
       "aria-describedby", "aria-expanded", "aria-checked", "aria-selected", "aria-current",
-      "aria-disabled", "aria-required", "aria-invalid", "aria-hidden", "data-testid", "data-test", "data-cy",
+      "aria-disabled", "aria-required", "aria-invalid", "aria-hidden", "placeholder", "title",
+      "data-testid", "data-test", "data-cy",
     ]);
     const output: Record<string, string> = {};
     for (const attribute of [...element.attributes].slice(0, 80)) {
@@ -183,7 +212,7 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
       const nextDistance = targetTop - rect.top;
       if (nextDistance < distance) {
         distance = nextDistance;
-        nearest = cleanText(heading.textContent, 500);
+        nearest = cleanText(subtreeText(heading), 500);
       }
     }
     return nearest;
@@ -201,7 +230,9 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
     const serialized = Object.entries(attributes)
       .map(([key, value]) => `${key}="${value.replace(/[&<>"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" })[character] || character)}"`)
       .join(" ");
-    const text = element.matches("input,textarea,select,[contenteditable=true]") ? "" : cleanText(element.textContent, 1_000);
+    const text = isEditableContent(element) || element.matches("input,textarea,select")
+      ? ""
+      : cleanText(subtreeText(element), 1_000);
     return `<${tag}${serialized ? ` ${serialized}` : ""}>${text}</${tag}>`.slice(0, 12_000);
   };
 
@@ -263,14 +294,52 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
     host.setAttribute("data-thewcag-picker", "");
     host.style.cssText = "all:initial;position:fixed;inset:0;z-index:2147483647;pointer-events:none;";
     const shadow = host.attachShadow({ mode: "closed" });
+    const style = document.createElement("style");
+    style.textContent = `
+      :host {
+        --elevation-0: none;
+        --elevation-1: 0 1px 2px rgb(33 24 14 / 0.08), 0 6px 24px rgb(33 24 14 / 0.10);
+        --space-1: 4px;
+        --space-2: 8px;
+      }
+      .picker-label { box-shadow: var(--elevation-1); }
+      @media (forced-colors: active) {
+        .picker-label {
+          border: 1px solid CanvasText;
+          box-shadow: var(--elevation-0);
+        }
+      }
+    `;
     const outline = document.createElement("div");
     const label = document.createElement("div");
     const veil = document.createElement("div");
-    outline.style.cssText = "position:fixed;display:none;border:3px solid #d9480f;border-radius:7px;background:rgba(217,72,15,.09);box-sizing:border-box;pointer-events:none;box-shadow:0 0 0 1px rgba(255,255,255,.9);";
-    label.style.cssText = "position:fixed;display:none;max-width:280px;padding:6px 9px;border-radius:7px;background:#1f2933;color:#fffdf7;font:600 12px/1.35 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;box-shadow:0 4px 14px rgba(31,41,51,.2);pointer-events:none;";
+    outline.style.cssText = "position:fixed;display:none;border:3px solid oklch(0.52 0.18 42);border-radius:10px;background:color-mix(in oklch,oklch(0.52 0.18 42) 9%,transparent);box-sizing:border-box;pointer-events:none;";
+    label.className = "picker-label";
+    label.style.cssText = "position:fixed;display:none;max-width:280px;padding:var(--space-1) var(--space-2);border-radius:10px;background:oklch(0.215 0.034 54);color:oklch(0.98 0.014 85);font:600 12px/1.35 Manrope,system-ui,sans-serif;pointer-events:none;";
     veil.style.cssText = "position:fixed;inset:0;background:transparent;pointer-events:none;cursor:crosshair;";
-    shadow.append(veil, outline, label);
+    shadow.append(style, veil, outline, label);
     document.documentElement.append(host);
+
+    const elementAtPoint = (
+      root: Document | ShadowRoot,
+      x: number,
+      y: number,
+    ): Element | null => {
+      const candidates = typeof root.elementsFromPoint === "function"
+        ? root.elementsFromPoint(x, y)
+        : [root.elementFromPoint(x, y)].filter((element): element is Element => Boolean(element));
+      for (const candidate of candidates) {
+        if (candidate === host || host.contains(candidate)) continue;
+        if (candidate.shadowRoot) {
+          const nested = elementAtPoint(candidate.shadowRoot, x, y);
+          if (nested) return nested;
+        }
+        return candidate;
+      }
+      return null;
+    };
+
+    const iframeOmission = "Iframe inner content was not inspected; only the iframe element and visible screenshot were captured";
 
     let hovered: Element | null = null;
     const keyboardCandidates = Array.from(document.querySelectorAll(
@@ -285,15 +354,23 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
       : -1;
     let dragStart: { x: number; y: number } | null = null;
     let dragRect: Rect | null = null;
+    let finished = false;
     const originalCursor = document.documentElement.style.cursor;
     document.documentElement.style.cursor = "crosshair";
 
-    const cleanup = () => {
+    const removeActionBlockers = () => {
+      document.removeEventListener("click", onClick, true);
+      document.removeEventListener("mousedown", onMouseDown, true);
+      document.removeEventListener("mouseup", onMouseUp, true);
+    };
+
+    const cleanup = (deferActionBlockers = false) => {
       document.removeEventListener("pointermove", onPointerMove, true);
       document.removeEventListener("pointerdown", onPointerDown, true);
       document.removeEventListener("pointerup", onPointerUp, true);
-      document.removeEventListener("click", onClick, true);
       document.removeEventListener("keydown", onKeyDown, true);
+      if (deferActionBlockers) window.setTimeout(removeActionBlockers, 0);
+      else removeActionBlockers();
       document.documentElement.style.cursor = originalCursor;
       host.remove();
     };
@@ -311,9 +388,16 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
     };
 
     const finish = (element: Element, bounds: Rect) => {
+      if (finished) return;
+      finished = true;
       const target = targetFor(element, bounds, mode);
-      cleanup();
-      resolve({ page: pageFor(), target });
+      const iframeSelected = element.tagName.toLowerCase() === "iframe";
+      cleanup(true);
+      resolve({
+        page: pageFor(),
+        target,
+        ...(iframeSelected ? { omissions: [iframeOmission] } : {}),
+      });
     };
 
     const highlightKeyboardCandidate = (direction: 1 | -1) => {
@@ -339,12 +423,13 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
         return;
       }
       if (mode !== "element") return;
-      const element = document.elementFromPoint(event.clientX, event.clientY);
-      if (!element || element === host || host.contains(element)) return;
+      const element = elementAtPoint(document, event.clientX, event.clientY);
+      if (!element) return;
       hovered = element;
       const rect = rectValue(element.getBoundingClientRect());
       const role = element.getAttribute("role") || implicitRole(element) || element.tagName.toLowerCase();
-      placeOutline(rect, `${element.tagName.toLowerCase()}${role ? ` · ${role}` : ""}`);
+      const iframeWarning = element.tagName.toLowerCase() === "iframe" ? " · inner content not inspected" : "";
+      placeOutline(rect, `${element.tagName.toLowerCase()}${role ? ` · ${role}` : ""}${iframeWarning}`);
     };
 
     const blockPageAction = (event: Event) => {
@@ -353,14 +438,21 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
       event.stopImmediatePropagation();
     };
 
+    const onMouseDown = (event: MouseEvent) => blockPageAction(event);
+    const onMouseUp = (event: MouseEvent) => blockPageAction(event);
+
     const onPointerDown = (event: PointerEvent) => {
-      if (mode !== "region") return;
       blockPageAction(event);
+      if (mode !== "region") return;
       dragStart = { x: event.clientX, y: event.clientY };
       dragRect = { x: event.clientX, y: event.clientY, width: 1, height: 1 };
     };
 
     const onPointerUp = (event: PointerEvent) => {
+      if (mode === "element") {
+        blockPageAction(event);
+        return;
+      }
       if (mode !== "region" || !dragStart || !dragRect) return;
       blockPageAction(event);
       const bounds = rectValue(dragRect);
@@ -373,14 +465,14 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
       }
       const centerX = Math.min(innerWidth - 1, Math.max(0, bounds.x + bounds.width / 2));
       const centerY = Math.min(innerHeight - 1, Math.max(0, bounds.y + bounds.height / 2));
-      const element = document.elementFromPoint(centerX, centerY) || document.body;
+      const element = elementAtPoint(document, centerX, centerY) || document.body;
       finish(element, bounds);
     };
 
     const onClick = (event: MouseEvent) => {
       blockPageAction(event);
-      if (mode !== "element") return;
-      const element = hovered || document.elementFromPoint(event.clientX, event.clientY);
+      if (finished || mode !== "element") return;
+      const element = hovered || elementAtPoint(document, event.clientX, event.clientY);
       if (!element) return;
       finish(element, rectValue(element.getBoundingClientRect()));
     };
@@ -410,6 +502,8 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
     document.addEventListener("pointerdown", onPointerDown, true);
     document.addEventListener("pointerup", onPointerUp, true);
     document.addEventListener("click", onClick, true);
+    document.addEventListener("mousedown", onMouseDown, true);
+    document.addEventListener("mouseup", onMouseUp, true);
     document.addEventListener("keydown", onKeyDown, true);
   });
 }

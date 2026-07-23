@@ -8,7 +8,7 @@ type Sev = keyof typeof SEV;
 function Pin({ n, sev, style }: { n: number; sev: Sev; style: CSSProperties }) {
   return (
     <span
-      className="absolute flex h-5 w-5 items-center justify-center rounded-md text-[10px] font-bold text-white shadow ring-2 ring-white"
+      className="absolute flex h-5 w-5 items-center justify-center rounded-md type-caption font-bold text-white shadow ring-2 ring-white"
       style={{ backgroundColor: SEV[sev], ...style }}
     >
       {n}
@@ -44,7 +44,7 @@ export function BrandPreview({
       <div aria-hidden="true" style={{ background: color }} className="h-1 w-full" />
 
       {/* branded header */}
-      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5">
+      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -52,9 +52,9 @@ export function BrandPreview({
           ) : (
             <span aria-hidden="true" className="h-6 w-6 rounded" style={{ background: color }} />
           )}
-          <span className="truncate text-sm font-semibold">{name || "Your organization"}</span>
+          <span className="truncate type-body font-semibold">{name || "Your organization"}</span>
         </div>
-        <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted">
+        <span className="shrink-0 type-caption font-medium uppercase text-muted">
           Accessibility report
         </span>
       </div>
@@ -63,9 +63,9 @@ export function BrandPreview({
       <div className="grid gap-3 p-3 sm:grid-cols-[1.7fr_1fr]">
         {/* mock annotated screenshot */}
         <div className="overflow-hidden rounded-lg border border-border bg-card">
-          <div className="flex items-center gap-1 border-b border-border bg-muted/40 px-2 py-1.5">
-            <ImageIcon size={11} />
-            <span className="text-[9px] text-muted">Captured screen</span>
+          <div className="flex items-center gap-1 border-b border-border bg-muted/40 px-2 py-2">
+            <ImageIcon size={16} />
+            <span className="type-caption text-muted">Captured screen</span>
           </div>
           <div className="relative space-y-2 p-3">
             <div className="h-3 w-1/3 rounded bg-muted/60" />
@@ -80,26 +80,26 @@ export function BrandPreview({
 
         {/* findings panel */}
         <div className="min-w-0">
-          <p className="text-xs font-semibold">Sample audit</p>
-          <p className="mt-0.5 text-[10px] text-muted">2 issues, today</p>
+          <p className="type-callout font-semibold">Sample audit</p>
+          <p className="mt-1 type-caption text-muted">2 issues, today</p>
           <div className="mt-2 flex flex-wrap gap-1">
-            <span className="rounded-md px-1.5 py-0.5 text-[9px] font-medium text-white" style={{ background: SEV.major }}>
+            <span className="rounded-md px-2 py-1 type-caption font-medium text-white" style={{ background: SEV.major }}>
               1 major
             </span>
-            <span className="rounded-md px-1.5 py-0.5 text-[9px] font-medium text-white" style={{ background: SEV.minor }}>
+            <span className="rounded-md px-2 py-1 type-caption font-medium text-white" style={{ background: SEV.minor }}>
               1 minor
             </span>
           </div>
-          <ol className="mt-2 space-y-1.5">
+          <ol className="mt-2 space-y-2">
             {SAMPLE.map((f) => (
-              <li key={f.n} className="flex gap-1.5">
+              <li key={f.n} className="flex gap-2">
                 <span
-                  className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded text-[8px] font-bold text-white"
+                  className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded type-caption font-bold text-white"
                   style={{ background: SEV[f.sev] }}
                 >
                   {f.n}
                 </span>
-                <span className="min-w-0 text-[10px] leading-tight text-muted">
+                <span className="min-w-0 type-caption text-muted">
                   <span className="font-medium text-foreground">{f.sc}</span>, {f.note}
                 </span>
               </li>
@@ -109,7 +109,7 @@ export function BrandPreview({
       </div>
 
       {/* attribution as it appears on white-labeled reports */}
-      <div className="border-t border-border px-4 py-2 text-center text-[10px] text-muted">
+      <div className="border-t border-border px-4 py-2 text-center type-caption text-muted">
         Prepared with <span className="font-medium">TheWCAG</span>
       </div>
     </div>

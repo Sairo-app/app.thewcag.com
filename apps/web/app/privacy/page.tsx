@@ -12,8 +12,8 @@ export default function PrivacyPage() {
     <>
       <Header />
       <main id="main" className="prose-page mx-auto max-w-3xl px-6 py-12">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Effective 22 July 2026</p>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight">Privacy policy</h1>
+        <p className="type-callout font-semibold uppercase text-primary">Effective 22 July 2026</p>
+        <h1 className="mt-3 type-title-1 font-bold ">Privacy policy</h1>
         <p className="mt-4 text-muted">TheWCAG is designed around local audit storage and deliberate sharing. This policy explains what remains on your device, what reaches the service, and what becomes public only after you choose to publish it.</p>
 
         <section><h2>Information stored locally</h2><p>Desktop audit plans, findings, checklists, annotations, captures, personal templates, settings, and locally configured provider credentials are stored on your computer. Provider and account credentials use the operating system credential protection available to the installed application.</p></section>

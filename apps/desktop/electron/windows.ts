@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { randomUUID } from "node:crypto";
 import { BrowserWindow, app, dialog, screen, type Display } from "electron";
 import type { AppView, OverlaySession, ScreenFrame, WorkspaceTool } from "../src/shared/desktop";
 import { hardenWebContents } from "./security";
@@ -12,6 +13,13 @@ function preloadPath(): string {
 export class WindowManager {
   private main: BrowserWindow | null = null;
   private annotate: BrowserWindow | null = null;
+  private annotateTransition: Promise<void> = Promise.resolve();
+  private annotateFlushes = new Map<string, {
+    contentsId: number;
+    resolve: () => void;
+    reject: (error: Error) => void;
+    timer: ReturnType<typeof setTimeout>;
+  }>();
   private lens: BrowserWindow | null = null;
   private overlays = new Map<number, BrowserWindow>();
   private overlaySessions = new Map<number, OverlaySession>();
@@ -90,8 +98,36 @@ export class WindowManager {
     this.overlaySessions.clear();
   }
 
-  openAnnotate(captureId: string): BrowserWindow {
-    if (this.annotate && !this.annotate.isDestroyed()) this.annotate.destroy();
+  openAnnotate(captureId: string): Promise<BrowserWindow> {
+    const replace = async (): Promise<BrowserWindow> => {
+      const existing = this.annotate;
+      if (existing && !existing.isDestroyed()) {
+        await this.flushAnnotate(existing);
+        if (!existing.isDestroyed()) existing.destroy();
+      }
+      return this.createAnnotate(captureId);
+    };
+    const transition = this.annotateTransition.then(replace, replace);
+    this.annotateTransition = transition.then(() => undefined, () => undefined);
+    return transition;
+  }
+
+  acknowledgeAnnotationFlush(
+    contentsId: number,
+    token: string,
+    ok: boolean,
+    message?: string,
+  ): boolean {
+    const pending = this.annotateFlushes.get(token);
+    if (!pending || pending.contentsId !== contentsId) return false;
+    clearTimeout(pending.timer);
+    this.annotateFlushes.delete(token);
+    if (ok) pending.resolve();
+    else pending.reject(new Error(message || "The open annotation could not be saved"));
+    return true;
+  }
+
+  private createAnnotate(captureId: string): BrowserWindow {
     const window = new BrowserWindow({
       title: "Annotate capture - TheWCAG",
       width: 1240,
@@ -109,6 +145,23 @@ export class WindowManager {
     window.on("closed", () => { if (this.annotate === window) this.annotate = null; });
     this.annotate = window;
     return window;
+  }
+
+  private flushAnnotate(window: BrowserWindow): Promise<void> {
+    const token = randomUUID();
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.annotateFlushes.delete(token);
+        reject(new Error("The open annotation did not finish saving; its window was kept open"));
+      }, 10_000);
+      this.annotateFlushes.set(token, {
+        contentsId: window.webContents.id,
+        resolve,
+        reject,
+        timer,
+      });
+      window.webContents.send("annotate:flush", { token });
+    });
   }
 
   toggleLens(): boolean {

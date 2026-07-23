@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { desktopDevices } from "@/lib/schema";
 import { verifyDeviceToken } from "@/lib/device-auth";
@@ -14,6 +14,9 @@ export async function DELETE(req: NextRequest) {
   await db
     .update(desktopDevices)
     .set({ revokedAt: new Date() })
-    .where(eq(desktopDevices.id, ctx.deviceId));
+    .where(and(
+      eq(desktopDevices.id, ctx.deviceId),
+      isNotNull(desktopDevices.claimedAt),
+    ));
   return NextResponse.json({ revoked: true });
 }

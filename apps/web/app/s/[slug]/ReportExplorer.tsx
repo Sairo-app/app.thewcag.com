@@ -42,7 +42,7 @@ export function ReportExplorer({ title, issues, imageUrl, imageAlt }: ReportExpl
 
   const criteria = useMemo(() => {
     const sorted = filterAndSortReportIssues(issues, { ...DEFAULT_REPORT_ISSUE_QUERY, sort: "criterion" });
-    return Array.from(new Set(sorted.flatMap((issue) => (issue.sc ? [issue.sc] : []))));
+    return Array.from(new Set(sorted.flatMap((issue) => issue.sc ?? [])));
   }, [issues]);
 
   const visibleIssues = useMemo(() => filterAndSortReportIssues(issues, query), [issues, query]);
@@ -195,7 +195,7 @@ export function ReportExplorer({ title, issues, imageUrl, imageAlt }: ReportExpl
               >
                 <option value="all">All criteria</option>
                 {criteria.map((criterion) => <option key={criterion} value={criterion}>WCAG {criterion}</option>)}
-                {issues.some((issue) => !issue.sc) && <option value="unmapped">Not mapped</option>}
+                {issues.some((issue) => !issue.sc?.length) && <option value="unmapped">Not mapped</option>}
               </select>
             </div>
             <div>
@@ -248,21 +248,27 @@ export function ReportExplorer({ title, issues, imageUrl, imageAlt }: ReportExpl
             {orderedIssues.map((issue) => {
               const status = reportIssueStatus(issue);
               return (
-                <li key={issue.id} hidden={!visibleIssueNumbers.has(issue.n)}>
+                <li key={issue.id ?? `finding-${issue.n}`} hidden={!visibleIssueNumbers.has(issue.n)}>
                   <article id={`finding-${issue.n}`} className="report-finding" tabIndex={-1} data-severity={issue.severity}>
                     <div className="report-finding__number" aria-hidden="true">{issue.n}</div>
                     <div className="report-finding__body">
                       <div className="report-finding__meta">
                         <span className="report-tag" data-severity={issue.severity}>{SEVERITY_LABEL[issue.severity]}</span>
                         <span className="report-tag" data-status={status}>{STATUS_LABEL[status]}</span>
-                        {issue.sc && <span className="report-tag report-tag--criterion">WCAG {issue.sc}</span>}
-                        <code
-                          className="report-finding__id"
-                          title={issue.id}
-                          aria-label={`Finding ID ${issue.id}`}
-                        >
-                          {compactFindingId(issue.id)}
-                        </code>
+                        {issue.sc?.map((criterion) => (
+                          <span key={criterion} className="report-tag report-tag--criterion">WCAG {criterion}</span>
+                        ))}
+                        {issue.id ? (
+                          <code
+                            className="report-finding__id"
+                            title={issue.id}
+                            aria-label={`Finding ID ${issue.id}`}
+                          >
+                            {compactFindingId(issue.id)}
+                          </code>
+                        ) : (
+                          <span className="report-finding__id">ID unavailable</span>
+                        )}
                       </div>
                       <h3>Finding {issue.n}: {issue.label}</h3>
                       {issue.note ? <p>{issue.note}</p> : <p className="report-finding__empty-note">No remediation note was provided.</p>}

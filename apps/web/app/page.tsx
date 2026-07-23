@@ -163,9 +163,9 @@ export default function Home() {
                   </Link>
                 </div>
                 <div className="home-hero__assurances" aria-label="Download details">
-                  <span><CheckIcon size={14} /> No account to start</span>
-                  <span><CheckIcon size={14} /> macOS and Windows</span>
-                  <span><CheckIcon size={14} /> Local by default</span>
+                  <span><CheckIcon size={16} /> No account to start</span>
+                  <span><CheckIcon size={16} /> macOS and Windows</span>
+                  <span><CheckIcon size={16} /> Local by default</span>
                 </div>
               </div>
 
@@ -178,10 +178,10 @@ export default function Home() {
 
         <aside className="home-proof" aria-label="Product facts">
           <div className="home-shell home-proof__inner">
-            <span><CheckIcon size={15} /> Free desktop app</span>
-            <span><CheckIcon size={15} /> Works without an account</span>
-            <span><CheckIcon size={15} /> Evidence stays on your device</span>
-            <span><CheckIcon size={15} /> WCAG 2.2 audit workflow</span>
+            <span><CheckIcon size={16} /> Free desktop app</span>
+            <span><CheckIcon size={16} /> Works without an account</span>
+            <span><CheckIcon size={16} /> Evidence stays on your device</span>
+            <span><CheckIcon size={16} /> WCAG 2.2 audit workflow</span>
           </div>
         </aside>
 
@@ -243,12 +243,12 @@ export default function Home() {
                 return (
                   <Link key={tool.title} href={tool.href} className="capability-map__item">
                     <span className="capability-map__number">{String(index + 1).padStart(2, "0")}</span>
-                    <span className="capability-map__icon" aria-hidden="true"><Icon size={22} /></span>
+                    <span className="capability-map__icon" aria-hidden="true"><Icon size={20} /></span>
                     <span className="capability-map__copy">
                       <strong>{tool.title}</strong>
                       <span>{tool.body}</span>
                     </span>
-                    <span className="capability-map__arrow" aria-hidden="true"><ArrowRightIcon size={17} /></span>
+                    <span className="capability-map__arrow" aria-hidden="true"><ArrowRightIcon size={16} /></span>
                   </Link>
                 );
               })}
@@ -264,9 +264,9 @@ export default function Home() {
             </div>
             <div className="home-connected__flow">
               <Link href="/chrome-accessibility-extension"><strong>Capture the barrier</strong><span>Select a webpage control or region with its visual and semantic context intact.</span></Link>
-              <span aria-hidden="true">→</span>
+              <ArrowRightIcon size={16} />
               <Link href="/accessibility-audit-software"><strong>Confirm the finding</strong><span>Review the evidence, WCAG decision, severity, ownership, and remediation locally.</span></Link>
-              <span aria-hidden="true">→</span>
+              <ArrowRightIcon size={16} />
               <Link href="/download"><strong>Deliver with control</strong><span>Export a portable audit or publish only the approved report you choose.</span></Link>
             </div>
           </div>
@@ -286,9 +286,9 @@ export default function Home() {
                   <h3>macOS</h3>
                   <p>Universal Apple Silicon and Intel builds with menu-bar access and clear Screen Recording permission recovery.</p>
                   <ul>
-                    <li><CheckIcon size={15} /> macOS 12 Monterey or later</li>
-                    <li><CheckIcon size={15} /> Apple Silicon and Intel</li>
-                    <li><CheckIcon size={15} /> <kbd>⌥⌘P</kbd> contrast picker</li>
+                    <li><CheckIcon size={16} /> macOS 12 Monterey or later</li>
+                    <li><CheckIcon size={16} /> Apple Silicon and Intel</li>
+                    <li><CheckIcon size={16} /> <kbd>⌥⌘P</kbd> contrast picker</li>
                   </ul>
                 </div>
                 <a href="/api/desktop/download?os=mac" className="button button--dark">
@@ -302,9 +302,9 @@ export default function Home() {
                   <h3>Windows</h3>
                   <p>Windows-aware chrome, compact layouts, native shortcut labels, and sharp output across high-DPI displays.</p>
                   <ul>
-                    <li><CheckIcon size={15} /> Windows 10 and 11, 64-bit</li>
-                    <li><CheckIcon size={15} /> Multi-display and high-DPI ready</li>
-                    <li><CheckIcon size={15} /> <kbd>Ctrl Alt P</kbd> contrast picker</li>
+                    <li><CheckIcon size={16} /> Windows 10 and 11, 64-bit</li>
+                    <li><CheckIcon size={16} /> Multi-display and high-DPI ready</li>
+                    <li><CheckIcon size={16} /> <kbd>Ctrl Alt P</kbd> contrast picker</li>
                   </ul>
                 </div>
                 <a href="/api/desktop/download?os=windows" className="button button--secondary">

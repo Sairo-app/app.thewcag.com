@@ -14,6 +14,7 @@ import { hasActiveProSubscription } from "@/lib/billing/entitlements";
 import { isReportAvailable } from "@/lib/billing/subscriptions";
 import { ReportExplorer } from "./ReportExplorer";
 import { a11yScanReportFixture } from "@/lib/a11y-scan-fixture";
+import { brandLogoPath } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,7 @@ const getScreenshot = cache(async (slug: string) => {
       brandName: users.brandName,
       brandColor: users.brandColor,
       brandLogoKey: users.brandLogoKey,
+      brandAssetToken: users.brandAssetToken,
     })
     .from(reports)
     .leftJoin(users, eq(users.id, reports.userId))
@@ -79,7 +81,7 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
       ? {
           name: shot.brandName,
           color: /^#[0-9a-fA-F]{6}$/.test(shot.brandColor ?? "") ? shot.brandColor! : null,
-          logoUrl: shot.brandLogoKey ? `/api/brand/${shot.userId}/logo` : null,
+          logoUrl: shot.brandLogoKey ? brandLogoPath(shot.brandAssetToken) : null,
         }
       : null;
 
@@ -88,23 +90,23 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
       <ReportViewTracker slug={slug} />
       {brand?.color && <div aria-hidden="true" style={{ background: brand.color }} className="h-1 w-full" />}
       <header className="report-header border-b border-border">
-        <div className="report-header__inner mx-auto flex max-w-[1600px] items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
+        <div className="report-header__inner mx-auto flex max-w-[1600px] items-center justify-between gap-3 px-4 py-3 sm:px-6">
           {brand ? (
-            <div className="flex min-w-0 items-center gap-2.5">
+            <div className="flex min-w-0 items-center gap-3">
               {brand.logoUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={brand.logoUrl} alt={brand.name ?? "Logo"} className="h-6 w-auto max-w-[170px] object-contain" />
               )}
-              {brand.name && <span className="truncate text-sm font-semibold">{brand.name}</span>}
+              {brand.name && <span className="truncate type-body font-semibold">{brand.name}</span>}
             </div>
           ) : (
             <Link href="/" className="flex items-center gap-2" aria-label="TheWCAG home">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/logo.png" alt="" width={22} height={22} className="h-[22px] w-[22px]" />
-              <span className="text-sm font-bold tracking-tight">TheWCAG</span>
+              <span className="type-body font-bold ">TheWCAG</span>
             </Link>
           )}
-          <span className="shrink-0 text-[10px] font-medium uppercase tracking-wider text-muted">
+          <span className="shrink-0 type-caption font-medium uppercase r text-muted">
             {shot.issues.length ? "Accessibility report" : "Shared screenshot"}
           </span>
         </div>
@@ -129,7 +131,7 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
           </div>
           <CopyLinkButton
             url={`${SITE_URL}/s/${slug}`}
-            className="report-copy-link inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-card"
+            className="report-copy-link inline-flex shrink-0 items-center gap-2 rounded-lg border border-border px-3 py-2 type-body font-medium hover:bg-card"
           />
         </section>
 

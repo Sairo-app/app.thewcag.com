@@ -1,8 +1,22 @@
 import { describe, expect, it } from "vitest";
 import sitemap, { PUBLIC_ROUTES } from "../app/sitemap";
-import { breadcrumbJsonLd, createPageMetadata, SITE_URL } from "./seo";
+import { breadcrumbJsonLd, createPageMetadata, SITE_URL, siteUrlFromEnvironment } from "./seo";
 
 describe("SEO metadata", () => {
+  it("normalizes trailing slashes and rejects non-origin production URLs", () => {
+    expect(siteUrlFromEnvironment({
+      NODE_ENV: "production",
+      NEXT_PUBLIC_APP_URL: "https://app.thewcag.com///",
+    })).toBe("https://app.thewcag.com");
+    expect(() => siteUrlFromEnvironment({
+      NODE_ENV: "production",
+      NEXT_PUBLIC_APP_URL: "https://app.thewcag.com/reports",
+    })).toThrow(/must be an origin/);
+    expect(() => siteUrlFromEnvironment({
+      NODE_ENV: "production",
+      NEXT_PUBLIC_APP_URL: "http://app.thewcag.com",
+    })).toThrow(/HTTPS/);
+  });
   it("creates an absolute social URL and a route-specific canonical", () => {
     const metadata = createPageMetadata({
       title: "Chrome accessibility extension",

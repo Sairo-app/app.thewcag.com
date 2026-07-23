@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { EVIDENCE_SCHEMA_VERSION, type EvidencePacketV1, type EvidenceTargetV1 } from "@accessibility-build/audit-contracts";
-import { applyConsent, calculateCropGeometry, createLocalDraft, runDeterministicChecks } from "./evidence";
+import { applyConsent, calculateCropGeometry, captureOmissions, createLocalDraft, runDeterministicChecks } from "./evidence";
 
 function target(patch: Partial<EvidenceTargetV1> = {}): EvidenceTargetV1 {
   return {
@@ -74,6 +74,31 @@ describe("evidence capture", () => {
     expect(checks).toContainEqual(expect.objectContaining({ id: "image-alternative", outcome: "needs-review" }));
   });
 
+  it.each(["placeholder", "title"] as const)("treats a %s-only name as needing review", (source) => {
+    const checks = runDeterministicChecks(target({
+      tagName: "input",
+      role: "textbox",
+      accessibleName: "Email address",
+      attributes: { type: "text", [source]: "Email address" },
+      domExcerpt: `<input type="text" ${source}="Email address"></input>`,
+    }));
+
+    expect(checks).toContainEqual(expect.objectContaining({
+      id: "interactive-name",
+      outcome: "needs-review",
+      wcag: ["4.1.2"],
+    }));
+    expect(checks).not.toContainEqual(expect.objectContaining({ id: "interactive-name", outcome: "fail" }));
+  });
+
+  it("retains the iframe inspection warning in evidence omissions", () => {
+    const omissions = captureOmissions({
+      omissions: ["Iframe inner content was not inspected; only the iframe element and visible screenshot were captured"],
+    });
+
+    expect(omissions).toContain("Iframe inner content was not inspected; only the iframe element and visible screenshot were captured");
+  });
+
   it("creates a structured local draft without asserting final severity", () => {
     const selected = target();
     const checks = runDeterministicChecks(selected);
@@ -133,7 +158,7 @@ describe("evidence capture", () => {
         sourceWidth: 10,
         sourceHeight: 10,
       },
-      checks: [],
+      checks: runDeterministicChecks(target()),
       omissions: [],
     };
     const approved = applyConsent(evidence, {
@@ -142,14 +167,27 @@ describe("evidence capture", () => {
       includeUrl: false,
     });
     expect(approved.image).toBeUndefined();
-    expect(approved.page).toMatchObject({ title: "", url: "", origin: "" });
-    expect(approved.target).toMatchObject({
+    expect(approved.page).toMatchObject({ title: "", url: "", origin: "", locale: "", browser: "" });
+    expect(approved.target).toEqual({
+      kind: "element",
+      tagName: "",
+      role: "",
       accessibleName: "",
+      accessibleDescription: "",
       selector: "",
       structuralPath: "",
+      bounds: { x: 0, y: 0, width: 1, height: 1 },
+      marker: { x: 0, y: 0, width: 1, height: 1 },
+      states: [],
+      labels: [],
+      nearbyHeading: "",
+      landmark: "",
       attributes: {},
+      styles: {},
       domExcerpt: "",
     });
+    expect(approved.checks).toEqual([]);
     expect(approved.omissions).toHaveLength(3);
+    expect(approved.omissions).toContain("Page title, address, browser/device details, and locale withheld by the auditor");
   });
 });

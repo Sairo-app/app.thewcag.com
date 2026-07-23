@@ -20,13 +20,13 @@ export default async function ConnectPage({
     return (
       <>
         <Header />
-        <main id="main" className="auth-page mx-auto max-w-md px-6 py-24 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Connection protected</p>
-          <h1 className="mt-3 text-2xl font-bold tracking-tight">This connection link is invalid</h1>
-          <p className="mt-3 text-sm text-muted">
+        <main id="main" className="auth-page mx-auto max-w-md px-6 py-marketing-section text-center">
+          <p className="type-callout font-semibold uppercase text-primary">Connection protected</p>
+          <h1 className="mt-3 type-title-2 font-bold ">This connection link is invalid</h1>
+          <p className="mt-3 type-body text-muted">
             Start sign-in again from the TheWCAG desktop app. Connection links are tied to the app that created them.
           </p>
-          <a href="/download" className="mt-6 inline-flex rounded-lg border border-border px-4 py-2.5 text-sm font-semibold hover:bg-card">
+          <a href="/download" className="mt-6 inline-flex rounded-lg border border-border px-4 py-3 type-body font-semibold hover:bg-card">
             Return to downloads
           </a>
         </main>

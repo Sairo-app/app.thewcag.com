@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { reports } from "@/lib/schema";
 import { hasActiveProSubscription } from "@/lib/billing/entitlements";
 import { isReportAvailable } from "@/lib/billing/subscriptions";
 import { a11yScanReportFixture } from "@/lib/a11y-scan-fixture";
+import { recordUniqueReportView } from "@/lib/report-views";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,11 +35,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     return NextResponse.json({ counted: false, analytics: false });
   }
 
-  await db
-    .update(reports)
-    .set({ viewCount: sql`${reports.viewCount} + 1` })
-    .where(eq(reports.slug, slug));
-  const response = NextResponse.json({ counted: true });
+  const counted = await recordUniqueReportView(slug, req.headers);
+  const response = NextResponse.json({ counted });
   response.cookies.set(cookieName, "1", {
     httpOnly: true,
     sameSite: "lax",

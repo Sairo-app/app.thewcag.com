@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowSquareOut,
+  ArrowsClockwise,
   Check,
   CheckCircle,
   Clipboard,
@@ -10,7 +11,7 @@ import {
   ShareNetwork,
   SignIn,
   WarningCircle,
-} from "@phosphor-icons/react";
+} from "../Icon";
 import type {
   Account,
   AuditProject,
@@ -21,14 +22,18 @@ import type {
   PublishedReport,
   WorkspaceStage,
 } from "../../shared/desktop";
-import { desktop, getStored, listCaptures, setStored } from "../api";
+import { desktop, getStored, listCaptures, saveStoredFindings, setStored } from "../api";
 import { auditPlanProgress, auditTestRunComplete } from "../audit-plan";
 import { auditStoreKey, type RecordAuditActivity } from "../audits";
 import { Button, Field, StatusBadge, Toast } from "../components";
 import { WCAG_CRITERIA } from "../data/wcag";
 import { messageFromError, useTransientMessage } from "../hooks";
-import { ISSUE_TYPES } from "../../lib/annotate/model";
-import { compactFindingId } from "@accessibility-build/audit-contracts";
+import {
+  cleanReportText,
+  compactFindingId,
+  normalizeReportCriteria,
+  REPORT_PUBLISH_LIMITS,
+} from "@accessibility-build/audit-contracts";
 import { renderCaptureBase64 } from "../capture-render";
 import { normalizeFindingReferences } from "../../shared/finding-references";
 import {
@@ -44,6 +49,24 @@ type ChecklistState = Record<
     findingKey?: string;
   }
 >;
+
+function reportCriteriaForFinding(finding: Finding): string[] {
+  const mappedCriteria = finding.wcagMappings?.map((mapping) => mapping.criterion) ?? [];
+  return normalizeReportCriteria(mappedCriteria.length ? mappedCriteria : finding.wcag);
+}
+
+function publishIssueForFinding(finding: Finding, index: number) {
+  const criteria = reportCriteriaForFinding(finding);
+  return {
+    id: finding.id,
+    n: index + 1,
+    ...(criteria.length ? { sc: criteria } : {}),
+    label: cleanReportText(finding.title, REPORT_PUBLISH_LIMITS.issueTitleLength) || "Accessibility issue",
+    severity: finding.severity,
+    note: cleanReportText(finding.note, REPORT_PUBLISH_LIMITS.issueNoteLength),
+    status: finding.status,
+  };
+}
 
 export function ShareView({
   audit,
@@ -63,6 +86,7 @@ export function ShareView({
   const [testRuns, setTestRuns] = useState<AuditTestRun[]>([]);
   const [reports, setReports] = useState<PublishedReport[]>([]);
   const [account, setAccount] = useState<Account>({ signedIn: false });
+  const [accountRetrying, setAccountRetrying] = useState(false);
   const [captureId, setCaptureId] = useState("");
   const [title, setTitle] = useState(`${audit.project} accessibility report`);
   const [description, setDescription] = useState(
@@ -112,10 +136,13 @@ export function ShareView({
         const normalized = normalizeFindingReferences(nextFindings);
         setFindings(normalized.findings);
         if (normalized.changed) {
-          void setStored(
+          void saveStoredFindings(
             auditStoreKey(audit.id, "findings"),
+            nextFindings,
             normalized.findings,
-          );
+          )
+            .then((saved) => { if (!cancelled) setFindings(saved); })
+            .catch((error) => { if (!cancelled) show(messageFromError(error), true); });
         }
         setChecklist(nextChecklist);
         setSampleItems(nextSampleItems);
@@ -133,11 +160,21 @@ export function ShareView({
       });
     const stopAccount = desktop.on(
       "account:changed",
-      () => void desktop.invoke<Account>("auth:account").then(setAccount),
+      () => void desktop.invoke<Account>("auth:account")
+        .then(setAccount)
+        .catch((error) => show(messageFromError(error, "Account status could not be refreshed."), true)),
     );
+    const findingsKey = auditStoreKey(audit.id, "findings");
+    const stopFindings = desktop.on<{ key: string | null }>("findings:changed", ({ key }) => {
+      if (key !== null && key !== findingsKey) return;
+      void getStored<Finding[]>(findingsKey, [])
+        .then((next) => { if (!cancelled) setFindings(next); })
+        .catch((error) => { if (!cancelled) show(messageFromError(error), true); });
+    });
     return () => {
       cancelled = true;
       stopAccount();
+      stopFindings();
     };
   }, [audit.id]);
 
@@ -191,7 +228,7 @@ export function ShareView({
       testRuns.length > 0 && testRuns.every(auditTestRunComplete);
     const incompleteFindings = activeFindings.filter(
       (finding) =>
-        !finding.wcag.trim() ||
+        reportCriteriaForFinding(finding).length === 0 ||
         !finding.location?.trim() ||
         !finding.actualResult?.trim() ||
         !finding.expectedResult?.trim() ||
@@ -266,6 +303,24 @@ export function ShareView({
     }
   }
 
+  async function retryAccount() {
+    if (accountRetrying) return;
+    setAccountRetrying(true);
+    try {
+      const refreshed = await desktop.invoke<Account>("auth:account");
+      setAccount(refreshed);
+      if (refreshed.featuresState === "unavailable") {
+        show("Account services are still unavailable. Last-known access is being preserved.", true);
+      } else {
+        show("Account status refreshed");
+      }
+    } catch (error) {
+      show(messageFromError(error, "Account status could not be refreshed."), true);
+    } finally {
+      setAccountRetrying(false);
+    }
+  }
+
   async function setConclusion(conclusion: AuditProject["conclusion"]) {
     if (conclusion === "meets-target" && !delivery.canMeetTarget) {
       show(
@@ -300,15 +355,7 @@ export function ShareView({
     setPublishing(true);
     try {
       const imageBase64 = await renderCaptureBase64(selectedCapture);
-      const issues = includedFindings.map((finding, index) => ({
-        id: finding.id,
-        n: index + 1,
-        sc: finding.wcag || undefined,
-        label: finding.title,
-        severity: finding.severity,
-        note: finding.note,
-        status: finding.status,
-      }));
+      const issues = includedFindings.map(publishIssueForFinding);
       const url = await desktop.invoke<string>("report:publish", {
         title: title.trim(),
         description: description.trim(),
@@ -359,7 +406,7 @@ export function ShareView({
       {publishedUrl ? (
         <section className="publish-success" role="status">
           <span>
-            <Check size={22} weight="bold" />
+            <Check size={20} />
           </span>
           <div>
             <strong>Report is live</strong>
@@ -375,6 +422,8 @@ export function ShareView({
                 void desktop.invoke("clipboard:write-text", {
                   text: publishedUrl,
                 })
+                  .then(() => show("Report link copied"))
+                  .catch((error) => show(messageFromError(error, "The report link could not be copied."), true))
               }
             >
               Copy link
@@ -386,6 +435,7 @@ export function ShareView({
                 void desktop.invoke("shell:open-external", {
                   url: publishedUrl,
                 })
+                  .catch((error) => show(messageFromError(error, "The published report could not be opened."), true))
               }
             >
               Open report
@@ -396,7 +446,7 @@ export function ShareView({
 
       {!captures.length || !findings.length ? (
         <section className="report-prerequisite" role="status">
-          <WarningCircle size={20} weight="duotone" />
+          <WarningCircle size={20} />
           <div>
             <strong>Focused report evidence is not ready</strong>
             <p>
@@ -433,9 +483,9 @@ export function ShareView({
         <div className="delivery-checks">
           <div data-ready={delivery.plan.complete === delivery.plan.total}>
             {delivery.plan.complete === delivery.plan.total ? (
-              <CheckCircle size={18} weight="fill" />
+              <CheckCircle size={20} weight="fill" />
             ) : (
-              <WarningCircle size={18} weight="fill" />
+              <WarningCircle size={20} weight="fill" />
             )}
             <span>
               <strong>Evaluation plan</strong>
@@ -447,9 +497,9 @@ export function ShareView({
           </div>
           <div data-ready={delivery.sampleComplete}>
             {delivery.sampleComplete ? (
-              <CheckCircle size={18} weight="fill" />
+              <CheckCircle size={20} weight="fill" />
             ) : (
-              <WarningCircle size={18} weight="fill" />
+              <WarningCircle size={20} weight="fill" />
             )}
             <span>
               <strong>Representative sample</strong>
@@ -464,9 +514,9 @@ export function ShareView({
           </div>
           <div data-ready={delivery.testRunsComplete}>
             {delivery.testRunsComplete ? (
-              <CheckCircle size={18} weight="fill" />
+              <CheckCircle size={20} weight="fill" />
             ) : (
-              <WarningCircle size={18} weight="fill" />
+              <WarningCircle size={20} weight="fill" />
             )}
             <span>
               <strong>Guided test runs</strong>
@@ -487,9 +537,9 @@ export function ShareView({
           >
             {delivery.reviewed === delivery.applicable &&
             delivery.undocumentedNA === 0 ? (
-              <CheckCircle size={18} weight="fill" />
+              <CheckCircle size={20} weight="fill" />
             ) : (
-              <WarningCircle size={18} weight="fill" />
+              <WarningCircle size={20} weight="fill" />
             )}
             <span>
               <strong>Applicable criteria</strong>
@@ -504,9 +554,9 @@ export function ShareView({
           </div>
           <div data-ready={delivery.unlinkedFailures === 0}>
             {delivery.unlinkedFailures === 0 ? (
-              <CheckCircle size={18} weight="fill" />
+              <CheckCircle size={20} weight="fill" />
             ) : (
-              <WarningCircle size={18} weight="fill" />
+              <WarningCircle size={20} weight="fill" />
             )}
             <span>
               <strong>Failure traceability</strong>
@@ -519,9 +569,9 @@ export function ShareView({
           </div>
           <div data-ready={delivery.findingsWithoutEvidence === 0}>
             {delivery.findingsWithoutEvidence === 0 ? (
-              <CheckCircle size={18} weight="fill" />
+              <CheckCircle size={20} weight="fill" />
             ) : (
-              <WarningCircle size={18} weight="fill" />
+              <WarningCircle size={20} weight="fill" />
             )}
             <span>
               <strong>Finding evidence</strong>
@@ -534,9 +584,9 @@ export function ShareView({
           </div>
           <div data-ready={delivery.incompleteFindings === 0}>
             {delivery.incompleteFindings === 0 ? (
-              <CheckCircle size={18} weight="fill" />
+              <CheckCircle size={20} weight="fill" />
             ) : (
-              <WarningCircle size={18} weight="fill" />
+              <WarningCircle size={20} weight="fill" />
             )}
             <span>
               <strong>Finding completeness</strong>
@@ -549,9 +599,9 @@ export function ShareView({
           </div>
           <div data-ready={delivery.findingsPendingReview === 0}>
             {delivery.findingsPendingReview === 0 ? (
-              <CheckCircle size={18} weight="fill" />
+              <CheckCircle size={20} weight="fill" />
             ) : (
-              <WarningCircle size={18} weight="fill" />
+              <WarningCircle size={20} weight="fill" />
             )}
             <span>
               <strong>Auditor review</strong>
@@ -564,9 +614,9 @@ export function ShareView({
           </div>
           <div data-ready={delivery.conclusionReady}>
             {delivery.conclusionReady ? (
-              <CheckCircle size={18} weight="fill" />
+              <CheckCircle size={20} weight="fill" />
             ) : (
-              <WarningCircle size={18} weight="fill" />
+              <WarningCircle size={20} weight="fill" />
             )}
             <span>
               <strong>Audit conclusion</strong>
@@ -653,7 +703,7 @@ export function ShareView({
         </div>
         {!delivery.canMeetTarget ? (
           <div className="conclusion-safeguard">
-            <WarningCircle size={18} weight="fill" />
+            <WarningCircle size={20} weight="fill" />
             <p>
               {delivery.conclusionConflict
                 ? "The recorded outcome conflicts with the current audit record. Change the outcome or resolve the incomplete coverage and unresolved failures before export."
@@ -667,7 +717,7 @@ export function ShareView({
         <section className="report-draft">
           <div className="report-section-heading">
             <span>
-              <FileText size={19} weight="duotone" />
+              <FileText size={20} />
             </span>
             <div>
               <h2>Report draft</h2>
@@ -708,7 +758,7 @@ export function ShareView({
             />
           </Field>
           <div className="access-row">
-            <LockKey size={19} weight="duotone" />
+            <LockKey size={20} />
             <span>
               <strong>Anyone with the link</strong>
               <small>
@@ -738,7 +788,7 @@ export function ShareView({
         <aside className="report-preview" aria-label="Report preview">
           <div className="report-section-heading">
             <span>
-              <Eye size={19} weight="duotone" />
+              <Eye size={20} />
             </span>
             <div>
               <h2>Included evidence</h2>
@@ -765,9 +815,9 @@ export function ShareView({
               <article key={finding.key}>
                 <i className={`severity-${finding.severity}`} />
                 <span>
-                  <strong>{finding.title}</strong>
+                  <strong>{publishIssueForFinding(finding, 0).label}</strong>
                   <small>
-                    {finding.wcag || ISSUE_TYPES.at(-1)?.label} · {compactFindingId(finding.id)}
+                    {publishIssueForFinding(finding, 0).sc?.join(", ") || "Not mapped"} · {compactFindingId(finding.id)}
                   </small>
                 </span>
                 <StatusBadge
@@ -789,7 +839,7 @@ export function ShareView({
           </div>
           {!account.signedIn ? (
             <div className="sign-in-callout">
-              <WarningCircle size={20} weight="duotone" />
+              <WarningCircle size={20} />
               <div>
                 <strong>Sign in to publish</strong>
                 <p>Your local audit remains available without an account.</p>
@@ -798,23 +848,41 @@ export function ShareView({
                 Sign in
               </Button>
             </div>
+          ) : account.featuresState === "unavailable" ? (
+            <div className="sign-in-callout">
+              <WarningCircle size={20} />
+              <div>
+                <strong>Plan status is temporarily unavailable</strong>
+                <p>{account.features?.hostedReports.enabled
+                  ? "Using your last-known Pro access while the service reconnects."
+                  : "Retry before publishing; your local report remains available."}</p>
+              </div>
+              <Button
+                icon={ArrowsClockwise}
+                disabled={accountRetrying}
+                onClick={() => void retryAccount()}
+              >
+                {accountRetrying ? "Retrying" : "Retry"}
+              </Button>
+            </div>
           ) : !account.features?.hostedReports.enabled ? (
             <div className="sign-in-callout">
-              <LockKey size={20} weight="duotone" />
+              <LockKey size={20} />
               <div>
                 <strong>Pro is required for hosted links</strong>
                 <p>Local reports and exports remain free and stay on this computer.</p>
               </div>
               <Button
                 icon={ArrowSquareOut}
-                onClick={() => void desktop.invoke("shell:open-external", { url: account.actions?.upgradeUrl || "https://app.thewcag.com/pricing" })}
+                onClick={() => void desktop.invoke("shell:open-external", { url: account.actions?.upgradeUrl || "https://app.thewcag.com/pricing" })
+                  .catch((error) => show(messageFromError(error, "The pricing page could not be opened."), true))}
               >
                 View Pro
               </Button>
             </div>
           ) : (
             <div className="signed-in-line">
-              <Check size={16} weight="bold" />
+              <Check size={16} />
               <span>Publishing as {account.email} · {account.features.hostedReports.active} of {account.features.hostedReports.limit} hosted reports</span>
             </div>
           )}
@@ -839,6 +907,8 @@ export function ShareView({
             <p className="publish-hint">
               This capture has no included findings.
             </p>
+          ) : account.signedIn && account.featuresState === "unavailable" && !account.features?.hostedReports.enabled ? (
+            <p className="publish-hint">Retry account status before publishing. The app will not treat an unavailable plan check as a Free account.</p>
           ) : account.signedIn && !account.features?.hostedReports.enabled ? (
             <p className="publish-hint">Choose Pro to create a hosted share link, or export the report locally for free.</p>
           ) : null}
@@ -854,6 +924,7 @@ export function ShareView({
                 void desktop.invoke("shell:open-external", {
                   url: "https://app.thewcag.com/screenshots",
                 })
+                  .catch((error) => show(messageFromError(error, "The report manager could not be opened."), true))
               }
             >
               Manage online
@@ -864,9 +935,10 @@ export function ShareView({
               key={report.id}
               onClick={() =>
                 void desktop.invoke("shell:open-external", { url: report.url })
+                  .catch((error) => show(messageFromError(error, "The report could not be opened."), true))
               }
             >
-              <ShareNetwork size={17} />
+              <ShareNetwork size={20} />
               <span>
                 <strong>{report.title}</strong>
                 <small>
@@ -874,7 +946,7 @@ export function ShareView({
                   {new Date(report.createdAt).toLocaleDateString()}
                 </small>
               </span>
-              <ArrowSquareOut size={16} />
+              <ArrowSquareOut size={20} />
             </button>
           ))}
         </section>

@@ -2,7 +2,7 @@
 // before the server via the Docker CMD so the co-located Postgres is always
 // schema-current. Uses postgres.js (a runtime dependency, present in the
 // standalone bundle) and reads ./drizzle relative to the working directory.
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import postgres from "postgres";
@@ -15,6 +15,10 @@ if (!url) {
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), "..", "drizzle");
 const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
+const aliasesPath = join(dir, "migration-aliases.json");
+const aliases = existsSync(aliasesPath)
+  ? JSON.parse(readFileSync(aliasesPath, "utf8"))
+  : {};
 const sql = postgres(url, { max: 1 });
 
 try {
@@ -23,10 +27,19 @@ try {
     "name" text PRIMARY KEY NOT NULL,
     "applied_at" timestamp DEFAULT now() NOT NULL
   )`;
+  const rows = await sql`SELECT "name" FROM "_thewcag_migrations"`;
+  const appliedNames = new Set(rows.map((row) => String(row.name)));
   for (const file of files) {
-    const [applied] = await sql`SELECT "name" FROM "_thewcag_migrations" WHERE "name" = ${file} LIMIT 1`;
-    if (applied) {
+    if (appliedNames.has(file)) {
       console.log(`migrate: already applied ${file}`);
+      continue;
+    }
+    const legacyName = (aliases[file] ?? []).find((name) => appliedNames.has(name));
+    if (legacyName) {
+      await sql`INSERT INTO "_thewcag_migrations" ("name") VALUES (${file})
+        ON CONFLICT ("name") DO NOTHING`;
+      appliedNames.add(file);
+      console.log(`migrate: recorded ${file} (formerly ${legacyName})`);
       continue;
     }
     const text = readFileSync(join(dir, file), "utf8");
@@ -37,6 +50,7 @@ try {
       }
       await tx`INSERT INTO "_thewcag_migrations" ("name") VALUES (${file})`;
     });
+    appliedNames.add(file);
     console.log(`migrate: applied ${file}`);
   }
   console.log("migrate: done");

@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode, useEffect, useState } from "react";
-import { WarningCircle } from "@phosphor-icons/react";
+import { WarningCircle } from "./Icon";
 import type { AppView, PlatformInfo } from "../shared/desktop";
 import { desktop } from "./api";
 import { Workspace } from "./Workspace";
@@ -24,7 +24,7 @@ function errorMessage(error: unknown): string {
 }
 
 function StartupFailure({ message }: { message: string }) {
-  return <main className="fatal-screen"><WarningCircle size={34} weight="duotone" /><h1>The workspace could not open</h1><p>{message}</p><button className="button button-primary" onClick={() => location.reload()}>Reload workspace</button></main>;
+  return <main className="fatal-screen"><WarningCircle size={32} /><h1>The workspace could not open</h1><p>{message}</p><button className="button button-primary" onClick={() => location.reload()}>Reload workspace</button></main>;
 }
 
 export function App() {

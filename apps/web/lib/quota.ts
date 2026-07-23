@@ -2,10 +2,6 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "./db";
 import { reports } from "./schema";
 
-/** Per-user image storage cap: 1 GiB. Keeps any single account from
- * overloading R2. Enforced on every publish; surfaced via entitlements. */
-export const STORAGE_QUOTA_BYTES = 1024 * 1024 * 1024;
-
 /** Sum of all image bytes this user currently has stored. */
 export async function userStorageBytes(userId: string): Promise<number> {
   const [row] = await db

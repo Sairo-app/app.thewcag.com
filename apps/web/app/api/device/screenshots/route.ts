@@ -3,15 +3,15 @@ import { and, count, desc, eq, gt, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { billingSubscriptions, findingIdentities, reports } from "@/lib/schema";
 import { verifyDeviceToken } from "@/lib/device-auth";
-import { decodePngBase64, generateSlug, isUniqueViolation, sanitizeReportIssues, SITE_URL } from "@/lib/reports";
+import { decodePngBase64, generateSlug, isUniqueViolation, sanitizeReportIssuesForPublish, SITE_URL } from "@/lib/reports";
 import { deleteImageBestEffort, putImage } from "@/lib/r2";
 import { formatBytes } from "@/lib/quota";
 import { readBoundedJson, RequestBodyTooLargeError } from "@/lib/bounded-json";
 import { resolveEntitlements } from "@/lib/billing/entitlements";
+import { cleanReportText, REPORT_PUBLISH_LIMITS } from "@accessibility-build/audit-contracts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-const MAX_REQUEST_BYTES = 5_600_000;
 
 class StorageQuotaError extends Error {
   constructor(public readonly usedBytes: number) {
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
 
   let body: unknown;
   try {
-    body = await readBoundedJson(req, MAX_REQUEST_BYTES);
+    body = await readBoundedJson(req, REPORT_PUBLISH_LIMITS.requestBytes);
   } catch (error) {
     if (error instanceof RequestBodyTooLargeError) {
       return NextResponse.json({ error: "request too large" }, { status: 413 });
@@ -71,10 +71,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: decoded.error }, { status: decoded.error === "image too large" ? 413 : 400 });
   }
 
-  const title = (typeof b.title === "string" ? b.title.trim() : "").slice(0, 140) || "Accessibility screenshot";
-  const description =
-    typeof b.description === "string" && b.description.trim() ? b.description.trim().slice(0, 500) : null;
-  const issues = sanitizeReportIssues(b.issues);
+  const title = cleanReportText(b.title, REPORT_PUBLISH_LIMITS.titleLength) || "Accessibility screenshot";
+  const description = cleanReportText(b.description, REPORT_PUBLISH_LIMITS.descriptionLength) || null;
+  const issues = sanitizeReportIssuesForPublish(b.issues);
 
   // Per-user 1 GiB image cap: reject before writing anything to R2.
   const used = entitlements.storage.usedBytes;

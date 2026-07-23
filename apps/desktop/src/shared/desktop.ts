@@ -352,6 +352,29 @@ export interface Finding {
   modifiedAt?: number;
 }
 
+export type CaptureSavedEvent = CaptureEntry & {
+  /** Present only when an overlay capture completed a coordinator session. */
+  sessionId?: string;
+};
+
+export type FindingMutation =
+  | {
+      type: "put";
+      finding: Finding;
+    }
+  | {
+      type: "patch";
+      key: string;
+      id?: string;
+      patch: Partial<Omit<Finding, "id" | "key">>;
+      unset?: Array<Exclude<keyof Finding, "id" | "key">>;
+    }
+  | {
+      type: "remove";
+      key: string;
+      id?: string;
+    };
+
 export interface FindingStatusTransition {
   status: Finding["status"];
   changedAt: number;
@@ -410,6 +433,8 @@ export interface AppSettings {
 
 export interface Account {
   signedIn: boolean;
+  /** Entitlements are fresh from the server or retained from the last successful refresh. */
+  featuresState?: "loaded" | "unavailable";
   email?: string;
   plan?: "free" | "pro";
   subscription?: {
@@ -463,20 +488,24 @@ export interface LensFrame {
 }
 
 export type DesktopEvent =
+  | "annotate:flush"
   | "overlay:init"
   | "overlay:progress"
   | "capture:result"
   | "capture:saved"
+  | "capture:cancelled"
   | "account:changed"
   | "update:state"
   | "shortcut:failed"
   | "notification"
   | "navigation:tool"
   | "screenshot:share"
+  | "findings:changed"
   | "lens:changed";
 
 export type InvokeChannel =
   | "app:platform"
+  | "annotate:flush-complete"
   | "window:minimize"
   | "window:toggle-maximize"
   | "window:close"
@@ -506,6 +535,7 @@ export type InvokeChannel =
   | "store:set"
   | "store:remove"
   | "store:add-findings"
+  | "store:mutate-findings"
   | "audit:activate"
   | "workspace:navigate"
   | "settings:get"

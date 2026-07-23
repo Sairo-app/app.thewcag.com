@@ -1,8 +1,9 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { ArrowClockwise, ArrowSquareOut, Camera, FloppyDisk, GearSix, LinkSimple, Plus, Ticket, Trash, X } from "@phosphor-icons/react";
+import { ArrowClockwise, ArrowSquareOut, Camera, FloppyDisk, GearSix, LinkSimple, Plus, Ticket, Trash, X } from "./Icon";
 import type { AffectedUser } from "@accessibility-build/audit-contracts";
 import type {
   CaptureEntry,
+  CaptureSavedEvent,
   Finding,
   FindingOccurrence,
   FindingTicketLink,
@@ -25,6 +26,12 @@ import { findingPrimaryEvidenceCaptureIds } from "../shared/finding-evidence";
 import { desktop } from "./api";
 import { Button, Field } from "./components";
 import { WCAG_CRITERIA } from "./data/wcag";
+import {
+  cancellationMatchesPendingSession,
+  captureMatchesPendingSession,
+  type FindingCaptureRole,
+  type PendingFindingCapture,
+} from "./capture-session";
 
 const AFFECTED_USER_LABELS: Record<AffectedUser, string> = {
   "screen-reader": "Screen reader",
@@ -197,44 +204,76 @@ export function FindingEditorDialog({
   const [ticketMessage, setTicketMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [captureBusy, setCaptureBusy] = useState(false);
   const [captureMessage, setCaptureMessage] = useState("");
-  const [pendingCaptureRole, setPendingCaptureRole] = useState<"evidence" | "before" | "after" | null>(null);
+  const [pendingCapture, setPendingCapture] = useState<PendingFindingCapture | null>(null);
   const [recentCaptures, setRecentCaptures] = useState<CaptureEntry[]>([]);
   const credentialRef = useRef<HTMLInputElement>(null);
+  const pendingCaptureRef = useRef<PendingFindingCapture | null>(null);
+  const captureIntentRoleRef = useRef<FindingCaptureRole | null>(null);
+  const earlyCapturesRef = useRef(new Map<string, CaptureSavedEvent>());
+  const cancelledCaptureSessionsRef = useRef(new Set<string>());
+  const pendingCaptureRole = pendingCapture?.role ?? null;
+
+  function updatePendingCapture(next: PendingFindingCapture | null) {
+    pendingCaptureRef.current = next;
+    setPendingCapture(next);
+  }
+
+  function attachCapturedEntry(role: FindingCaptureRole, entry: CaptureSavedEvent) {
+    setValue((current) => {
+      if (role === "before") return { ...current, beforeCaptureId: entry.id };
+      if (role === "after") return { ...current, afterCaptureId: entry.id };
+      const evidenceCaptureIds = [...new Set([...current.evidenceCaptureIds, entry.id])];
+      return {
+        ...current,
+        evidenceCaptureIds,
+        captureId: evidenceCaptureIds[0] ?? "",
+      };
+    });
+    captureIntentRoleRef.current = null;
+    updatePendingCapture(null);
+    setCaptureBusy(false);
+    setCaptureMessage("Capture attached. Add annotations in the capture window, then return here when ready.");
+  }
 
   useEffect(() => {
     if (open) {
       setValue(valueFromFinding(finding, initialValue));
       setRecentCaptures([]);
-      setPendingCaptureRole(null);
+      captureIntentRoleRef.current = null;
+      earlyCapturesRef.current.clear();
+      cancelledCaptureSessionsRef.current.clear();
+      updatePendingCapture(null);
+      setCaptureBusy(false);
       setCaptureMessage("");
     }
   }, [finding, initialValue, open]);
 
   useEffect(() => {
     if (!open) return;
-    return desktop.on<CaptureEntry>("capture:saved", (entry) => {
+    const stopSaved = desktop.on<CaptureSavedEvent>("capture:saved", (entry) => {
       if (auditId && entry.auditId !== auditId) return;
       setRecentCaptures((current) => [entry, ...current.filter((item) => item.id !== entry.id)]);
-      if (!pendingCaptureRole) return;
-      setValue((current) => {
-        if (pendingCaptureRole === "before") {
-          return { ...current, beforeCaptureId: entry.id };
-        }
-        if (pendingCaptureRole === "after") {
-          return { ...current, afterCaptureId: entry.id };
-        }
-        const evidenceCaptureIds = [...new Set([...current.evidenceCaptureIds, entry.id])];
-        return {
-          ...current,
-          evidenceCaptureIds,
-          captureId: evidenceCaptureIds[0] ?? "",
-        };
-      });
-      setPendingCaptureRole(null);
-      setCaptureBusy(false);
-      setCaptureMessage("Capture attached. Add annotations in the capture window, then return here when ready.");
+      const pending = pendingCaptureRef.current;
+      if (captureMatchesPendingSession(pending, entry)) {
+        attachCapturedEntry(pending.role, entry);
+      } else if (!pending && captureIntentRoleRef.current && entry.sessionId) {
+        earlyCapturesRef.current.set(entry.sessionId, entry);
+      }
     });
-  }, [auditId, open, pendingCaptureRole]);
+    const stopCancelled = desktop.on<{ sessionId: string }>("capture:cancelled", ({ sessionId }) => {
+      cancelledCaptureSessionsRef.current.add(sessionId);
+      const pending = pendingCaptureRef.current;
+      if (!cancellationMatchesPendingSession(pending, sessionId)) return;
+      captureIntentRoleRef.current = null;
+      updatePendingCapture(null);
+      setCaptureBusy(false);
+      setCaptureMessage("Capture cancelled. Start another capture when ready.");
+    });
+    return () => {
+      stopSaved();
+      stopCancelled();
+    };
+  }, [auditId, open]);
 
   useEffect(() => {
     if (!open || !finding) return;
@@ -275,22 +314,36 @@ export function FindingEditorDialog({
     ...captures.filter((capture) => !recentCaptures.some((item) => item.id === capture.id)),
   ];
 
-  async function captureForFinding(role: "evidence" | "before" | "after") {
+  async function captureForFinding(role: FindingCaptureRole) {
     setCaptureBusy(true);
-    setPendingCaptureRole(role);
+    captureIntentRoleRef.current = role;
+    updatePendingCapture(null);
     setCaptureMessage("Drag around the evidence. The annotated capture will attach here automatically.");
     try {
-      await desktop.invoke("capture:begin", {
+      const { sessionId } = await desktop.invoke<{ sessionId: string }>("capture:begin", {
         mode: "capture",
         auditId,
         sampleItemId,
         testRunId,
       });
+      if (cancelledCaptureSessionsRef.current.delete(sessionId)) {
+        captureIntentRoleRef.current = null;
+        setCaptureBusy(false);
+        setCaptureMessage("Capture cancelled. Start another capture when ready.");
+        return;
+      }
+      const earlyCapture = earlyCapturesRef.current.get(sessionId);
+      if (earlyCapture) {
+        earlyCapturesRef.current.delete(sessionId);
+        attachCapturedEntry(role, earlyCapture);
+        return;
+      }
+      updatePendingCapture({ role, sessionId });
     } catch (error) {
-      setPendingCaptureRole(null);
-      setCaptureMessage(ticketErrorMessage(error));
-    } finally {
+      captureIntentRoleRef.current = null;
+      updatePendingCapture(null);
       setCaptureBusy(false);
+      setCaptureMessage(ticketErrorMessage(error));
     }
   }
 
@@ -485,7 +538,7 @@ export function FindingEditorDialog({
             <p>Record observable behavior and user impact. Confirm mappings and severity before delivery.</p>
           </div>
           <button type="button" aria-label="Close finding editor" onClick={onClose}>
-            <X size={18} />
+            <X size={20} />
           </button>
         </header>
 
@@ -546,8 +599,9 @@ export function FindingEditorDialog({
                   return (
                     <li key={captureId}>
                       <span><strong>{capture?.title ?? "Local capture"}</strong><small>{index === 0 ? "Primary evidence" : "Additional evidence"}</small></span>
-                      <button type="button" onClick={() => void desktop.invoke("capture:open", { id: captureId })}>Annotate</button>
-                      <button type="button" aria-label={`Remove ${capture?.title ?? "capture"} from finding`} onClick={() => removeEvidenceCapture(captureId)}><X size={15} /></button>
+                      <button type="button" onClick={() => void desktop.invoke("capture:open", { id: captureId })
+                        .catch((error) => setCaptureMessage(ticketErrorMessage(error)))}>Annotate</button>
+                      <button type="button" aria-label={`Remove ${capture?.title ?? "capture"} from finding`} onClick={() => removeEvidenceCapture(captureId)}><X size={20} /></button>
                     </li>
                   );
                 })}
@@ -652,7 +706,7 @@ export function FindingEditorDialog({
           {finding ? (
             <section className="finding-ticket-panel finding-editor-wide" aria-labelledby="finding-ticket-heading">
               <div className="finding-ticket-heading">
-                <span aria-hidden="true"><Ticket size={19} /></span>
+                <span aria-hidden="true"><Ticket size={20} /></span>
                 <div>
                   <h3 id="finding-ticket-heading">Create ticket</h3>
                   <p>Send this finding without retyping it. External changes always wait for auditor review.</p>
@@ -678,7 +732,8 @@ export function FindingEditorDialog({
                     <Button
                       type="button"
                       icon={ArrowSquareOut}
-                      onClick={() => void desktop.invoke("shell:open-external", { url: value.ticketLink!.url })}
+                      onClick={() => void desktop.invoke("shell:open-external", { url: value.ticketLink!.url })
+                        .catch((error) => setTicketMessage({ text: ticketErrorMessage(error), error: true }))}
                     >
                       Open ticket
                     </Button>
@@ -978,7 +1033,7 @@ export function FindingEditorDialog({
                         )
                       }
                     >
-                      <Trash size={16} />
+                      <Trash size={20} />
                     </button>
                   </div>
                 ))}

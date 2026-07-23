@@ -1,5 +1,29 @@
 import type { CaptureEntry, Finding } from "./desktop";
 
+const EVIDENCE_ID = /^[a-zA-Z0-9_-]{1,55}$/;
+
+/** Returns the filename-safe store key for a browser evidence packet. */
+export function findingEvidenceStoreKey(
+  finding: Pick<Finding, "evidenceId">,
+): string | null {
+  const evidenceId = finding.evidenceId?.trim();
+  return evidenceId && EVIDENCE_ID.test(evidenceId)
+    ? `evidence-${evidenceId}`
+    : null;
+}
+
+export function findingEvidenceStoreKeys(
+  findings: Array<Pick<Finding, "evidenceId">>,
+): string[] {
+  return [
+    ...new Set(
+      findings
+        .map(findingEvidenceStoreKey)
+        .filter((key): key is string => Boolean(key)),
+    ),
+  ];
+}
+
 function uniqueCaptureIds(values: Array<string | undefined>): string[] {
   const seen = new Set<string>();
   return values.filter((value): value is string => {

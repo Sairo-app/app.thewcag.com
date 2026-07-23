@@ -81,7 +81,9 @@ export interface EvidenceImageV1 {
 export interface EvidenceConsentV1 {
   approvedAt: number;
   includeScreenshot: boolean;
+  /** Component name, role, selector, HTML metadata, geometry, and derived checks. */
   includeElementText: boolean;
+  /** Page title, address, browser/device details, and locale. Retains the legacy field name. */
   includeUrl: boolean;
 }
 
@@ -225,7 +227,8 @@ export type NativeResponseV1 =
       draftSource: "local" | "ai";
     }
   | {
-      protocolVersion: typeof NATIVE_PROTOCOL_VERSION;
+      /** Error bodies remain readable across protocol versions so clients can surface upgrade guidance. */
+      protocolVersion: number;
       requestId: string;
       ok: false;
       type: "error";

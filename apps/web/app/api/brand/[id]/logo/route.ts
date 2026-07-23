@@ -3,19 +3,23 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
 import { getImage } from "@/lib/r2";
-import { hasActiveProSubscription } from "@/lib/billing/entitlements";
+import { isBrandAssetToken } from "@/lib/brand";
 
 export const runtime = "nodejs";
 
-/** Stream a white-label logo only while the owner has active Pro access. */
+/**
+ * Stream a public brand asset by opaque token. UUID lookup remains temporarily
+ * available for already-rendered legacy report URLs. Entitlement is enforced
+ * by the report page, so this asset response does not expose subscription state.
+ */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const [row] = await db
     .select({ key: users.brandLogoKey })
     .from(users)
-    .where(eq(users.id, id))
+    .where(eq(isBrandAssetToken(id) ? users.brandAssetToken : users.id, id))
     .limit(1);
-  if (!row?.key || !(await hasActiveProSubscription(id))) return new NextResponse("Not found", { status: 404 });
+  if (!row?.key) return new NextResponse("Not found", { status: 404 });
 
   const obj = await getImage(row.key);
   if (!obj) return new NextResponse("Not found", { status: 404 });

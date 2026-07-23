@@ -5,6 +5,7 @@ import {
   app,
   nativeTheme,
   net,
+  Notification,
   protocol,
   session,
   type Tray,
@@ -50,6 +51,8 @@ const lock = app.requestSingleInstanceLock();
 if (!lock) app.quit();
 
 let tray: Tray | null = null;
+let stopFindingsWatch: (() => void) | null = null;
+let stopStoreQuarantine: (() => void) | null = null;
 let services: {
   auth: AuthService;
   windows: WindowManager;
@@ -67,9 +70,17 @@ async function handleDeepLink(url: string): Promise<void> {
     pendingLinks.push(url);
     return;
   }
-  if (await services.auth.handleDeepLink(url)) {
+  try {
+    await services.auth.handleDeepLink(url);
     services.windows.showMain();
     services.windows.broadcast("account:changed", null);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "The device could not be connected. Try again.";
+    services.windows.showMain();
+    services.windows.broadcast("notification", { text: message, error: true });
+    if (Notification.isSupported()) {
+      new Notification({ title: "Sign-in not completed", body: message }).show();
+    }
   }
 }
 
@@ -112,6 +123,19 @@ async function start(): Promise<void> {
   await Promise.all([store.initialize(), captures.initialize()]);
 
   const windows = new WindowManager((error) => { void logFatal(error); });
+  const pendingStoreNotifications: string[] = [];
+  let storeNotificationsReady = false;
+  stopStoreQuarantine = store.onQuarantine((event) => {
+    if (storeNotificationsReady) {
+      windows.broadcast("notification", { text: event.message, error: true });
+    } else {
+      pendingStoreNotifications.push(event.message);
+    }
+  });
+  await store.sweepOrphanedEvidence().catch((error) => logFatal(error));
+  stopFindingsWatch = store.watchFindings((key) => {
+    windows.broadcast("findings:changed", { key });
+  });
   const screenCapture = new ScreenCaptureService();
   const captureCoordinator = new CaptureCoordinator(screenCapture, captures, windows);
   const auth = new AuthService(userData, store);
@@ -162,7 +186,18 @@ async function start(): Promise<void> {
   const actions = { windows, captures: captureCoordinator };
   installApplicationMenu(actions);
   tray = createTray(actions);
-  windows.createMain();
+  const mainWindow = windows.createMain();
+  const flushStoreNotifications = () => {
+    storeNotificationsReady = true;
+    for (const message of pendingStoreNotifications.splice(0)) {
+      windows.broadcast("notification", { text: message, error: true });
+    }
+  };
+  if (mainWindow.isVisible()) {
+    flushStoreNotifications();
+  } else {
+    mainWindow.once("ready-to-show", flushStoreNotifications);
+  }
 
   const initialLink = findDeepLink(process.argv);
   if (initialLink) pendingLinks.push(initialLink);
@@ -174,7 +209,13 @@ async function start(): Promise<void> {
 }
 
 app.on("activate", () => services?.windows.showMain());
-app.on("before-quit", () => services?.settings.dispose());
+app.on("before-quit", () => {
+  stopFindingsWatch?.();
+  stopFindingsWatch = null;
+  stopStoreQuarantine?.();
+  stopStoreQuarantine = null;
+  services?.settings.dispose();
+});
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });

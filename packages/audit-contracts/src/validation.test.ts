@@ -7,6 +7,7 @@ import {
   parseAiFindingDraft,
   parseEvidencePacket,
   parseNativeRequest,
+  parseNativeResponse,
   createFindingId,
   type AiFindingDraftV1,
   type EvidencePacketV1,
@@ -176,6 +177,52 @@ describe("audit contracts", () => {
       expect("unexpected" in parsed).toBe(false);
       expect("ignoredAuditContent" in parsed.evidence).toBe(false);
     }
+  });
+
+  it("validates native audit summaries and strips non-contract fields", () => {
+    const parsed = parseNativeResponse({
+      protocolVersion: NATIVE_PROTOCOL_VERSION,
+      requestId: "e1f6ebf8-8f42-4373-a3d2-3ea5b64f0ac7",
+      ok: true,
+      type: "audits:list",
+      audits: [{
+        id: "aud-checkout1",
+        project: "Checkout",
+        target: "example.com",
+        standard: "WCAG 2.2 AA",
+        active: true,
+        updatedAt: 10,
+        secret: "must not cross the boundary",
+      }],
+    });
+
+    expect(parsed).toMatchObject({ ok: true, type: "audits:list" });
+    if (parsed.ok && parsed.type === "audits:list") {
+      expect(parsed.audits[0]).toEqual({
+        id: "aud-checkout1",
+        project: "Checkout",
+        target: "example.com",
+        standard: "WCAG 2.2 AA",
+        active: true,
+        updatedAt: 10,
+      });
+    }
+  });
+
+  it("allows a bounded version-mismatch error from a newer native host", () => {
+    expect(parseNativeResponse({
+      protocolVersion: NATIVE_PROTOCOL_VERSION + 1,
+      requestId: "e1f6ebf8-8f42-4373-a3d2-3ea5b64f0ac7",
+      ok: false,
+      type: "error",
+      code: "version-mismatch",
+      message: "Update the extension.",
+      retryable: false,
+    })).toMatchObject({
+      protocolVersion: NATIVE_PROTOCOL_VERSION + 1,
+      ok: false,
+      code: "version-mismatch",
+    });
   });
 
   it("creates an explicitly unconfirmed local review draft from captured evidence", () => {

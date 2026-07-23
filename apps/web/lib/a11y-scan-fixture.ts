@@ -6,7 +6,7 @@ const ISSUES: ReportIssue[] = [
   {
     id: "WCG-F-20260722-00000-00000-00000-00000-000101",
     n: 1,
-    sc: "2.4.7",
+    sc: ["2.4.7"],
     label: "Keyboard focus is obscured by the sticky action bar",
     severity: "blocker",
     status: "open",
@@ -15,7 +15,7 @@ const ISSUES: ReportIssue[] = [
   {
     id: "WCG-F-20260722-00000-00000-00000-00000-000102",
     n: 2,
-    sc: "1.4.3",
+    sc: ["1.4.3"],
     label: "Secondary instructions need stronger contrast",
     severity: "major",
     status: "retest",
@@ -24,7 +24,7 @@ const ISSUES: ReportIssue[] = [
   {
     id: "WCG-F-20260722-00000-00000-00000-00000-000103",
     n: 3,
-    sc: "4.1.2",
+    sc: ["4.1.2"],
     label: "Icon-only action needs an accessible name",
     severity: "minor",
     status: "fixed",
@@ -49,6 +49,7 @@ export function a11yScanReportFixture(slug: string) {
     brandName: null,
     brandColor: null,
     brandLogoKey: null,
+    brandAssetToken: null,
     whiteLabelEnabled: false,
   } as const;
 }

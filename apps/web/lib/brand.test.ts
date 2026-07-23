@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { hasValidBrandLogoSignature, validateBrandLogoMeta } from "./brand";
+import { brandLogoPath, hasValidBrandLogoSignature, isBrandAssetToken, validateBrandLogoMeta } from "./brand";
 
 describe("brand logo validation", () => {
+  it("recognizes opaque brand asset tokens without accepting user UUIDs", () => {
+    expect(isBrandAssetToken("br_0123456789abcdef0123456789abcdef")).toBe(true);
+    expect(isBrandAssetToken("72f3c21a-a5a5-4f08-a2ae-f790448519e7")).toBe(false);
+    expect(brandLogoPath("br_0123456789abcdef0123456789abcdef")).toBe(
+      "/api/brand/br_0123456789abcdef0123456789abcdef/logo",
+    );
+    expect(brandLogoPath("72f3c21a-a5a5-4f08-a2ae-f790448519e7")).toBeNull();
+  });
   it("accepts supported image metadata within the cap", () => {
     expect(validateBrandLogoMeta("image/png", 100)).toBeNull();
     expect(validateBrandLogoMeta("image/svg+xml", 1_000_000)).toMatch(/PNG/);

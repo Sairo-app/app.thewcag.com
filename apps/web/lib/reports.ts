@@ -1,12 +1,16 @@
-import type { ReportIssue } from "./schema";
+import type { IdentifiedReportIssue, ReportIssue } from "./schema";
 import {
+  cleanReportText,
   createFindingId,
   isFindingId,
+  normalizeReportCriteria,
+  REPORT_PUBLISH_LIMITS,
 } from "@accessibility-build/audit-contracts";
 import { REPORT_STATUSES } from "./report-view";
 import type { Metadata } from "next";
+import { SITE_URL } from "./seo";
 
-export const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://app.thewcag.com";
+export { SITE_URL };
 
 export function buildSharedReportMetadata(input: {
   slug: string;
@@ -30,11 +34,24 @@ export function buildSharedReportMetadata(input: {
 const ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 /** Short, unguessable, URL-safe slug for a shared report. */
-export function generateSlug(len = 10): string {
+export function generateSlug(
+  len = 10,
+  fillRandom: (bytes: Uint8Array) => void = (bytes) => { crypto.getRandomValues(bytes); },
+): string {
+  if (!Number.isInteger(len) || len < 1 || len > 128) throw new Error("invalid slug length");
   let out = "";
-  const bytes = new Uint8Array(len);
-  crypto.getRandomValues(bytes);
-  for (let i = 0; i < len; i++) out += ALPHABET[bytes[i] % ALPHABET.length];
+  while (out.length < len) {
+    const remaining = len - out.length;
+    const bytes = new Uint8Array(Math.max(16, Math.ceil(remaining * 256 / 248)));
+    fillRandom(bytes);
+    for (const byte of bytes) {
+      // 248 is the largest multiple of 62 below 256. Rejecting the remaining
+      // eight byte values gives every alphabet character equal probability.
+      if (byte >= 248) continue;
+      out += ALPHABET[byte % ALPHABET.length];
+      if (out.length === len) break;
+    }
+  }
   return out;
 }
 
@@ -106,36 +123,52 @@ export function isUniqueViolation(err: unknown): boolean {
 const ISSUE_SEVERITIES = new Set(["blocker", "major", "minor"]);
 const ISSUE_STATUSES = new Set(REPORT_STATUSES);
 
-function cleanText(value: unknown, maxLength: number): string {
-  // Report metadata is public and may originate from the extension or desktop app.
-  // eslint-disable-next-line no-control-regex
-  return typeof value === "string" ? value.replace(/[\u0000-\u001F\u007F]/g, " ").trim().slice(0, maxLength) : "";
-}
-
-/** Bound and normalize untrusted issue metadata before it reaches JSONB or a public report. */
-export function sanitizeReportIssues(value: unknown, maxItems = 100): ReportIssue[] {
+function sanitizeReportIssuesInternal(
+  value: unknown,
+  maxItems: number,
+  allocateIds: boolean,
+): ReportIssue[] {
   if (!Array.isArray(value)) return [];
   const issues: ReportIssue[] = [];
   const usedIds = new Set<string>();
   for (const candidate of value.slice(0, maxItems)) {
     if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue;
     const raw = candidate as Record<string, unknown>;
-    const label = cleanText(raw.label, 120) || "Accessibility issue";
-    const note = cleanText(raw.note, 1000);
-    const rawSc = cleanText(raw.sc, 20);
-    const sc = /^\d+(?:\.\d+){1,3}$/.test(rawSc) ? rawSc : undefined;
-    const rawSeverity = cleanText(raw.severity, 20).toLowerCase();
+    const label = cleanReportText(raw.label, REPORT_PUBLISH_LIMITS.issueTitleLength) || "Accessibility issue";
+    const note = cleanReportText(raw.note, REPORT_PUBLISH_LIMITS.issueNoteLength);
+    const criteria = normalizeReportCriteria(raw.sc);
+    const sc = criteria.length ? criteria : undefined;
+    const rawSeverity = cleanReportText(raw.severity, 20).toLowerCase();
     const severity = ISSUE_SEVERITIES.has(rawSeverity) ? rawSeverity as ReportIssue["severity"] : "major";
-    let id = cleanText(raw.id, 64).toUpperCase();
-    if (!isFindingId(id) || usedIds.has(id)) {
+    const candidateId = cleanReportText(raw.id, 64).toUpperCase();
+    let id: string | undefined = isFindingId(candidateId) && !usedIds.has(candidateId)
+      ? candidateId
+      : undefined;
+    if (!id && allocateIds) {
       do id = createFindingId(); while (usedIds.has(id));
     }
-    usedIds.add(id);
-    const rawStatus = cleanText(raw.status, 20).toLowerCase();
+    if (id) usedIds.add(id);
+    const rawStatus = cleanReportText(raw.status, 20).toLowerCase();
     const status = ISSUE_STATUSES.has(rawStatus as (typeof REPORT_STATUSES)[number])
       ? rawStatus as NonNullable<ReportIssue["status"]>
       : "open";
-    issues.push({ id, n: issues.length + 1, sc, label, severity, note, status });
+    issues.push({ ...(id ? { id } : {}), n: issues.length + 1, sc, label, severity, note, status });
   }
   return issues;
+}
+
+/** Normalize stored report data for rendering without ever inventing an identity. */
+export function sanitizeReportIssues(
+  value: unknown,
+  maxItems: number = REPORT_PUBLISH_LIMITS.issues,
+): ReportIssue[] {
+  return sanitizeReportIssuesInternal(value, maxItems, false);
+}
+
+/** Bound publish input and allocate identities before the report is persisted. */
+export function sanitizeReportIssuesForPublish(
+  value: unknown,
+  maxItems: number = REPORT_PUBLISH_LIMITS.issues,
+): IdentifiedReportIssue[] {
+  return sanitizeReportIssuesInternal(value, maxItems, true) as IdentifiedReportIssue[];
 }

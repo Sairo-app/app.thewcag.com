@@ -18,10 +18,10 @@ export const metadata: Metadata = createPageMetadata({
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
     <section aria-labelledby={id} className="mt-10">
-      <h2 id={id} className="text-xl font-bold tracking-tight">
+      <h2 id={id} className="type-title-2 font-bold ">
         {title}
       </h2>
-      <div className="mt-3 space-y-3 text-sm leading-relaxed text-muted">{children}</div>
+      <div className="mt-3 space-y-3 type-body text-muted">{children}</div>
     </section>
   );
 }
@@ -30,9 +30,9 @@ export default function AccessibilityStatementPage() {
   return (
     <>
       <Header />
-      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-16">
-        <h1 className="text-3xl font-bold tracking-tight">Accessibility Statement</h1>
-        <p className="mt-3 text-sm text-muted">
+      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-12">
+        <h1 className="type-title-1 font-bold ">Accessibility Statement</h1>
+        <p className="mt-3 type-body text-muted">
           Last reviewed: 21 July 2026. This statement applies to the website at{" "}
           <span className="font-mono">app.thewcag.com</span>, the TheWCAG desktop application, and the Chrome evidence extension.
         </p>
@@ -58,7 +58,7 @@ export default function AccessibilityStatementPage() {
         </Section>
 
         <Section id="measures" title="Measures we take">
-          <ul className="list-disc space-y-1.5 pl-5">
+          <ul className="list-disc space-y-2 pl-5">
             <li>Semantic HTML with correct landmark, heading, and list structure.</li>
             <li>Visible keyboard focus indicators and a fully keyboard-operable interface.</li>
             <li>Text and interface colors tested against AA contrast thresholds for text and user-interface components.</li>
@@ -77,7 +77,7 @@ export default function AccessibilityStatementPage() {
 
         <Section id="limitations" title="Known limitations">
           <p>Despite our efforts, some limitations may remain. We are actively working on these:</p>
-          <ul className="list-disc space-y-1.5 pl-5">
+          <ul className="list-disc space-y-2 pl-5">
             <li>
               Public share pages render a user-supplied screenshot image; the accessibility of that
               image&apos;s content is determined by its author, not by us. The surrounding page,
@@ -105,7 +105,7 @@ export default function AccessibilityStatementPage() {
             We welcome your feedback on the accessibility of TheWCAG. If you encounter a barrier, or
             need content in a different format, please tell us:
           </p>
-          <ul className="list-disc space-y-1.5 pl-5">
+          <ul className="list-disc space-y-2 pl-5">
             <li>
               Open an issue on{" "}
               <a href={ISSUES} className="underline hover:text-foreground">
@@ -124,7 +124,7 @@ export default function AccessibilityStatementPage() {
           <p>We aim to respond to accessibility feedback within five business days.</p>
         </Section>
 
-        <p className="mt-12 text-sm text-muted">
+        <p className="mt-12 type-body text-muted">
           Want to hold your own product to this standard?{" "}
           <Link href="/download" className="underline hover:text-foreground">
             Download TheWCAG

@@ -60,7 +60,7 @@ export default function AccessibilityIssueTrackerIntegrationsPage() {
           },
         ],
       }} />
-      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-16">
+      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-12">
         <h1>Create remediation tickets without retyping the finding</h1>
         <p>
           Send a reviewed accessibility finding to Jira, Linear, or GitHub Issues with its evidence and audit context intact. Configure the mapping once, retain the returned ticket key and URL, and review external changes beside the local auditor decision.
@@ -94,7 +94,7 @@ export default function AccessibilityIssueTrackerIntegrationsPage() {
           <h2 id="mapping-heading">Configurable finding-to-ticket mapping</h2>
           <p className="mt-3">Each connector maps the same reviewed finding fields into the destination&apos;s available fields. Unmapped values can remain in the generated description so context is not discarded.</p>
           <div className="mt-6 overflow-x-auto">
-            <table className="w-full text-left text-sm">
+            <table className="w-full text-left type-body">
               <thead><tr><th scope="col">Finding field</th><th scope="col">Ticket content</th></tr></thead>
               <tbody>{MAPPINGS.map(([field, content]) => <tr key={field}><th scope="row">{field}</th><td>{content}</td></tr>)}</tbody>
             </table>

@@ -8,7 +8,7 @@ import {
   Minus,
   Plus,
   Warning,
-} from "@phosphor-icons/react";
+} from "../Icon";
 import type {
   AppSettings,
   AuditProject,
@@ -20,12 +20,12 @@ import {
   nextFindingReference,
   normalizeFindingReferences,
 } from "../../shared/finding-references";
-import { desktop, getStored, setStored } from "../api";
+import { desktop, getStored, saveStoredFindings } from "../api";
 import { auditStoreKey, type RecordAuditActivity } from "../audits";
 import { Button, Segmented, Toast } from "../components";
 import { CRITERION_GUIDANCE, understandingUrl } from "../data/criterion-guidance";
 import { WCAG_CRITERIA, type CriterionLevel } from "../data/wcag";
-import { useStoredState, useTransientMessage } from "../hooks";
+import { messageFromError, useStoredState, useTransientMessage } from "../hooks";
 
 type Result = "untested" | "pass" | "fail" | "na";
 interface Entry {
@@ -238,7 +238,7 @@ export function ChecklistView({
       reproductionSteps: [guidance.test],
       manualChecks: ["Confirm the finding details, affected users, severity, and evidence before delivery."],
     };
-    await setStored(key, [...findings, finding]);
+    await saveStoredFindings(key, storedFindings, [...findings, finding]);
     setState((current) => ({
       ...current,
       [sc]: { ...entry, result: "fail", findingKey: finding.key },
@@ -432,7 +432,7 @@ export function ChecklistView({
                     aria-label={`Pass ${item.sc}`}
                     onClick={() => chooseResult(item.sc, "pass")}
                   >
-                    <Check size={14} weight="bold" />
+                    <Check size={20} />
                   </button>
                   <button
                     aria-pressed={entry.result === "fail"}
@@ -441,7 +441,7 @@ export function ChecklistView({
                     aria-label={`Fail ${item.sc}`}
                     onClick={() => chooseResult(item.sc, "fail")}
                   >
-                    <Warning size={14} weight="fill" />
+                    <Warning size={20} weight="fill" />
                   </button>
                   <button
                     aria-pressed={entry.result === "na"}
@@ -450,7 +450,7 @@ export function ChecklistView({
                     aria-label={`Not applicable ${item.sc}`}
                     onClick={() => chooseResult(item.sc, "na")}
                   >
-                    <Minus size={14} weight="bold" />
+                    <Minus size={20} />
                   </button>
                 </div>
                 <button
@@ -482,9 +482,10 @@ export function ChecklistView({
                     <div className="criterion-reference-row">
                       <small>Testing prompts are informative. The WCAG success criterion remains the conformance basis.</small>
                       <button
-                        onClick={() => void desktop.invoke("shell:open-external", { url: understandingUrl(item.name) })}
+                        onClick={() => void desktop.invoke("shell:open-external", { url: understandingUrl(item.name) })
+                          .catch((error) => show(messageFromError(error, "The W3C reference could not be opened."), true))}
                       >
-                        W3C Understanding <ArrowSquareOut size={14} />
+                        W3C Understanding <ArrowSquareOut size={20} />
                       </button>
                     </div>
                     <div className="criterion-note">

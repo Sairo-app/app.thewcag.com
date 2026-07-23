@@ -10,5 +10,5 @@ export const metadata = { title: "Confirming subscription", robots: { index: fal
 export default async function BillingReturnPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/signin?callbackUrl=/billing/return");
-  return <><Header /><main id="main" className="app-page mx-auto max-w-xl px-6 py-16 text-center"><h1 className="text-2xl font-bold">Thank you</h1><div className="mt-4 rounded-xl border border-border bg-card p-6"><BillingReturnStatus /></div></main><Footer /></>;
+  return <><Header /><main id="main" className="app-page mx-auto max-w-xl px-6 py-12 text-center"><h1 className="type-title-2 font-bold">Thank you</h1><div className="mt-4 rounded-xl border border-border bg-card p-6"><BillingReturnStatus /></div></main><Footer /></>;
 }

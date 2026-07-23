@@ -19,7 +19,8 @@ import {
   Sparkle,
   Trash,
   Warning,
-} from "@phosphor-icons/react";
+  X,
+} from "./Icon";
 import {
   WCAG_CRITERIA,
   parseAiFindingDraft,
@@ -48,14 +49,32 @@ import {
   requestDesktopPermission,
   saveDesktopFinding,
 } from "../native";
-import type { ExtensionRequest, ExtensionResponse } from "../shared/messages";
+import {
+  PANEL_PORT_NAME,
+  type ExtensionRequest,
+  type ExtensionResponse,
+  type PanelPortMessage,
+} from "../shared/messages";
 import {
   AUDIT_STORAGE_KEY,
   CAPTURE_TAB_STORAGE_KEY,
   DRAFT_STORAGE_KEY,
   EVIDENCE_STORAGE_KEY,
   QUEUED_FINDING_STORAGE_KEY,
+  SAVED_FINDING_STORAGE_KEY,
+  storageWriteFailureMessage,
 } from "../shared/storage";
+import {
+  clampEvidencePatch,
+  consumeOwnStorageEcho,
+  draftPersistenceAction,
+  EVIDENCE_EDITABLE_LIMITS,
+  rememberStorageWrite,
+  restoreEvidencePacket,
+  restoreSavedFindingMarker,
+  type LastWrittenStorage,
+  type SavedFindingMarker,
+} from "./storage-state";
 
 type StatusMessage = { text: string; tone: "neutral" | "success" | "danger" } | null;
 type DesktopState = "checking" | "connected" | "disconnected";
@@ -96,6 +115,9 @@ function displayError(error: unknown): string {
     if (error.failure === "host-exited") {
       return "The desktop connector started but closed before responding. Restart TheWCAG, then try again.";
     }
+    if (error.failure === "timeout") {
+      return `${error.message} Restart or update TheWCAG, then try again.`;
+    }
     if (error.failure === "protocol-error") {
       return "The extension and desktop connector could not complete a secure handshake. Update both and try again.";
     }
@@ -125,6 +147,7 @@ function Field({
   multiline = false,
   rows = 3,
   hint,
+  maxLength,
 }: {
   label: string;
   value: string;
@@ -132,16 +155,18 @@ function Field({
   multiline?: boolean;
   rows?: number;
   hint?: string;
+  maxLength?: number;
 }) {
   return (
     <label className="field">
       <span>{label}</span>
       {multiline ? (
-        <textarea value={value} rows={rows} onChange={(event) => onChange(event.target.value)} />
+        <textarea value={value} rows={rows} maxLength={maxLength} onChange={(event) => onChange(event.target.value)} />
       ) : (
-        <input value={value} onChange={(event) => onChange(event.target.value)} />
+        <input value={value} maxLength={maxLength} onChange={(event) => onChange(event.target.value)} />
       )}
       {hint ? <small>{hint}</small> : null}
+      {maxLength ? <small>{value.length}/{maxLength} characters</small> : null}
     </label>
   );
 }
@@ -156,6 +181,7 @@ export function App({ surface }: { surface: ExtensionSurface }) {
     key: string;
     source: "local" | "ai";
   } | null>(null);
+  const [savedFinding, setSavedFinding] = useState<SavedFindingMarker | null>(null);
   const [status, setStatus] = useState<StatusMessage>(null);
   const [desktopState, setDesktopState] = useState<DesktopState>("checking");
   const [desktopVersion, setDesktopVersion] = useState("");
@@ -168,6 +194,31 @@ export function App({ surface }: { surface: ExtensionSurface }) {
   const [capturedTabId, setCapturedTabId] = useState<number | null>(null);
   const statusRef = useRef<HTMLDivElement>(null);
   const selectedAuditRef = useRef("");
+  const evidenceRef = useRef<EvidencePacketV1 | null>(null);
+  const lastWrittenRef = useRef<LastWrittenStorage>({});
+  const draftClearedRef = useRef(false);
+  const panelPortRef = useRef<chrome.runtime.Port | null>(null);
+  const [storageRestored, setStorageRestored] = useState(false);
+
+  useEffect(() => {
+    const port = chrome.runtime.connect({ name: PANEL_PORT_NAME });
+    panelPortRef.current = port;
+    let disconnected = false;
+    void chrome.windows.getCurrent().then((currentWindow) => {
+      if (disconnected || typeof currentWindow.id !== "number") return;
+      setCurrentWindowId(currentWindow.id);
+      port.postMessage({ type: "panel-connected", windowId: currentWindow.id } satisfies PanelPortMessage);
+    }).catch(() => undefined);
+    return () => {
+      disconnected = true;
+      if (panelPortRef.current === port) panelPortRef.current = null;
+      try {
+        port.disconnect();
+      } catch {
+        // The service worker may already have closed the channel.
+      }
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -179,11 +230,25 @@ export function App({ surface }: { surface: ExtensionSurface }) {
           AUDIT_STORAGE_KEY,
           CAPTURE_TAB_STORAGE_KEY,
           QUEUED_FINDING_STORAGE_KEY,
+          SAVED_FINDING_STORAGE_KEY,
         ]);
         if (cancelled) return;
-        const restoredEvidence = stored[EVIDENCE_STORAGE_KEY]
-          ? parseEvidencePacket(stored[EVIDENCE_STORAGE_KEY])
+        const restored = stored[EVIDENCE_STORAGE_KEY]
+          ? restoreEvidencePacket(stored[EVIDENCE_STORAGE_KEY])
           : null;
+        const restoredEvidence = restored?.evidence ?? null;
+        if (restored?.recoveredFields.length) {
+          void writeLocal({ [EVIDENCE_STORAGE_KEY]: restoredEvidence }).catch(() => {
+            if (!cancelled) setStatus({
+              text: "The saved note was recovered for this session, but extension storage could not be updated.",
+              tone: "danger",
+            });
+          });
+          setStatus({
+            text: "A saved note exceeded its character limit. It was truncated and the rest of the capture was recovered.",
+            tone: "neutral",
+          });
+        }
         const expired = Boolean(
           restoredEvidence && Date.now() - restoredEvidence.capturedAt > EVIDENCE_RETENTION_MS,
         );
@@ -193,11 +258,15 @@ export function App({ surface }: { surface: ExtensionSurface }) {
             DRAFT_STORAGE_KEY,
             CAPTURE_TAB_STORAGE_KEY,
             QUEUED_FINDING_STORAGE_KEY,
+            SAVED_FINDING_STORAGE_KEY,
           ]);
           setStatus({ text: "The previous capture expired after 24 hours and was removed from local extension storage.", tone: "neutral" });
         } else {
           setEvidence(restoredEvidence);
-          if (stored[DRAFT_STORAGE_KEY]) setDraft(parseAiFindingDraft(stored[DRAFT_STORAGE_KEY]));
+          if (stored[DRAFT_STORAGE_KEY]) {
+            draftClearedRef.current = false;
+            setDraft(parseAiFindingDraft(stored[DRAFT_STORAGE_KEY]));
+          }
           const queued = stored[QUEUED_FINDING_STORAGE_KEY] as Record<string, unknown> | undefined;
           if (
             queued &&
@@ -206,6 +275,10 @@ export function App({ surface }: { surface: ExtensionSurface }) {
           ) {
             setQueuedFinding({ key: queued.key, source: queued.source });
           }
+          setSavedFinding(restoreSavedFindingMarker(
+            stored[SAVED_FINDING_STORAGE_KEY],
+            restoredEvidence?.findingId,
+          ));
         }
         const storedAudit = typeof stored[AUDIT_STORAGE_KEY] === "string" ? stored[AUDIT_STORAGE_KEY] : "";
         selectedAuditRef.current = storedAudit;
@@ -214,9 +287,7 @@ export function App({ surface }: { surface: ExtensionSurface }) {
           ? stored[CAPTURE_TAB_STORAGE_KEY]
           : null;
         setCapturedTabId(storedTabId);
-        if (storedTabId !== null) {
-          await chrome.action.setBadgeText({ tabId: storedTabId, text: "" }).catch(() => undefined);
-        }
+        if (storedTabId !== null) notifyEvidenceSeen(storedTabId);
         await checkDesktop(false, storedAudit);
       } catch {
         await chrome.storage.local.remove([
@@ -224,13 +295,13 @@ export function App({ surface }: { surface: ExtensionSurface }) {
           DRAFT_STORAGE_KEY,
           CAPTURE_TAB_STORAGE_KEY,
           QUEUED_FINDING_STORAGE_KEY,
+          SAVED_FINDING_STORAGE_KEY,
         ]);
         if (!cancelled) setStatus({ text: "The saved capture could not be restored. Start a new capture.", tone: "danger" });
+      } finally {
+        if (!cancelled) setStorageRestored(true);
       }
     })();
-    void chrome.windows.getCurrent().then((currentWindow) => {
-      if (typeof currentWindow.id === "number") setCurrentWindowId(currentWindow.id);
-    });
     const handleStorageChange = (
       changes: Record<string, chrome.storage.StorageChange>,
       areaName: chrome.storage.AreaName,
@@ -239,17 +310,41 @@ export function App({ surface }: { surface: ExtensionSurface }) {
       try {
         if (changes[EVIDENCE_STORAGE_KEY]) {
           const next = changes[EVIDENCE_STORAGE_KEY].newValue;
-          setEvidence(next ? parseEvidencePacket(next) : null);
+          if (!consumeOwnStorageEcho(lastWrittenRef.current, EVIDENCE_STORAGE_KEY, next)) {
+            if (next) {
+              const restored = restoreEvidencePacket(next);
+              evidenceRef.current = restored.evidence;
+              setEvidence(restored.evidence);
+              if (restored.recoveredFields.length) {
+                void writeLocal({ [EVIDENCE_STORAGE_KEY]: restored.evidence }).catch(() => {
+                  setStatus({
+                    text: "The saved note was recovered for this session, but extension storage could not be updated.",
+                    tone: "danger",
+                  });
+                });
+                setStatus({
+                  text: "A saved note exceeded its character limit. It was truncated and the rest of the capture was recovered.",
+                  tone: "neutral",
+                });
+              }
+            } else {
+              evidenceRef.current = null;
+              setEvidence(null);
+            }
+          }
         }
         if (changes[DRAFT_STORAGE_KEY]) {
           const next = changes[DRAFT_STORAGE_KEY].newValue;
-          setDraft(next ? parseAiFindingDraft(next) : null);
+          if (!consumeOwnStorageEcho(lastWrittenRef.current, DRAFT_STORAGE_KEY, next)) {
+            draftClearedRef.current = !next;
+            setDraft(next ? parseAiFindingDraft(next) : null);
+          }
         }
         if (changes[CAPTURE_TAB_STORAGE_KEY]) {
           const next = changes[CAPTURE_TAB_STORAGE_KEY].newValue;
           const tabId = typeof next === "number" ? next : null;
           setCapturedTabId(tabId);
-          if (tabId !== null) void chrome.action.setBadgeText({ tabId, text: "" }).catch(() => undefined);
+          if (tabId !== null) notifyEvidenceSeen(tabId);
         }
         if (changes[QUEUED_FINDING_STORAGE_KEY]) {
           const next = changes[QUEUED_FINDING_STORAGE_KEY].newValue as Record<string, unknown> | undefined;
@@ -260,6 +355,12 @@ export function App({ surface }: { surface: ExtensionSurface }) {
               ? { key: next.key, source: next.source }
               : null,
           );
+        }
+        if (changes[SAVED_FINDING_STORAGE_KEY]) {
+          setSavedFinding(restoreSavedFindingMarker(
+            changes[SAVED_FINDING_STORAGE_KEY].newValue,
+            evidenceRef.current?.findingId,
+          ));
         }
       } catch {
         setStatus({ text: "The saved capture could not be restored. Start a new capture.", tone: "danger" });
@@ -277,6 +378,10 @@ export function App({ surface }: { surface: ExtensionSurface }) {
   }, [selectedAudit]);
 
   useEffect(() => {
+    evidenceRef.current = evidence;
+  }, [evidence]);
+
+  useEffect(() => {
     if (!status) return;
     statusRef.current?.focus();
   }, [status]);
@@ -284,18 +389,53 @@ export function App({ surface }: { surface: ExtensionSurface }) {
   useEffect(() => {
     if (!evidence) return;
     const timeout = setTimeout(() => {
-      void chrome.storage.local.set({ [EVIDENCE_STORAGE_KEY]: evidence });
+      void writeLocal({ [EVIDENCE_STORAGE_KEY]: evidence }).catch(reportStorageWriteFailure);
     }, 250);
     return () => clearTimeout(timeout);
   }, [evidence]);
 
   useEffect(() => {
-    if (!draft) return;
+    const action = draftPersistenceAction(storageRestored, draft);
+    if (action === "none") return;
     const timeout = setTimeout(() => {
-      void chrome.storage.local.set({ [DRAFT_STORAGE_KEY]: draft });
+      if (action === "set" && !draftClearedRef.current) {
+        void writeLocal({ [DRAFT_STORAGE_KEY]: draft }).catch(reportStorageWriteFailure);
+      } else {
+        void chrome.storage.local.remove(DRAFT_STORAGE_KEY).catch(reportStorageWriteFailure);
+      }
     }, 250);
     return () => clearTimeout(timeout);
-  }, [draft]);
+  }, [draft, storageRestored]);
+
+  async function writeLocal(values: Record<string, unknown>): Promise<void> {
+    rememberStorageWrite(lastWrittenRef.current, values);
+    try {
+      await chrome.storage.local.set(values);
+    } catch (error) {
+      for (const [key, value] of Object.entries(values)) {
+        consumeOwnStorageEcho(lastWrittenRef.current, key, value);
+      }
+      throw error;
+    }
+  }
+
+  function reportStorageWriteFailure(error: unknown): void {
+    setStatus({ text: storageWriteFailureMessage(error), tone: "danger" });
+  }
+
+  function notifyEvidenceSeen(tabId: number): void {
+    try {
+      panelPortRef.current?.postMessage({ type: "evidence-seen", tabId } satisfies PanelPortMessage);
+    } catch {
+      // The service worker owns badge state and may be restarting between messages.
+    }
+  }
+
+  async function clearDraft(): Promise<void> {
+    draftClearedRef.current = true;
+    setDraft(null);
+    await chrome.storage.local.remove(DRAFT_STORAGE_KEY);
+  }
 
   async function checkDesktop(requestPermission: boolean, preferredAuditId = selectedAuditRef.current) {
     setDesktopState("checking");
@@ -339,8 +479,9 @@ export function App({ surface }: { surface: ExtensionSurface }) {
       }
       const packet = response.evidence;
       setEvidence(packet);
-      setDraft(null);
+      await clearDraft();
       setQueuedFinding(null);
+      setSavedFinding(null);
       setStatus({ text: "Component captured. Describe the issue, then send it to review.", tone: "success" });
     } catch (error) {
       setStatus({ text: displayError(error), tone: "danger" });
@@ -350,7 +491,8 @@ export function App({ surface }: { surface: ExtensionSurface }) {
   }
 
   function patchEvidence(patch: Partial<EvidencePacketV1>) {
-    setEvidence((current) => current ? { ...current, ...patch } : current);
+    const bounded = clampEvidencePatch(patch);
+    setEvidence((current) => current ? { ...current, ...bounded } : current);
   }
 
   function patchDraft(patch: Partial<AiFindingDraftV1>) {
@@ -380,8 +522,9 @@ export function App({ surface }: { surface: ExtensionSurface }) {
         nextDraft = createLocalDraft(scoped);
       }
       setEvidence(scoped);
+      draftClearedRef.current = false;
       setDraft(nextDraft);
-      await chrome.storage.local.set({ [EVIDENCE_STORAGE_KEY]: scoped, [DRAFT_STORAGE_KEY]: nextDraft });
+      await writeLocal({ [EVIDENCE_STORAGE_KEY]: scoped, [DRAFT_STORAGE_KEY]: nextDraft });
       if (nextDraft.provenance.source === "ai") setStatus({ text: "AI draft ready. Confirm every field before saving.", tone: "success" });
       else if (fallbackMessage) setStatus({ text: fallbackMessage, tone: "neutral" });
       else setStatus({ text: "Local structured draft ready. Connect the desktop app to enable AI authoring.", tone: "success" });
@@ -404,15 +547,17 @@ export function App({ surface }: { surface: ExtensionSurface }) {
       const scoped = parseEvidencePacket({ ...approved, auditId: selectedAudit });
       const queued = await queueDesktopFinding(selectedAudit, scoped);
       setEvidence(scoped);
-      setDraft(null);
+      await clearDraft();
+      setSavedFinding(null);
       setQueuedFinding({ key: queued.findingKey, source: queued.draftSource });
-      await chrome.storage.local.set({
+      await writeLocal({
         [EVIDENCE_STORAGE_KEY]: scoped,
         [QUEUED_FINDING_STORAGE_KEY]: {
           key: queued.findingKey,
           source: queued.draftSource,
         },
       });
+      await chrome.storage.local.remove(SAVED_FINDING_STORAGE_KEY);
       setStatus({
         text: `Issue sent to ${audits.find((audit) => audit.id === selectedAudit)?.project || "the desktop audit"}. It is in Needs review and no auditor decision was applied.`,
         tone: "success",
@@ -433,8 +578,30 @@ export function App({ surface }: { surface: ExtensionSurface }) {
     setSaving(true);
     try {
       const validated = parseAiFindingDraft(draft);
-      await saveDesktopFinding(selectedAudit, { ...evidence, auditId: selectedAudit }, validated);
-      setStatus({ text: "Finding saved to the selected desktop audit.", tone: "success" });
+      const scoped = parseEvidencePacket({ ...evidence, auditId: selectedAudit });
+      const findingKey = await saveDesktopFinding(selectedAudit, scoped, validated);
+      const marker: SavedFindingMarker = {
+        key: findingKey,
+        findingId: scoped.findingId,
+        auditId: selectedAudit,
+      };
+      setEvidence(scoped);
+      setQueuedFinding(null);
+      setSavedFinding(marker);
+      try {
+        await writeLocal({
+          [EVIDENCE_STORAGE_KEY]: scoped,
+          [SAVED_FINDING_STORAGE_KEY]: marker,
+        });
+        await clearDraft();
+        await chrome.storage.local.remove(QUEUED_FINDING_STORAGE_KEY);
+        setStatus({ text: "Finding saved to the selected desktop audit.", tone: "success" });
+      } catch (error) {
+        setStatus({
+          text: `Finding saved to the desktop audit. ${storageWriteFailureMessage(error)}`,
+          tone: "danger",
+        });
+      }
     } catch (error) {
       setStatus({ text: displayError(error), tone: "danger" });
     } finally {
@@ -444,11 +611,13 @@ export function App({ surface }: { surface: ExtensionSurface }) {
 
   async function reset() {
     if (capturedTabId !== null) {
-      await chrome.action.setBadgeText({ tabId: capturedTabId, text: "" }).catch(() => undefined);
+      notifyEvidenceSeen(capturedTabId);
     }
     setEvidence(null);
+    draftClearedRef.current = true;
     setDraft(null);
     setQueuedFinding(null);
+    setSavedFinding(null);
     setCapturedTabId(null);
     setStatus(null);
     await chrome.storage.local.remove([
@@ -456,6 +625,7 @@ export function App({ surface }: { surface: ExtensionSurface }) {
       DRAFT_STORAGE_KEY,
       CAPTURE_TAB_STORAGE_KEY,
       QUEUED_FINDING_STORAGE_KEY,
+      SAVED_FINDING_STORAGE_KEY,
     ]);
   }
 
@@ -542,7 +712,7 @@ export function App({ surface }: { surface: ExtensionSurface }) {
           </span>
           {surface === "popup" ? (
             <button className="icon-button" onClick={openWorkspace} aria-label="Open expanded evidence workspace" title="Open expanded workspace">
-              <ArrowSquareOut size={17} />
+              <ArrowSquareOut size={20} />
             </button>
           ) : null}
         </div>
@@ -550,16 +720,44 @@ export function App({ surface }: { surface: ExtensionSurface }) {
 
       {status ? (
         <div className={`status status-${status.tone}`} role={status.tone === "danger" ? "alert" : "status"} tabIndex={-1} ref={statusRef}>
-          {status.tone === "danger" ? <Warning size={17} weight="fill" /> : status.tone === "success" ? <CheckCircle size={17} weight="fill" /> : <Eye size={17} />}
+          {status.tone === "danger" ? <Warning size={16} weight="fill" /> : status.tone === "success" ? <CheckCircle size={16} weight="fill" /> : <Eye size={16} />}
           <span>{status.text}</span>
-          <button onClick={() => setStatus(null)} aria-label="Dismiss message">×</button>
+          <button onClick={() => setStatus(null)} aria-label="Dismiss message"><X size={20} /></button>
         </div>
       ) : null}
 
       <main id="extension-main" tabIndex={-1}>
-        {queuedFinding && evidence ? (
+        {savedFinding && evidence ? (
+          <section className="queued-view" aria-labelledby="saved-heading">
+            <CheckCircle size={32} weight="fill" aria-hidden="true" />
+            <span className="step">Desktop audit</span>
+            <h1 id="saved-heading">Finding saved</h1>
+            <p>
+              The finding is stored in {audits.find((audit) => audit.id === savedFinding.auditId)?.project || "the selected desktop audit"}.
+              Repeated save requests for this capture will reuse the same finding.
+            </p>
+            <button
+              type="button"
+              className="finding-identity"
+              title={savedFinding.findingId}
+              onClick={() => {
+                void navigator.clipboard.writeText(savedFinding.findingId);
+                setStatus({ text: "Finding ID copied.", tone: "success" });
+              }}
+            >
+              <span>Immutable finding ID</span>
+              <code>{compactFindingId(savedFinding.findingId)}</code>
+              <Copy size={20} />
+            </button>
+            <div className="action-stack">
+              <button className="button button-primary button-full" onClick={() => void reset()}>
+                <Plus size={20} /> Capture another issue
+              </button>
+            </div>
+          </section>
+        ) : queuedFinding && evidence ? (
           <section className="queued-view" aria-labelledby="queued-heading">
-            <CheckCircle size={34} weight="fill" aria-hidden="true" />
+            <CheckCircle size={32} weight="fill" aria-hidden="true" />
             <span className="step">Desktop review queue</span>
             <h1 id="queued-heading">Issue sent for review</h1>
             <p>
@@ -568,12 +766,12 @@ export function App({ surface }: { surface: ExtensionSurface }) {
               {" "}An auditor must still confirm every field.
             </p>
             <div className="target-summary">
-              <div className="target-icon"><Code size={18} /></div>
+              <div className="target-icon"><Code size={20} /></div>
               <div><span>Queued component</span><strong>{targetLabel}</strong><code>{evidence.target.selector || evidence.target.structuralPath || "Visual region"}</code></div>
             </div>
             <div className="action-stack">
               <button className="button button-primary button-full" onClick={() => void reset()}>
-                <Plus size={18} /> Capture another issue
+                <Plus size={20} /> Capture another issue
               </button>
             </div>
           </section>
@@ -590,13 +788,13 @@ export function App({ surface }: { surface: ExtensionSurface }) {
               <figure className="capture-preview popup-preview">
                 <img src={evidence.image.dataUrl} alt={`Page context showing ${targetLabel} highlighted in orange as issue 1`} />
                 <figcaption>
-                  <span><ImageSquare size={14} /> Context screenshot</span>
-                  <strong><Crosshair size={14} /> {evidence.captureMode === "element" ? "Control highlighted" : "Region highlighted"}</strong>
+                  <span><ImageSquare size={16} /> Context screenshot</span>
+                  <strong><Crosshair size={16} /> {evidence.captureMode === "element" ? "Control highlighted" : "Region highlighted"}</strong>
                 </figcaption>
               </figure>
             ) : null}
             <div className="target-summary">
-              <div className="target-icon"><Code size={18} /></div>
+              <div className="target-icon"><Code size={20} /></div>
               <div>
                 <span>Selected target</span>
                 <strong>{targetLabel}</strong>
@@ -610,46 +808,46 @@ export function App({ surface }: { surface: ExtensionSurface }) {
             </p>
             <div className="action-stack popup-actions">
               <button className="button button-primary button-full" onClick={openWorkspace}>
-                <ArrowSquareOut size={18} /> Add issue details
+                <ArrowSquareOut size={20} /> Add issue details
               </button>
               <button className="button button-secondary button-full" onClick={() => void reset()}>
-                <ArrowCounterClockwise size={18} /> Start another capture
+                <ArrowCounterClockwise size={20} /> Start another capture
               </button>
             </div>
           </section>
         ) : !evidence ? (
           <section className="start-view" aria-labelledby="start-heading">
-            <div className="intro-icon"><Crosshair size={24} weight="duotone" /></div>
+            <div className="intro-icon"><Crosshair size={24} /></div>
             <h1 id="start-heading">Capture the affected component.</h1>
             <p>Select a component or region, describe what happened, and send its screenshot and context to desktop review.</p>
 
             <div className="capture-actions">
               <button className="capture-card capture-primary" disabled={capturing !== null} onClick={() => void startCapture("element")}>
-                <span className="capture-card-icon"><MouseSimple size={21} /></span>
+                <span className="capture-card-icon"><MouseSimple size={20} /></span>
                 <span><strong>{capturing === "element" ? "Select on page" : "Component"}</strong><small>Controls, text, or images</small></span>
-                <Crosshair size={19} />
+                <Crosshair size={20} />
               </button>
               <button className="capture-card" disabled={capturing !== null} onClick={() => void startCapture("region")}>
-                <span className="capture-card-icon"><Selection size={21} /></span>
+                <span className="capture-card-icon"><Selection size={20} /></span>
                 <span><strong>{capturing === "region" ? "Drag on page" : "Region"}</strong><small>Several related elements</small></span>
-                <Selection size={19} />
+                <Selection size={20} />
               </button>
             </div>
 
             <div className="privacy-note">
-              <ShieldCheck size={20} weight="duotone" />
+              <ShieldCheck size={20} />
               <div><strong>Local until you approve</strong><p>Evidence is reviewed in this panel before anything can be sent for AI generation.</p></div>
             </div>
 
             {desktopState !== "connected" ? (
               <button className="button button-secondary button-full" onClick={() => void checkDesktop(true)} disabled={desktopState === "checking"}>
-                <Desktop size={18} /> {desktopState === "checking" ? "Checking desktop" : "Connect desktop app"}
+                <Desktop size={20} /> {desktopState === "checking" ? "Checking desktop" : "Connect desktop app"}
               </button>
             ) : (
               <div className="desktop-card">
-                <Desktop size={19} />
+                <Desktop size={20} />
                 <div><strong>TheWCAG {desktopVersion}</strong><span>{audits.length ? `${audits.length} local ${audits.length === 1 ? "audit" : "audits"}` : "No audits yet"}</span></div>
-                <Check size={18} weight="bold" />
+                <Check size={20} />
               </div>
             )}
           </section>
@@ -657,21 +855,21 @@ export function App({ surface }: { surface: ExtensionSurface }) {
           <section className="evidence-view" aria-labelledby="evidence-heading">
             <div className="section-heading">
               <div><span className="step">Issue capture</span><h1 id="evidence-heading">Describe the issue</h1></div>
-              <button className="icon-button" onClick={() => void reset()} aria-label="Discard capture"><ArrowCounterClockwise size={18} /></button>
+              <button className="icon-button" onClick={() => void reset()} aria-label="Discard capture"><ArrowCounterClockwise size={20} /></button>
             </div>
 
             {evidence.image ? (
               <figure className="capture-preview">
                 <img src={evidence.image.dataUrl} alt={`Page context showing ${targetLabel} highlighted in orange as issue 1`} />
                 <figcaption>
-                  <span><ImageSquare size={15} /> {evidence.image.width} × {evidence.image.height}</span>
-                  <strong><Crosshair size={14} /> {evidence.captureMode === "element" ? "Control highlighted" : "Region highlighted"}</strong>
+                  <span><ImageSquare size={16} /> {evidence.image.width} × {evidence.image.height}</span>
+                  <strong><Crosshair size={16} /> {evidence.captureMode === "element" ? "Control highlighted" : "Region highlighted"}</strong>
                 </figcaption>
               </figure>
             ) : null}
 
             <div className="target-summary">
-              <div className="target-icon"><Code size={18} /></div>
+              <div className="target-icon"><Code size={20} /></div>
               <div><span>Selected target</span><strong>{targetLabel}</strong><code>{evidence.target.selector || evidence.target.structuralPath || "Visual region"}</code></div>
             </div>
 
@@ -696,13 +894,13 @@ export function App({ surface }: { surface: ExtensionSurface }) {
                 <div className="subheading"><h2 id="checks-heading">Captured signals</h2><span>{evidence.checks.length}</span></div>
                 {evidence.checks.map((check) => (
                   <div className={`check check-${check.outcome}`} key={check.id}>
-                    {check.outcome === "fail" ? <Warning size={17} weight="fill" /> : <Eye size={17} />}
+                    {check.outcome === "fail" ? <Warning size={16} weight="fill" /> : <Eye size={16} />}
                     <div><strong>{check.title}</strong><span>{check.wcag.length ? `WCAG ${check.wcag.join(", ")}` : "Manual review"}</span></div>
                   </div>
                 ))}
               </section>
             ) : (
-              <div className="quiet-callout"><Eye size={18} /><p>No deterministic issue was found for this target. Your observation will guide the draft and all mappings will require manual review.</p></div>
+              <div className="quiet-callout"><Eye size={20} /><p>No deterministic issue was found for this target. Your observation will guide the draft and all mappings will require manual review.</p></div>
             )}
 
             <Field
@@ -712,12 +910,14 @@ export function App({ surface }: { surface: ExtensionSurface }) {
               multiline
               rows={4}
               hint="Describe the behavior, not the fix. Example: The button is announced only as “button.”"
+              maxLength={EVIDENCE_EDITABLE_LIMITS.observation}
             />
             <Field
               label="Task context (optional)"
               value={evidence.taskContext}
               onChange={(taskContext) => patchEvidence({ taskContext })}
               hint="Example: Complete checkout or submit the support form"
+              maxLength={EVIDENCE_EDITABLE_LIMITS.taskContext}
             />
 
             {desktopState === "connected" && audits.length ? (
@@ -735,28 +935,28 @@ export function App({ surface }: { surface: ExtensionSurface }) {
 
             <fieldset className="payload-options">
               <legend>Send with issue</legend>
-              <label><input type="checkbox" checked={includeScreenshot} onChange={(event) => setIncludeScreenshot(event.target.checked)} /><ImageSquare size={17} /><span><strong>Screenshot</strong><small>Marked context image</small></span></label>
-              <label><input type="checkbox" checked={includeElementText} onChange={(event) => setIncludeElementText(event.target.checked)} /><Code size={17} /><span><strong>Component data</strong><small>Name, role, and selector</small></span></label>
-              <label><input type="checkbox" checked={includeUrl} onChange={(event) => setIncludeUrl(event.target.checked)} /><ArrowSquareOut size={17} /><span><strong>Page</strong><small>Title and address</small></span></label>
+              <label><input type="checkbox" checked={includeScreenshot} onChange={(event) => setIncludeScreenshot(event.target.checked)} /><ImageSquare size={16} /><span><strong>Screenshot</strong><small>Marked context image</small></span></label>
+              <label><input type="checkbox" checked={includeElementText} onChange={(event) => setIncludeElementText(event.target.checked)} /><Code size={16} /><span><strong>Component data</strong><small>Name, role, selector, and HTML details</small></span></label>
+              <label><input type="checkbox" checked={includeUrl} onChange={(event) => setIncludeUrl(event.target.checked)} /><ArrowSquareOut size={16} /><span><strong>Page</strong><small>Title, address, browser/device details, and locale</small></span></label>
             </fieldset>
 
-            <div className="consent-copy"><ShieldCheck size={18} /><p>Nothing is sent until you choose the action below. Desktop drafts stay in Needs review until an auditor confirms them.</p></div>
+            <div className="consent-copy"><ShieldCheck size={20} /><p>Nothing is sent until you choose the action below. Desktop drafts stay in Needs review until an auditor confirms them.</p></div>
             {desktopState === "connected" && selectedAudit ? (
               <div className="action-stack compact-actions">
                 <button className="button button-primary button-full" onClick={() => void queueForReview()} disabled={saving}>
-                  <Desktop size={18} weight="fill" /> {saving ? "Sending issue" : "Send to desktop review"}
+                  <Desktop size={20} /> {saving ? "Sending issue" : "Send to desktop review"}
                 </button>
                 <button className="button button-quiet button-full" onClick={() => void generateDraft()} disabled={generating}>
-                  <MagicWand size={18} /> {generating ? "Preparing draft" : "Edit draft here instead"}
+                  <MagicWand size={20} /> {generating ? "Preparing draft" : "Edit draft here instead"}
                 </button>
               </div>
             ) : (
               <div className="action-stack compact-actions">
                 <button className="button button-primary button-full" onClick={() => void generateDraft()} disabled={generating}>
-                  <MagicWand size={18} weight="fill" /> {generating ? "Preparing draft" : "Create local draft"}
+                  <MagicWand size={20} /> {generating ? "Preparing draft" : "Create local draft"}
                 </button>
                 <button className="button button-quiet button-full" onClick={() => void checkDesktop(true)} disabled={desktopState === "checking"}>
-                  <Desktop size={18} /> Connect desktop
+                  <Desktop size={20} /> Connect desktop
                 </button>
               </div>
             )}
@@ -769,7 +969,7 @@ export function App({ surface }: { surface: ExtensionSurface }) {
             </div>
 
             <div className={`draft-source ${draft.provenance.source === "ai" ? "draft-source-ai" : ""}`}>
-              <Sparkle size={18} weight="fill" />
+              <Sparkle size={20} />
               <div><strong>{draft.provenance.source === "ai" ? "AI-assisted draft" : "Local structured draft"}</strong><span>Suggested until you save it</span></div>
             </div>
 
@@ -784,7 +984,7 @@ export function App({ surface }: { surface: ExtensionSurface }) {
             >
               <span>Immutable finding ID</span>
               <code>{compactFindingId(evidence.findingId)}</code>
-              <Copy size={14} />
+              <Copy size={20} />
             </button>
 
             <Field label="Issue title" value={draft.title} onChange={(title) => patchDraft({ title })} />
@@ -844,15 +1044,15 @@ export function App({ surface }: { surface: ExtensionSurface }) {
                     </select>
                     <ConfidenceBadge value={mapping.confidence} />
                     <button type="button" className="button button-quiet" aria-label={`Remove WCAG ${mapping.criterion}`} onClick={() => removeWcagMapping(index)}>
-                      <Trash size={16} /> Remove
+                      <Trash size={20} /> Remove
                     </button>
                   </div>
                   <strong>{mapping.name} · Level {mapping.level}</strong>
                   <textarea aria-label={`WCAG rationale ${index + 1}`} rows={3} value={mapping.rationale} onChange={(event) => patchDraft({ wcag: draft.wcag.map((item, itemIndex) => itemIndex === index ? { ...item, rationale: event.target.value } : item) })} />
                 </div>
-              )) : <div className="quiet-callout"><Warning size={18} /><p>No criterion was assigned. Complete a manual review before saving this finding.</p></div>}
+              )) : <div className="quiet-callout"><Warning size={20} /><p>No criterion was assigned. Complete a manual review before saving this finding.</p></div>}
               <button type="button" className="button button-secondary button-full" disabled={draft.wcag.length >= 8} onClick={addWcagMapping}>
-                <Plus size={17} /> Add WCAG criterion
+                <Plus size={20} /> Add WCAG criterion
               </button>
             </section>
 
@@ -875,27 +1075,27 @@ export function App({ surface }: { surface: ExtensionSurface }) {
             <div className="action-stack">
               {desktopState === "connected" && selectedAudit ? (
                 <button className="button button-primary button-full" disabled={saving} onClick={() => void saveFinding()}>
-                  <Check size={18} weight="bold" /> {saving ? "Saving finding" : `Save to ${selectedAuditName || "desktop audit"}`}
+                  <Check size={20} /> {saving ? "Saving finding" : `Save to ${selectedAuditName || "desktop audit"}`}
                 </button>
               ) : (
                 <button className="button button-secondary button-full" onClick={() => void checkDesktop(true)}>
-                  <Desktop size={18} /> Connect desktop to save
+                  <Desktop size={20} /> Connect desktop to save
                 </button>
               )}
               <button className="button button-secondary button-full" onClick={() => {
                 const markdown = findingMarkdown(evidence, draft);
                 download(`thewcag-${evidence.id.slice(0, 8)}.md`, markdown, "text/markdown;charset=utf-8");
                 setStatus({ text: "Markdown draft exported.", tone: "success" });
-              }}><DownloadSimple size={18} /> Export Markdown</button>
-              <button className="button button-quiet button-full" onClick={() => void copyFinding()}><Copy size={18} /> Copy finding</button>
-              <button className="button button-quiet button-full" onClick={() => setDraft(null)}><ArrowCounterClockwise size={18} /> Back to evidence</button>
+              }}><DownloadSimple size={20} /> Export Markdown</button>
+              <button className="button button-quiet button-full" onClick={() => void copyFinding()}><Copy size={20} /> Copy finding</button>
+              <button className="button button-quiet button-full" onClick={() => void clearDraft()}><ArrowCounterClockwise size={20} /> Back to evidence</button>
             </div>
           </section>
         )}
       </main>
 
       <footer>
-        <ShieldCheck size={15} />
+        <ShieldCheck size={16} />
         <span>{hasFailures ? "Deterministic failure captured" : "Human review remains required"}</span>
       </footer>
     </div>

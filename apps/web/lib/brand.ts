@@ -5,6 +5,15 @@ export const BRAND_LOGO_TYPES: Record<string, string> = {
 };
 
 export const BRAND_LOGO_MAX_BYTES = 1_000_000;
+export const BRAND_ASSET_TOKEN_PATTERN = /^br_[a-f0-9]{32}$/;
+
+export function isBrandAssetToken(value: string): boolean {
+  return BRAND_ASSET_TOKEN_PATTERN.test(value);
+}
+
+export function brandLogoPath(token: string | null | undefined): string | null {
+  return token && isBrandAssetToken(token) ? `/api/brand/${token}/logo` : null;
+}
 
 export function validateBrandLogoMeta(type: string, size: number): string | null {
   if (!BRAND_LOGO_TYPES[type]) return "Logo must be a PNG, JPG, or WEBP.";

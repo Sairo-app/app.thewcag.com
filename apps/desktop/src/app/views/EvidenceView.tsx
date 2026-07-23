@@ -15,7 +15,7 @@ import {
   Sparkle,
   Trash,
   WarningCircle,
-} from "@phosphor-icons/react";
+} from "../Icon";
 import {
   compactFindingId,
   createFindingId,
@@ -29,7 +29,7 @@ import type {
   OverlayResult,
   WorkspaceStage,
 } from "../../shared/desktop";
-import { desktop, getStored, listCaptures, setStored } from "../api";
+import { desktop, getStored, listCaptures, saveStoredFindings, setStored } from "../api";
 import { auditStoreKey, type RecordAuditActivity } from "../audits";
 import {
   Button,
@@ -42,11 +42,18 @@ import {
 } from "../components";
 import { messageFromError, useTransientMessage } from "../hooks";
 import {
+  STANDALONE_FINDINGS_KEY,
+  STANDALONE_FINDING_VIEWS_KEY,
+} from "../evidence-storage";
+import {
+  findingReferenceWithId,
   nextFindingReference,
   normalizeFindingReferences,
 } from "../../shared/finding-references";
 import { findingStatusHistoryAfterChange } from "../../shared/finding-lifecycle";
+import { retainFindingSelection } from "../../shared/finding-selection";
 import {
+  findingEvidenceStoreKey,
   findingPrimaryEvidenceCaptureIds,
   unassignedCaptures,
 } from "../../shared/finding-evidence";
@@ -120,18 +127,24 @@ export function EvidenceView({
     item: Finding;
     index: number;
     links: string[];
+    evidence?: { key: string; value: unknown };
   } | null>(null);
   const bulkUndoRef = useRef<{ findings: Finding[]; label: string } | null>(null);
   const findingsWriteQueue = useRef<Promise<void>>(Promise.resolve());
   const refreshVersion = useRef(0);
-  const findingsKey = auditId ? auditStoreKey(auditId, "findings") : "standalone:findings";
-  const findingViewsKey = auditId ? auditStoreKey(auditId, "findingViews") : "standalone:findingViews";
+  const findingsKey = auditId ? auditStoreKey(auditId, "findings") : STANDALONE_FINDINGS_KEY;
+  const findingViewsKey = auditId ? auditStoreKey(auditId, "findingViews") : STANDALONE_FINDING_VIEWS_KEY;
   const logActivity: RecordAuditActivity = recordActivity ?? (async () => undefined);
 
-  function persistFindings(next: Finding[]) {
+  function openCaptureForAnnotation(id: string) {
+    void desktop.invoke("capture:open", { id })
+      .catch((error) => show(messageFromError(error, "The capture could not be opened."), true));
+  }
+
+  function persistFindings(next: Finding[], previous: Finding[] = findings) {
     const key = findingsKey;
-    const request = findingsWriteQueue.current.then(() => setStored(key, next));
-    findingsWriteQueue.current = request.catch(() => undefined);
+    const request = findingsWriteQueue.current.then(() => saveStoredFindings(key, previous, next));
+    findingsWriteQueue.current = request.then(() => undefined, () => undefined);
     return request;
   }
 
@@ -139,21 +152,34 @@ export function EvidenceView({
     const version = ++refreshVersion.current;
     const [nextCaptures, storedFindings, nextViews] = await Promise.all([
       listCaptures(auditId),
-      auditId ? getStored<Finding[]>(findingsKey, []) : Promise.resolve([]),
-      auditId ? getStored<FindingSavedView[]>(findingViewsKey, []) : Promise.resolve([]),
+      getStored<Finding[]>(findingsKey, []),
+      getStored<FindingSavedView[]>(findingViewsKey, []),
     ]);
     if (version !== refreshVersion.current) return;
     const normalized = normalizeFindingReferences(storedFindings);
     setCaptures(nextCaptures);
     setFindings(normalized.findings);
     setSavedViews(nextViews);
-    setSelectedFindings(new Set());
-    if (normalized.changed) await persistFindings(normalized.findings);
+    setSelectedFindings((current) =>
+      retainFindingSelection(current, normalized.findings),
+    );
+    if (normalized.changed) {
+      const saved = await persistFindings(normalized.findings, storedFindings);
+      setFindings(saved);
+    }
   }
 
   useEffect(() => {
+    setSelectedFindings(new Set());
     void refresh().catch((error) => show(messageFromError(error), true));
-    return desktop.on("capture:saved", () => void refresh());
+    const stopCapture = desktop.on("capture:saved", () => void refresh());
+    const stopFindings = desktop.on<{ key: string | null }>("findings:changed", ({ key }) => {
+      if (key === null || key === findingsKey) void refresh();
+    });
+    return () => {
+      stopCapture();
+      stopFindings();
+    };
   }, [auditId, findingViewsKey, findingsKey]);
   useEffect(
     () =>
@@ -230,7 +256,8 @@ export function EvidenceView({
     );
     setFindings(next);
     try {
-      await persistFindings(next);
+      const saved = await persistFindings(next);
+      setFindings(saved);
     } catch (error) {
       setFindings(findings);
       show(messageFromError(error), true);
@@ -290,8 +317,8 @@ export function EvidenceView({
       ? findings.map((item) => item.key === existing.key ? nextFinding : item)
       : [nextFinding, ...findings];
     try {
-      await persistFindings(next);
-      setFindings(next);
+      const saved = await persistFindings(next);
+      setFindings(saved);
       setEditingFinding(undefined);
       try {
         await logActivity({
@@ -318,7 +345,9 @@ export function EvidenceView({
     setFindings(next);
     setEditingFinding(updated);
     try {
-      await persistFindings(next);
+      const saved = await persistFindings(next);
+      setFindings(saved);
+      setEditingFinding(saved.find((item) => item.key === updated.key));
     } catch (error) {
       setFindings(prior);
       setEditingFinding(prior.find((item) => item.key === updated.key));
@@ -327,17 +356,26 @@ export function EvidenceView({
   }
 
   async function removeFinding(key: string) {
-    if (!auditId) return;
     const index = findings.findIndex((item) => item.key === key);
     if (index < 0) return;
+    const removed = findings[index];
     const next = findings.filter((item) => item.key !== key);
-    const checklistKey = auditStoreKey(auditId, "checklist");
+    const checklistKey = auditId ? auditStoreKey(auditId, "checklist") : null;
+    const evidenceKey = findingEvidenceStoreKey(removed);
+    let evidenceValue: unknown = null;
+    let checklist: Record<string, { result: string; note: string; findingKey?: string }> = {};
+    let links: string[] = [];
     try {
-      const checklist = await getStored<Record<string, { result: string; note: string; findingKey?: string }>>(
-        checklistKey,
-        {},
-      );
-      const links = Object.entries(checklist)
+      if (checklistKey) {
+        checklist = await getStored<Record<string, { result: string; note: string; findingKey?: string }>>(
+          checklistKey,
+          {},
+        );
+      }
+      if (evidenceKey) {
+        evidenceValue = await getStored<unknown | null>(evidenceKey, null);
+      }
+      links = Object.entries(checklist)
         .filter(([, entry]) => entry.findingKey === key)
         .map(([criterion]) => criterion);
       const nextChecklist = Object.fromEntries(
@@ -346,32 +384,53 @@ export function EvidenceView({
           entry.findingKey === key ? { ...entry, findingKey: undefined } : entry,
         ]),
       );
-      await setStored(checklistKey, nextChecklist);
+      if (checklistKey) await setStored(checklistKey, nextChecklist);
+      if (evidenceKey) {
+        await desktop.invoke("store:remove", { key: evidenceKey });
+      }
       try {
-        await persistFindings(next);
+        const saved = await persistFindings(next);
+        setFindings(saved);
       } catch (error) {
-        await setStored(checklistKey, checklist).catch(() => undefined);
+        await Promise.all([
+          checklistKey
+            ? setStored(checklistKey, checklist)
+            : Promise.resolve(),
+          evidenceKey && evidenceValue !== null
+            ? setStored(evidenceKey, evidenceValue)
+            : Promise.resolve(),
+        ]).catch(() => undefined);
         throw error;
       }
-      deletedRef.current = { item: findings[index], index, links };
-      setFindings(next);
+      deletedRef.current = {
+        item: removed,
+        index,
+        links,
+        ...(evidenceKey && evidenceValue !== null
+          ? { evidence: { key: evidenceKey, value: evidenceValue } }
+          : {}),
+      };
       show("Finding removed. Use Undo below to restore it.");
     } catch (error) {
+      if (checklistKey) {
+        await setStored(checklistKey, checklist).catch(() => undefined);
+      }
       show(messageFromError(error), true);
     }
   }
 
   async function undoFinding() {
-    if (!auditId) return;
     const deleted = deletedRef.current;
     if (!deleted) return;
     const next = [...findings];
     next.splice(deleted.index, 0, deleted.item);
-    const checklistKey = auditStoreKey(auditId, "checklist");
-    const checklist = await getStored<Record<string, { result: string; note: string; findingKey?: string }>>(
-      checklistKey,
-      {},
-    );
+    const checklistKey = auditId ? auditStoreKey(auditId, "checklist") : null;
+    const checklist = checklistKey
+      ? await getStored<Record<string, { result: string; note: string; findingKey?: string }>>(
+          checklistKey,
+          {},
+        )
+      : {};
     const nextChecklist = Object.fromEntries(
       Object.entries(checklist).map(([criterion, entry]) => [
         criterion,
@@ -381,11 +440,14 @@ export function EvidenceView({
       ]),
     );
     deletedRef.current = null;
-    setFindings(next);
-    await Promise.all([
+    const [saved] = await Promise.all([
       persistFindings(next),
-      setStored(checklistKey, nextChecklist),
+      checklistKey ? setStored(checklistKey, nextChecklist) : Promise.resolve(),
+      deleted.evidence
+        ? setStored(deleted.evidence.key, deleted.evidence.value)
+        : Promise.resolve(),
     ]);
+    setFindings(saved);
     show("Finding restored");
   }
 
@@ -413,7 +475,7 @@ export function EvidenceView({
   async function exportMarkdown(items = findings) {
     const findingSections = items.map((item) => {
       const section = [
-        `## ${item.reference || "Unreferenced"}: ${item.title}`,
+        `## ${findingReferenceWithId(item)}: ${item.title}`,
         "",
         `- Finding ID: ${item.id}`,
         `- WCAG: ${item.wcag}`,
@@ -561,9 +623,9 @@ export function EvidenceView({
     };
     const next = [duplicate, ...findings];
     try {
-      await persistFindings(next);
-      setFindings(next);
-      setEditingFinding(duplicate);
+      const saved = await persistFindings(next);
+      setFindings(saved);
+      setEditingFinding(saved.find((finding) => finding.key === duplicate.key) ?? duplicate);
       await logActivity({
         kind: "finding",
         title: "Finding duplicated",
@@ -593,9 +655,9 @@ export function EvidenceView({
         : finding,
     );
     try {
-      await persistFindings(next);
+      const saved = await persistFindings(next);
       bulkUndoRef.current = { findings: previous, label };
-      setFindings(next);
+      setFindings(saved);
       const count = selectedFindings.size;
       setSelectedFindings(new Set());
       await logActivity({
@@ -613,8 +675,10 @@ export function EvidenceView({
     const undo = bulkUndoRef.current;
     if (!undo) return;
     try {
-      await persistFindings(undo.findings);
-      setFindings(undo.findings);
+      const undoByKey = new Map(undo.findings.map((finding) => [finding.key, finding]));
+      const next = findings.map((finding) => undoByKey.get(finding.key) ?? finding);
+      const saved = await persistFindings(next);
+      setFindings(saved);
       bulkUndoRef.current = null;
       show(`${undo.label} undone`);
     } catch (error) {
@@ -678,9 +742,9 @@ export function EvidenceView({
       <Toast message={message} />
       <section className="capture-banner">
         <div className="capture-illustration">
-          <FrameCorners size={34} weight="duotone" />
+          <FrameCorners size={32} />
           <span>
-            <Camera size={17} weight="fill" />
+            <Camera size={16} />
           </span>
         </div>
         <div>
@@ -725,7 +789,7 @@ export function EvidenceView({
           />
         ) : <strong className="standalone-library-label">Recent local captures · {captures.length}/100</strong>}
         <label className="search-field">
-          <MagnifyingGlass size={17} />
+          <MagnifyingGlass size={16} />
           <input
             value={query}
             onChange={(event) => {
@@ -848,7 +912,7 @@ export function EvidenceView({
               aria-label="Delete selected saved view"
               onClick={() => void deleteSavedView()}
             >
-              <Trash size={16} />
+              <Trash size={20} />
             </button>
           ) : null}
           <Button
@@ -997,14 +1061,13 @@ export function EvidenceView({
                         title={`Copy ${item.id}`}
                         aria-label={`Copy finding ID ${item.id}`}
                         onClick={() => {
-                          void desktop.invoke("clipboard:write-text", {
-                            text: item.id,
-                          });
-                          show("Finding ID copied");
+                          void desktop.invoke("clipboard:write-text", { text: item.id })
+                            .then(() => show("Finding ID copied"))
+                            .catch((error) => show(messageFromError(error, "The finding ID could not be copied."), true));
                         }}
                       >
                         <code>{compactFindingId(item.id)}</code>
-                        <Copy size={12} />
+                        <Copy size={20} />
                       </button>
                       {item.reviewState === "pending" ? (
                         <span className="finding-review-state">Needs review</span>
@@ -1019,13 +1082,13 @@ export function EvidenceView({
                           aria-controls={`finding-detail-${item.key}`}
                           onClick={() => void toggleFinding(item)}
                         >
-                          <Sparkle size={13} weight="fill" />
+                          <Sparkle size={20} />
                           {item.source === "ai"
                             ? "AI-assisted evidence"
                             : item.source === "manual"
                               ? "Manual finding"
                               : "Browser evidence"}
-                          <CaretDown size={13} className={expandedFinding === item.key ? "rotated" : ""} />
+                          <CaretDown size={20} className={expandedFinding === item.key ? "rotated" : ""} />
                         </button>
                       ) : null}
                     </span>
@@ -1062,21 +1125,21 @@ export function EvidenceView({
                       aria-label={`Duplicate ${item.reference} ${item.title}`}
                       onClick={() => void duplicateFinding(item)}
                     >
-                      <Copy size={16} />
+                      <Copy size={20} />
                     </button>
                     <button
                       className="row-action"
                       aria-label={`Edit ${item.title}`}
                       onClick={() => setEditingFinding(item)}
                     >
-                      <PencilSimple size={16} />
+                      <PencilSimple size={20} />
                     </button>
                     <button
                       className="row-action"
                       aria-label={`Delete ${item.title}`}
                       onClick={() => void removeFinding(item.key)}
                     >
-                      <Trash size={16} />
+                      <Trash size={20} />
                     </button>
                   </div>
                 </article>
@@ -1121,7 +1184,7 @@ export function EvidenceView({
                           {findingPrimaryEvidenceCaptureIds(item).map((captureId) => {
                             const capture = captures.find((entry) => entry.id === captureId);
                             return capture ? (
-                              <button key={captureId} type="button" onClick={() => void desktop.invoke("capture:open", { id: captureId })}>
+                              <button key={captureId} type="button" onClick={() => openCaptureForAnnotation(captureId)}>
                                 <img src={capture.thumbnailUrl || capture.assetUrl} alt="" />
                                 <span>{capture.title}</span>
                               </button>
@@ -1178,7 +1241,14 @@ export function EvidenceView({
                             <span className={`status ${item.ticketLink.syncState === "in-sync" ? "status-success" : item.ticketLink.syncState === "review" ? "status-warning" : "status-danger"}`}>
                               {item.ticketLink.syncState === "in-sync" ? "In sync" : item.ticketLink.syncState === "review" ? `${item.ticketLink.conflicts.length} to review` : "Sync error"}
                             </span>
-                            <button type="button" className="text-action" onClick={() => void desktop.invoke("shell:open-external", { url: item.ticketLink!.url })}>Open ticket</button>
+                            <button
+                              type="button"
+                              className="text-action"
+                              onClick={() => void desktop.invoke("shell:open-external", { url: item.ticketLink!.url })
+                                .catch((error) => show(messageFromError(error, "The ticket link could not be opened."), true))}
+                            >
+                              Open ticket
+                            </button>
                             {item.ticketLink.syncState !== "in-sync" ? (
                               <button type="button" className="text-action" onClick={() => setEditingFinding(item)}>Review changes</button>
                             ) : null}
@@ -1201,7 +1271,7 @@ export function EvidenceView({
                             return (
                               <li key={occurrence.id}>
                                 <span><strong>{occurrence.location || "Location not documented"}</strong>{occurrence.note ? ` · ${occurrence.note}` : ""}</span>
-                                {capture ? <button onClick={() => void desktop.invoke("capture:open", { id: capture.id })}>Open {capture.title}</button> : null}
+                                {capture ? <button onClick={() => openCaptureForAnnotation(capture.id)}>Open {capture.title}</button> : null}
                               </li>
                             );
                           })}
@@ -1266,7 +1336,7 @@ export function EvidenceView({
         <section className="capture-library">
           {auditId && unassignedCaptureIds.size ? (
             <div className="unassigned-captures-notice" role="status">
-              <WarningCircle size={18} weight="duotone" />
+              <WarningCircle size={20} />
               <span><strong>Unassigned captures · {unassignedCaptureIds.size}</strong><small>These images are preserved but not linked to a finding. Attach them from a finding editor when they support an issue.</small></span>
             </div>
           ) : null}
@@ -1276,7 +1346,7 @@ export function EvidenceView({
                 <button
                   className="capture-thumb"
                   onClick={() =>
-                    void desktop.invoke("capture:open", { id: entry.id })
+                    openCaptureForAnnotation(entry.id)
                   }
                 >
                   {entry.thumbnailUrl || entry.assetUrl ? (
@@ -1285,7 +1355,7 @@ export function EvidenceView({
                       alt={`Preview of ${entry.title}`}
                     />
                   ) : (
-                    <Image size={30} />
+                    <Image size={20} />
                   )}
                   {entry.issues ? (
                     <span>
@@ -1306,16 +1376,16 @@ export function EvidenceView({
                     <button
                       aria-label={`Annotate ${entry.title}`}
                       onClick={() =>
-                        void desktop.invoke("capture:open", { id: entry.id })
+                        openCaptureForAnnotation(entry.id)
                       }
                     >
-                      <NotePencil size={17} />
+                      <NotePencil size={20} />
                     </button>
                     <button
                       aria-label={`Delete ${entry.title}`}
                       onClick={() => setCaptureToDelete(entry)}
                     >
-                      <Trash size={17} />
+                      <Trash size={20} />
                     </button>
                   </div>
                 </div>

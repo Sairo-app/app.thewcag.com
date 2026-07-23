@@ -16,17 +16,19 @@ WORKDIR /app
 # root node_modules from a separate deps stage leaves `next` unresolved.
 # Manifests are copied first so the install layer caches until they change.
 FROM base AS build
-COPY pnpm-workspace.yaml package.json ./
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY apps/web/package.json apps/web/
 COPY packages/a11y-core/package.json packages/a11y-core/
 COPY packages/audit-contracts/package.json packages/audit-contracts/
-RUN pnpm install --filter @thewcag/web... --frozen-lockfile=false
+RUN pnpm install --filter @thewcag/web... --frozen-lockfile
 COPY packages ./packages
 COPY apps/web ./apps/web
 RUN pnpm --filter @thewcag/web build
 
 # --- runtime ---
 FROM base AS runner
+RUN addgroup --system --gid 1001 app \
+  && adduser --system --uid 1001 --ingroup app app
 ENV NODE_ENV=production
 ENV PORT=3100
 # Bind to all interfaces so Coolify's reverse proxy (Traefik, on the docker
@@ -36,11 +38,12 @@ ENV HOSTNAME=0.0.0.0
 WORKDIR /app
 # Standalone (traced from the monorepo root) bundles the server, node_modules
 # and packages. Server lives at apps/web/server.js; static + public sit beside it.
-COPY --from=build /app/apps/web/.next/standalone ./
-COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
-COPY --from=build /app/apps/web/public ./apps/web/public
-COPY --from=build /app/apps/web/drizzle ./apps/web/drizzle
-COPY --from=build /app/apps/web/scripts/migrate.mjs ./apps/web/scripts/migrate.mjs
+COPY --from=build --chown=app:app /app/apps/web/.next/standalone ./
+COPY --from=build --chown=app:app /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=build --chown=app:app /app/apps/web/public ./apps/web/public
+COPY --from=build --chown=app:app /app/apps/web/drizzle ./apps/web/drizzle
+COPY --from=build --chown=app:app /app/apps/web/scripts/migrate.mjs ./apps/web/scripts/migrate.mjs
+USER app
 EXPOSE 3100
 # Apply versioned migrations before the application process receives traffic.
 CMD ["sh", "-c", "node apps/web/scripts/migrate.mjs && exec node apps/web/server.js"]

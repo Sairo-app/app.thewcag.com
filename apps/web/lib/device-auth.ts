@@ -1,7 +1,9 @@
 import { createHash, randomBytes } from "crypto";
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, eq, gt, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { desktopDevices } from "@/lib/schema";
+
+export const DEVICE_TOKEN_LIFETIME_MS = 90 * 24 * 60 * 60 * 1_000;
 
 export function generateDeviceToken(): string {
   return randomBytes(32).toString("hex");
@@ -28,15 +30,20 @@ export async function verifyDeviceToken(authHeader: string | null): Promise<Devi
     .from(desktopDevices)
     .where(and(
       eq(desktopDevices.tokenHash, tokenHash),
+      isNotNull(desktopDevices.claimedAt),
       isNull(desktopDevices.revokedAt),
       gt(desktopDevices.expiresAt, new Date()),
     ))
     .limit(1);
   if (!row) return null;
 
+  const now = new Date();
   await db
     .update(desktopDevices)
-    .set({ lastSeenAt: new Date() })
+    .set({
+      lastSeenAt: now,
+      expiresAt: new Date(now.getTime() + DEVICE_TOKEN_LIFETIME_MS),
+    })
     .where(eq(desktopDevices.id, row.id))
     .catch(() => {});
 

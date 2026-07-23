@@ -32,11 +32,13 @@ export function reportIssueStatus(issue: ReportIssue): ReportRemediationStatus {
 }
 
 function compareCriterion(a: ReportIssue, b: ReportIssue): number {
-  if (!a.sc && !b.sc) return a.n - b.n;
-  if (!a.sc) return 1;
-  if (!b.sc) return -1;
-  const left = a.sc.split(".").map(Number);
-  const right = b.sc.split(".").map(Number);
+  const aCriterion = a.sc?.[0];
+  const bCriterion = b.sc?.[0];
+  if (!aCriterion && !bCriterion) return a.n - b.n;
+  if (!aCriterion) return 1;
+  if (!bCriterion) return -1;
+  const left = aCriterion.split(".").map(Number);
+  const right = bCriterion.split(".").map(Number);
   for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
     const difference = (left[index] ?? 0) - (right[index] ?? 0);
     if (difference !== 0) return difference;
@@ -61,8 +63,8 @@ export function filterAndSortReportIssues(issues: readonly ReportIssue[], query:
     .filter((issue) => query.severity === "all" || issue.severity === query.severity)
     .filter((issue) => {
       if (query.criterion === "all") return true;
-      if (query.criterion === "unmapped") return !issue.sc;
-      return issue.sc === query.criterion;
+      if (query.criterion === "unmapped") return !issue.sc?.length;
+      return issue.sc?.includes(query.criterion) ?? false;
     })
     .filter((issue) => query.status === "all" || reportIssueStatus(issue) === query.status)
     .slice()
@@ -81,7 +83,7 @@ export function reportIssueEmptyState(
 export function reportImageAlt(title: string, issues: readonly ReportIssue[]): string {
   if (issues.length === 0) return `Annotated screenshot for ${title}. No findings are marked on the image.`;
   const findings = issues.map((issue) => {
-    const criterion = issue.sc ? `, WCAG ${issue.sc}` : "";
+    const criterion = issue.sc?.length ? `, WCAG ${issue.sc.join(", ")}` : "";
     const note = issue.note ? `: ${issue.note}` : "";
     return `Finding ${issue.n}, ${issue.severity}${criterion}, ${issue.label}${note}`;
   });

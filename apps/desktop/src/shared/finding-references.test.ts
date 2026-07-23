@@ -32,6 +32,13 @@ describe("finding references", () => {
       "F-005",
       "F-006",
     ]);
+    expect(result.referenceChanges).toEqual([
+      {
+        id: result.findings[2].id,
+        previousReference: "F-004",
+        assignedReference: "F-006",
+      },
+    ]);
     expect(normalizeFindingReferences(result.findings).changed).toBe(false);
   });
 

@@ -57,9 +57,9 @@ export default function DownloadPage() {
             Choose macOS or Windows and start locally. Plan scope, inspect rendered interfaces, capture evidence, manage WCAG 2.2 findings, retest fixes, and deliver a reviewable record from one workspace.
           </p>
           <div className="download-hero__assurances" aria-label="Download assurances">
-            <span><CheckIcon size={15} /> No account to start</span>
-            <span><CheckIcon size={15} /> No payment details</span>
-            <span><CheckIcon size={15} /> Captures stay local</span>
+            <span><CheckIcon size={16} /> No account to start</span>
+            <span><CheckIcon size={16} /> No payment details</span>
+            <span><CheckIcon size={16} /> Captures stay local</span>
           </div>
         </header>
 

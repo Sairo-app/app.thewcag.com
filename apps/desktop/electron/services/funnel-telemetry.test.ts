@@ -62,6 +62,30 @@ describe("desktop funnel telemetry", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
+  it("retries after a transient 503 and records the event after success", async () => {
+    const { fetcher, service } = harness(true);
+    fetcher.mockResolvedValueOnce(new Response(null, { status: 503 }));
+
+    await expect(service.emit("download_to_first_plan")).resolves.toMatchObject({
+      accepted: false,
+      reason: "unavailable",
+    });
+    await expect(service.emit("download_to_first_plan")).resolves.toMatchObject({ accepted: true });
+    await expect(service.emit("download_to_first_plan")).resolves.toMatchObject({ reason: "duplicate" });
+
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry a terminal 4xx response", async () => {
+    const { fetcher, service } = harness(true);
+    fetcher.mockResolvedValueOnce(new Response(null, { status: 400 }));
+
+    await expect(service.emit("download_to_first_plan")).resolves.toMatchObject({ reason: "unavailable" });
+    await expect(service.emit("download_to_first_plan")).resolves.toMatchObject({ reason: "duplicate" });
+
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects unknown events and any extra renderer field", () => {
     expect(() => parseDesktopTelemetryRequest({ event: "finding_created" })).toThrow("Unsupported telemetry event");
     expect(() => parseDesktopTelemetryRequest({

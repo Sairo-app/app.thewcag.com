@@ -1,6 +1,27 @@
 import type { Metadata } from "next";
 
-export const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://app.thewcag.com").replace(/\/+$/, "");
+const DEFAULT_SITE_URL = "https://app.thewcag.com";
+
+export function siteUrlFromEnvironment(
+  environment: Record<string, string | undefined> = process.env,
+): string {
+  const raw = environment.NEXT_PUBLIC_APP_URL?.trim() || DEFAULT_SITE_URL;
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error("NEXT_PUBLIC_APP_URL must be a valid absolute URL.");
+  }
+  if (!/^\/+$/u.test(url.pathname) || url.search || url.hash || url.username || url.password) {
+    throw new Error("NEXT_PUBLIC_APP_URL must be an origin without a path, credentials, query, or fragment.");
+  }
+  if (url.protocol !== "https:" && !(environment.NODE_ENV !== "production" && url.protocol === "http:")) {
+    throw new Error("NEXT_PUBLIC_APP_URL must use HTTPS in production.");
+  }
+  return url.origin;
+}
+
+export const SITE_URL = siteUrlFromEnvironment();
 
 export const PRODUCT_DESCRIPTION =
   "TheWCAG is a local-first accessibility audit workstation for macOS and Windows with WCAG 2.2 planning, finding-owned evidence, remediation tickets, accessible reports, retesting, and program trends.";

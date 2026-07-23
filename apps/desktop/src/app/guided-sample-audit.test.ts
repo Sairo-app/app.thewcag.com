@@ -33,19 +33,26 @@ describe("guided sample audit", () => {
 
   it("has one complete deletion plan for every package record", async () => {
     const source = createGuidedSampleAuditPackage(1_800_000_000_000);
+    source.sections.findings[0].evidenceId = "browser-packet-1";
     const deletedCaptures: string[] = [];
     const removedKeys: string[] = [];
     const listCaptures = vi.fn(async () => source.captures.map(({ id }) => ({ id })));
+    const getFindings = vi.fn(async () => source.sections.findings);
 
     await deleteAuditData(source.audit.id, {
       listCaptures,
+      getFindings,
       deleteCapture: async (id) => { deletedCaptures.push(id); },
       removeStoreKey: async (key) => { removedKeys.push(key); },
     });
 
     expect(listCaptures).toHaveBeenCalledWith(source.audit.id);
+    expect(getFindings).toHaveBeenCalledWith(`findings-${source.audit.id}`);
     expect(deletedCaptures).toEqual(source.captures.map(({ id }) => id));
-    expect(removedKeys.sort()).toEqual(auditDeletionKeys(source.audit.id).sort());
-    expect(removedKeys).toHaveLength(10);
+    expect(removedKeys.sort()).toEqual([
+      ...auditDeletionKeys(source.audit.id),
+      "evidence-browser-packet-1",
+    ].sort());
+    expect(removedKeys).toHaveLength(11);
   });
 });

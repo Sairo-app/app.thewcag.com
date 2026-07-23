@@ -12,7 +12,7 @@ import {
   SignIn,
   Trash,
   X,
-} from "@phosphor-icons/react";
+} from "../Icon";
 import type { Account, CaptureEntry } from "../../shared/desktop";
 import { issueTypeOf, parseDoc } from "../../lib/annotate/model";
 import { desktop, listCaptures } from "../api";
@@ -26,6 +26,7 @@ import {
   Toast,
 } from "../components";
 import { messageFromError, useTransientMessage } from "../hooks";
+import { LatestRequest } from "../latest-request";
 
 function dateLabel(timestamp: number) {
   return new Intl.DateTimeFormat(undefined, {
@@ -56,20 +57,42 @@ export function ScreenshotView({
   const [account, setAccount] = useState<Account>({ signedIn: false });
   const [message, show, clearMessage] = useTransientMessage(5000);
   const shareDialog = useRef<HTMLDialogElement>(null);
+  const captureLoader = useRef(new LatestRequest<CaptureEntry[]>());
+
+  async function loadCaptureLibrary(): Promise<CaptureEntry[] | null> {
+    return captureLoader.current.run(
+      () => listCaptures(undefined, { unscoped: true }),
+      setCaptures,
+    );
+  }
 
   async function refresh() {
-    setCaptures(await listCaptures(undefined, { unscoped: true }));
+    await loadCaptureLibrary();
+  }
+
+  function reportLoadFailure(error: unknown) {
+    show(messageFromError(error, "The screenshot library could not be loaded."), true);
+  }
+
+  function openCapture(id: string) {
+    void desktop.invoke("capture:open", { id })
+      .catch((error) => show(messageFromError(error, "The capture could not be opened."), true));
   }
 
   useEffect(() => {
-    void Promise.all([refresh(), desktop.invoke<Account>("auth:account")])
+    void Promise.all([loadCaptureLibrary(), desktop.invoke<Account>("auth:account")])
       .then(([, nextAccount]) => setAccount(nextAccount))
-      .catch((error) => show(messageFromError(error), true));
-    const offCapture = desktop.on("capture:saved", () => void refresh());
+      .catch(reportLoadFailure);
+    const offCapture = desktop.on("capture:saved", () => {
+      void loadCaptureLibrary().catch(reportLoadFailure);
+    });
     const offAccount = desktop.on("account:changed", () =>
-      void desktop.invoke<Account>("auth:account").then(setAccount),
+      void desktop.invoke<Account>("auth:account")
+        .then(setAccount)
+        .catch((error) => show(messageFromError(error, "Account status could not be refreshed."), true)),
     );
     return () => {
+      captureLoader.current.invalidate();
       offCapture();
       offAccount();
     };
@@ -159,12 +182,14 @@ export function ScreenshotView({
 
   useEffect(() => {
     if (!shareCaptureId) return;
-    void listCaptures(undefined, { unscoped: true })
+    void loadCaptureLibrary()
       .then((next) => {
-        setCaptures(next);
+        if (!next) return;
         const target = next.find((entry) => entry.id === shareCaptureId);
         if (target) openShare(target);
+        else show("The screenshot selected for sharing is no longer available.", true);
       })
+      .catch((error) => show(messageFromError(error, "The screenshot selected for sharing could not be loaded."), true))
       .finally(() => onShareHandled?.());
   }, [shareCaptureId]);
 
@@ -199,15 +224,6 @@ export function ScreenshotView({
         }),
       ]);
       const annotationDocument = parseDoc(rawDocument || "");
-      if (
-        annotationDocument &&
-        JSON.stringify(annotationDocument) !== rawDocument
-      ) {
-        await desktop.invoke("capture:save-document", {
-          id: shareTarget.id,
-          json: JSON.stringify(annotationDocument),
-        });
-      }
       const badges = (annotationDocument?.shapes ?? []).filter(
         (shape) => shape.kind === "badge",
       );
@@ -245,8 +261,8 @@ export function ScreenshotView({
 
       <section className="capture-banner screenshot-banner">
         <div className="capture-illustration">
-          <FrameCorners size={34} weight="duotone" />
-          <span><Camera size={17} weight="fill" /></span>
+          <FrameCorners size={32} />
+          <span><Camera size={16} /></span>
         </div>
         <div>
           <span className="section-label">Standalone screenshot workspace</span>
@@ -281,7 +297,7 @@ export function ScreenshotView({
           <span>{captures.length} stored locally outside every audit</span>
         </div>
         <label className="search-field">
-          <MagnifyingGlass size={17} />
+          <MagnifyingGlass size={16} />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -300,7 +316,7 @@ export function ScreenshotView({
             <article className="capture-card screenshot-card" key={entry.id}>
               <button
                 className="capture-thumb"
-                onClick={() => void desktop.invoke("capture:open", { id: entry.id })}
+                onClick={() => openCapture(entry.id)}
               >
                 {entry.thumbnailUrl || entry.assetUrl ? (
                   <img
@@ -308,7 +324,7 @@ export function ScreenshotView({
                     alt={`Preview of ${entry.title}`}
                   />
                 ) : (
-                  <Image size={30} />
+                  <Image size={20} />
                 )}
                 {entry.issues ? (
                   <span>{entry.issues} issue{entry.issues === 1 ? "" : "s"}</span>
@@ -322,32 +338,32 @@ export function ScreenshotView({
               </div>
               <div className="screenshot-card-actions" aria-label={`Actions for ${entry.title}`}>
                 <button
-                  onClick={() => void desktop.invoke("capture:open", { id: entry.id })}
+                  onClick={() => openCapture(entry.id)}
                   aria-label={`Annotate ${entry.title}`}
                   title="Annotate"
-                ><NotePencil size={17} /></button>
+                ><NotePencil size={20} /></button>
                 <button
                   disabled={Boolean(working)}
                   onClick={() => void copyOrExport(entry, true)}
                   aria-label={`Copy ${entry.title}`}
                   title="Copy"
-                ><Clipboard size={17} /></button>
+                ><Clipboard size={20} /></button>
                 <button
                   disabled={Boolean(working)}
                   onClick={() => void copyOrExport(entry, false)}
                   aria-label={`Export ${entry.title}`}
                   title="Export PNG"
-                ><DownloadSimple size={17} /></button>
+                ><DownloadSimple size={20} /></button>
                 <button
                   onClick={() => openShare(entry)}
                   aria-label={`Share ${entry.title}`}
                   title="Create share link"
-                ><ShareNetwork size={17} /></button>
+                ><ShareNetwork size={20} /></button>
                 <button
                   onClick={() => setDeleteTarget(entry)}
                   aria-label={`Delete ${entry.title}`}
                   title="Delete"
-                ><Trash size={17} /></button>
+                ><Trash size={20} /></button>
               </div>
             </article>
           ))
@@ -394,7 +410,7 @@ export function ScreenshotView({
             <h2 id="screenshot-share-title">Share this screenshot</h2>
           </div>
           <button aria-label="Close sharing" onClick={closeShare} disabled={working === "publish"}>
-            <X size={18} />
+            <X size={20} />
           </button>
         </div>
 
@@ -406,14 +422,17 @@ export function ScreenshotView({
             <div>
               <Button
                 icon={Clipboard}
-                onClick={() => void desktop.invoke("clipboard:write-text", { text: publishedUrl })}
+                onClick={() => void desktop.invoke("clipboard:write-text", { text: publishedUrl })
+                  .then(() => show("Share link copied"))
+                  .catch((error) => show(messageFromError(error, "The share link could not be copied."), true))}
               >
                 Copy link
               </Button>
               <Button
                 variant="primary"
                 icon={ArrowSquareOut}
-                onClick={() => void desktop.invoke("shell:open-external", { url: publishedUrl })}
+                onClick={() => void desktop.invoke("shell:open-external", { url: publishedUrl })
+                  .catch((error) => show(messageFromError(error, "The published screenshot could not be opened."), true))}
               >
                 Open link
               </Button>

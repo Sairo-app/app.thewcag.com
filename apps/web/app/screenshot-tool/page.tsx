@@ -85,8 +85,8 @@ export default function ScreenshotToolPage() {
           })),
         }}
       />
-      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-16">
-        <h1 className="text-3xl font-bold tracking-tight">The accessibility screenshot tool</h1>
+      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-12">
+        <h1 className="type-title-1 font-bold ">The accessibility screenshot tool</h1>
         <p className="mt-3 max-w-2xl text-muted">
           Keep your audit process. TheWCAG gives you a separate screenshot workspace for capturing
           any app, adding clear annotations, copying or exporting the result, and sharing an
@@ -96,7 +96,7 @@ export default function ScreenshotToolPage() {
         <div className="mt-6">
           <Link
             href="/download"
-            className="inline-flex items-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
+            className="inline-flex items-center rounded-lg bg-primary px-4 py-3 type-body font-semibold text-primary-foreground hover:opacity-90"
           >
             Download the free app
           </Link>
@@ -117,8 +117,8 @@ export default function ScreenshotToolPage() {
           </figcaption>
         </figure>
 
-        <section className="mt-14" aria-labelledby="steps">
-          <h2 id="steps" className="text-xl font-bold tracking-tight">
+        <section className="mt-12" aria-labelledby="steps">
+          <h2 id="steps" className="type-title-2 font-bold ">
             Step by step
           </h2>
           <ol className="mt-5 space-y-6">
@@ -126,25 +126,25 @@ export default function ScreenshotToolPage() {
               <li key={s.title} className="flex gap-4">
                 <span
                   aria-hidden="true"
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary type-body font-semibold text-primary-foreground"
                 >
                   {i + 1}
                 </span>
                 <div>
-                  <h3 className="text-base font-semibold">{s.title}</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-muted">{s.body}</p>
+                  <h3 className="type-headline font-semibold">{s.title}</h3>
+                  <p className="mt-1 type-body text-muted">{s.body}</p>
                 </div>
               </li>
             ))}
           </ol>
         </section>
 
-        <section className="mt-16" aria-labelledby="shortcuts">
-          <h2 id="shortcuts" className="text-xl font-bold tracking-tight">
+        <section className="mt-12" aria-labelledby="shortcuts">
+          <h2 id="shortcuts" className="type-title-2 font-bold ">
             Keyboard shortcuts
           </h2>
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-left text-sm">
+            <table className="w-full text-left type-body">
               <thead>
                 <tr className="border-b border-border text-muted">
                   <th scope="col" className="py-2 pr-4 font-medium">Action</th>
@@ -163,24 +163,24 @@ export default function ScreenshotToolPage() {
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-sm text-muted">All global shortcuts can be remapped in the app.</p>
+          <p className="mt-3 type-body text-muted">All global shortcuts can be remapped in the app.</p>
         </section>
 
-        <section className="mt-16" aria-labelledby="faq">
-          <h2 id="faq" className="text-xl font-bold tracking-tight">
+        <section className="mt-12" aria-labelledby="faq">
+          <h2 id="faq" className="type-title-2 font-bold ">
             Frequently asked questions
           </h2>
           <dl className="mt-4 space-y-5">
             {FAQ.map((f) => (
               <div key={f.q}>
-                <dt className="text-sm font-semibold">{f.q}</dt>
-                <dd className="mt-1 text-sm text-muted">{f.a}</dd>
+                <dt className="type-body font-semibold">{f.q}</dt>
+                <dd className="mt-1 type-body text-muted">{f.a}</dd>
               </div>
             ))}
           </dl>
         </section>
 
-        <p className="mt-12 text-sm text-muted">
+        <p className="mt-12 type-body text-muted">
           Next, learn the{" "}
           <Link href="/wcag-contrast" className="underline hover:text-foreground">
             WCAG contrast requirements

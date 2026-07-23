@@ -7,6 +7,8 @@ const CAPTURE_ID = /^cap-[0-9a-z-]{8,80}$/i;
 const AUDIT_ID = /^aud-[a-z0-9-]{6,36}$/;
 const MAX_CAPTURE_BYTES = 40 * 1024 * 1024;
 const MAX_DOCUMENT_BYTES = 8 * 1024 * 1024;
+export const MAX_CAPTURE_CANVAS_SIDE = 8_192;
+export const MAX_CAPTURE_CANVAS_PIXELS = 32 * 1024 * 1024;
 
 export function assertCaptureId(id: string): void {
   if (!CAPTURE_ID.test(id)) throw new Error("Invalid capture identifier");
@@ -31,8 +33,16 @@ function pngDimensions(bytes: Buffer): { width: number; height: number } {
   }
   const width = bytes.readUInt32BE(16);
   const height = bytes.readUInt32BE(20);
-  if (width < 1 || height < 1 || width > 32_768 || height > 32_768) {
-    throw new Error("Capture dimensions are not supported");
+  if (
+    width < 1 ||
+    height < 1 ||
+    width > MAX_CAPTURE_CANVAS_SIDE ||
+    height > MAX_CAPTURE_CANVAS_SIDE ||
+    width * height > MAX_CAPTURE_CANVAS_PIXELS
+  ) {
+    throw new Error(
+      "Capture dimensions exceed the annotation limit. Capture a smaller area and try again.",
+    );
   }
   return { width, height };
 }

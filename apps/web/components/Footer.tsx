@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { headers } from "next/headers";
 import {
   AccessibilityIcon,
   AppleIcon,
@@ -24,37 +25,37 @@ const COLUMNS: { heading: string; links: { href: string; label: string; icon: Re
   {
     heading: "Product",
     links: [
-      { href: "/accessibility-audit-software", label: "Audit workstation", icon: <AccessibilityIcon size={15} /> },
-      { href: "/accessibility-reporting-software", label: "Accessible reporting", icon: <FileCheckIcon size={15} /> },
-      { href: "/accessibility-issue-tracker-integrations", label: "Issue tracker integrations", icon: <LinkIcon size={15} /> },
-      { href: "/accessibility-program-management", label: "Program management", icon: <FlagIcon size={15} /> },
-      { href: "/chrome-accessibility-extension", label: "Chrome extension", icon: <CropIcon size={15} /> },
-      { href: "/screenshot-tool", label: "Screenshot tool", icon: <CropIcon size={15} /> },
-      { href: "/color-contrast-checker", label: "Contrast checker", icon: <ContrastIcon size={15} /> },
-      { href: "/download", label: "Download the app", icon: <DownloadIcon size={15} /> },
-      { href: "/pricing", label: "Pricing", icon: <BookIcon size={15} /> },
+      { href: "/accessibility-audit-software", label: "Audit workstation", icon: <AccessibilityIcon size={20} /> },
+      { href: "/accessibility-reporting-software", label: "Accessible reporting", icon: <FileCheckIcon size={20} /> },
+      { href: "/accessibility-issue-tracker-integrations", label: "Issue tracker integrations", icon: <LinkIcon size={20} /> },
+      { href: "/accessibility-program-management", label: "Program management", icon: <FlagIcon size={20} /> },
+      { href: "/chrome-accessibility-extension", label: "Chrome extension", icon: <CropIcon size={20} /> },
+      { href: "/screenshot-tool", label: "Screenshot tool", icon: <CropIcon size={20} /> },
+      { href: "/color-contrast-checker", label: "Contrast checker", icon: <ContrastIcon size={20} /> },
+      { href: "/download", label: "Download the app", icon: <DownloadIcon size={20} /> },
+      { href: "/pricing", label: "Pricing", icon: <BookIcon size={20} /> },
     ],
   },
   {
     heading: "Workspace",
     links: [
-      { href: "/signin", label: "Sign in", icon: <LogInIcon size={15} /> },
-      { href: "/screenshots", label: "My reports", icon: <ImageIcon size={15} /> },
-      { href: "/brand", label: "Report branding", icon: <PaletteIcon size={15} /> },
-      { href: "/account", label: "Account and devices", icon: <LogInIcon size={15} /> },
+      { href: "/signin", label: "Sign in", icon: <LogInIcon size={20} /> },
+      { href: "/screenshots", label: "My reports", icon: <ImageIcon size={20} /> },
+      { href: "/brand", label: "Report branding", icon: <PaletteIcon size={20} /> },
+      { href: "/account", label: "Account and devices", icon: <LogInIcon size={20} /> },
     ],
   },
   {
     heading: "Guides",
     links: [
-      { href: "/getting-started", label: "Getting started", icon: <BookIcon size={15} /> },
-      { href: "/wcag-contrast", label: "WCAG contrast", icon: <BookIcon size={15} /> },
-      { href: "/wcag-checklist", label: "WCAG 2.2 checklist", icon: <BookIcon size={15} /> },
-      { href: "/apca-contrast", label: "APCA vs WCAG", icon: <ContrastIcon size={15} /> },
-      { href: "/alt-text-guide", label: "Alt text guide", icon: <ImageIcon size={15} /> },
-      { href: "/accessibility-statement", label: "Accessibility statement", icon: <AccessibilityIcon size={15} /> },
-      { href: "/privacy", label: "Privacy policy", icon: <AccessibilityIcon size={15} /> },
-      { href: "/terms", label: "Terms of use", icon: <BookIcon size={15} /> },
+      { href: "/getting-started", label: "Getting started", icon: <BookIcon size={20} /> },
+      { href: "/wcag-contrast", label: "WCAG contrast", icon: <BookIcon size={20} /> },
+      { href: "/wcag-checklist", label: "WCAG 2.2 checklist", icon: <BookIcon size={20} /> },
+      { href: "/apca-contrast", label: "APCA vs WCAG", icon: <ContrastIcon size={20} /> },
+      { href: "/alt-text-guide", label: "Alt text guide", icon: <ImageIcon size={20} /> },
+      { href: "/accessibility-statement", label: "Accessibility statement", icon: <AccessibilityIcon size={20} /> },
+      { href: "/privacy", label: "Privacy policy", icon: <AccessibilityIcon size={20} /> },
+      { href: "/terms", label: "Terms of use", icon: <BookIcon size={20} /> },
     ],
   },
 ];
@@ -69,7 +70,7 @@ export function Footer() {
             <p>Start free on macOS or Windows. No account is required for local audits.</p>
           </div>
           <Link href="/download" className="site-footer__cta">
-            Download free <ArrowRightIcon size={16} />
+            Download free <ArrowRightIcon size={20} />
           </Link>
         </div>
 
@@ -84,9 +85,9 @@ export function Footer() {
               Plan the audit, inspect rendered interfaces, keep evidence with findings, coordinate remediation, retest fixes, and deliver only what you choose.
             </p>
             <div className="site-footer__platforms">
-              <Link href="/download" className="site-footer__platform" aria-label="Download for macOS"><AppleIcon className="h-[15px] w-[15px]" />macOS</Link>
-              <Link href="/download" className="site-footer__platform" aria-label="Download for Windows"><WindowsIcon className="h-[15px] w-[15px]" />Windows</Link>
-              <a href={REPO} target="_blank" rel="noreferrer" aria-label="TheWCAG on GitHub" className="site-footer__github"><GitHubIcon className="h-[19px] w-[19px]" /></a>
+              <Link href="/download" className="site-footer__platform" aria-label="Download for macOS"><AppleIcon className="h-4 w-4" />macOS</Link>
+              <Link href="/download" className="site-footer__platform" aria-label="Download for Windows"><WindowsIcon className="h-4 w-4" />Windows</Link>
+              <a href={REPO} target="_blank" rel="noreferrer" aria-label="TheWCAG on GitHub" className="site-footer__github"><GitHubIcon className="h-5 w-5" /></a>
             </div>
           </div>
 
@@ -116,9 +117,11 @@ export function Footer() {
 }
 
 /** Inline JSON-LD structured data for rich results. */
-export function JsonLd({ data }: { data: Record<string, unknown> }) {
+export async function JsonLd({ data }: { data: Record<string, unknown> }) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <script
+      nonce={nonce}
       type="application/ld+json"
       // eslint-disable-next-line react/no-danger
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}

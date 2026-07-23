@@ -3,7 +3,7 @@ import { createHmac } from "node:crypto";
 import type { Subscription } from "dodopayments/resources/subscriptions";
 import { deriveEffectiveEntitlements } from "./entitlements";
 import { isAllowedDodoHostedUrl, resetDodoClientForTests } from "./dodo";
-import { billingConfigured, planForChoice, planForProduct, validateLiveBillingConfiguration } from "./plans";
+import { billingConfigured, parsePlanChoice, planForChoice, planForProduct, validateLiveBillingConfiguration } from "./plans";
 import { normalizeDodoSubscription, reportRetentionDeleteAt } from "./status";
 import { isReportAvailable, reportAvailabilityForSubscription } from "./subscriptions";
 import { billingWebhookErrorCode, verifyDodoWebhook, webhookPayloadHash, webhookRemoteObjectId } from "./webhooks";
@@ -30,6 +30,8 @@ describe("billing plans and authorization", () => {
   afterEach(() => vi.unstubAllEnvs());
 
   it("accepts only configured choices and product IDs", () => {
+    expect(parsePlanChoice("pro-annual")).toBe("pro-annual");
+    expect(parsePlanChoice("enterprise")).toBeNull();
     expect(planForChoice("pro-monthly")?.productId).toBe("prod_monthly");
     expect(planForChoice("enterprise")).toBeNull();
     expect(planForProduct("prod_annual")?.interval).toBe("year");

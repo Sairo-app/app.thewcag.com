@@ -6,6 +6,7 @@ target/
 apps/desktop/out/
 apps/desktop/release/
 apps/desktop/release-check/
+apps/desktop/connector-check*/
 
 # Next.js build output
 .next/

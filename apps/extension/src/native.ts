@@ -1,5 +1,6 @@
 import {
   NATIVE_PROTOCOL_VERSION,
+  parseNativeResponse,
   type AiFindingDraftV1,
   type AuditSummaryV1,
   type EvidencePacketV1,
@@ -13,6 +14,7 @@ export type NativeConnectorFailure =
   | "not-registered"
   | "extension-not-allowed"
   | "host-exited"
+  | "timeout"
   | "protocol-error"
   | "unknown";
 
@@ -27,6 +29,9 @@ export class NativeConnectorError extends Error {
 }
 
 export function classifyNativeConnectorFailure(message: string): NativeConnectorFailure {
+  if (/desktop did not respond|timed out/i.test(message)) {
+    return "timeout";
+  }
   if (/native messaging host.*not found|Specified native messaging host not found|host name is not registered/i.test(message)) {
     return "not-registered";
   }
@@ -42,22 +47,59 @@ export function classifyNativeConnectorFailure(message: string): NativeConnector
   return "unknown";
 }
 
+function timeoutFor(request: NativeRequestV1): number {
+  return request.type === "finding:generate" || request.type === "finding:queue" ? 60_000 : 10_000;
+}
+
 function sendNative(request: NativeRequestV1): Promise<NativeResponseV1> {
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendNativeMessage(NATIVE_HOST, request, (response: NativeResponseV1 | undefined) => {
+  const responsePromise = new Promise<NativeResponseV1>((resolve, reject) => {
+    chrome.runtime.sendNativeMessage(NATIVE_HOST, request, (response: unknown) => {
       const error = chrome.runtime.lastError;
       if (error) {
         const message = error.message || "TheWCAG desktop did not respond.";
         reject(new NativeConnectorError(classifyNativeConnectorFailure(message), message));
         return;
       }
-      if (!response || response.protocolVersion !== NATIVE_PROTOCOL_VERSION || response.requestId !== request.requestId) {
+      let parsed: NativeResponseV1;
+      try {
+        parsed = parseNativeResponse(response);
+      } catch {
         reject(new NativeConnectorError("protocol-error", "TheWCAG desktop returned an invalid response."));
         return;
       }
-      resolve(response);
+      if (parsed.requestId !== request.requestId) {
+        reject(new NativeConnectorError("protocol-error", "TheWCAG desktop returned an invalid response."));
+        return;
+      }
+      resolve(parsed);
     });
   });
+
+  const timeoutMs = timeoutFor(request);
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_resolve, reject) => {
+    timeoutId = globalThis.setTimeout(() => {
+      reject(new NativeConnectorError(
+        "timeout",
+        `TheWCAG desktop did not respond within ${timeoutMs / 1_000} seconds.`,
+      ));
+    }, timeoutMs);
+  });
+  return Promise.race([responsePromise, timeoutPromise]).finally(() => {
+    if (timeoutId !== undefined) globalThis.clearTimeout(timeoutId);
+  });
+}
+
+function errorFromResponse(response: Extract<NativeResponseV1, { ok: false }>): Error {
+  if (response.code === "version-mismatch") {
+    const punctuation = /[.!?]$/.test(response.message) ? "" : ".";
+    return new Error(`${response.message}${punctuation} Update TheWCAG desktop and this extension, then try again.`);
+  }
+  return new Error(response.message);
+}
+
+function unexpectedResponse(): NativeConnectorError {
+  return new NativeConnectorError("protocol-error", "TheWCAG desktop returned an unexpected response.");
 }
 
 export async function requestDesktopPermission(): Promise<boolean> {
@@ -74,7 +116,8 @@ export async function pingDesktop(): Promise<string> {
     requestId: crypto.randomUUID(),
     type: "ping",
   });
-  if (!response.ok || response.type !== "pong") throw new Error(response.ok ? "TheWCAG desktop returned an unexpected response." : response.message);
+  if (!response.ok) throw errorFromResponse(response);
+  if (response.type !== "pong") throw unexpectedResponse();
   return response.appVersion;
 }
 
@@ -84,7 +127,8 @@ export async function listDesktopAudits(): Promise<AuditSummaryV1[]> {
     requestId: crypto.randomUUID(),
     type: "audits:list",
   });
-  if (!response.ok || response.type !== "audits:list") throw new Error(response.ok ? "TheWCAG desktop returned an unexpected response." : response.message);
+  if (!response.ok) throw errorFromResponse(response);
+  if (response.type !== "audits:list") throw unexpectedResponse();
   return response.audits;
 }
 
@@ -95,7 +139,8 @@ export async function generateDesktopDraft(evidence: EvidencePacketV1): Promise<
     type: "finding:generate",
     evidence,
   });
-  if (!response.ok || response.type !== "finding:generated") throw new Error(response.ok ? "TheWCAG desktop returned an unexpected response." : response.message);
+  if (!response.ok) throw errorFromResponse(response);
+  if (response.type !== "finding:generated") throw unexpectedResponse();
   return response.draft;
 }
 
@@ -112,7 +157,8 @@ export async function saveDesktopFinding(
     evidence,
     draft,
   });
-  if (!response.ok || response.type !== "finding:saved") throw new Error(response.ok ? "TheWCAG desktop returned an unexpected response." : response.message);
+  if (!response.ok) throw errorFromResponse(response);
+  if (response.type !== "finding:saved") throw unexpectedResponse();
   return response.findingKey;
 }
 
@@ -127,8 +173,7 @@ export async function queueDesktopFinding(
     auditId,
     evidence,
   });
-  if (!response.ok || response.type !== "finding:queued") {
-    throw new Error(response.ok ? "TheWCAG desktop returned an unexpected response." : response.message);
-  }
+  if (!response.ok) throw errorFromResponse(response);
+  if (response.type !== "finding:queued") throw unexpectedResponse();
   return { findingKey: response.findingKey, draftSource: response.draftSource };
 }

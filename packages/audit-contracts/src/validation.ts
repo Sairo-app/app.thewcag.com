@@ -11,6 +11,7 @@ import {
   type EvidenceRect,
   type FindingSeverity,
   type NativeRequestV1,
+  type NativeResponseV1,
   type WcagMappingV1,
 } from "./types";
 import { WCAG_BY_ID } from "./wcag";
@@ -21,6 +22,20 @@ const PACKET_JSON_MAX = 12 * 1024 * 1024;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const AUDIT_ID = /^aud-[a-z0-9-]{6,36}$/;
 const WCAG = /^\d+(?:\.\d+){1,2}$/;
+const NATIVE_ERROR_CODES = new Set<Extract<NativeResponseV1, { ok: false }>["code"]>([
+  "invalid-request",
+  "version-mismatch",
+  "desktop-unavailable",
+  "not-authenticated",
+  "quota-exceeded",
+  "generation-failed",
+  "save-failed",
+]);
+
+export const EVIDENCE_EDITABLE_LIMITS = {
+  observation: 2_000,
+  taskContext: 1_000,
+} as const;
 
 const affectedUsers = new Set<AffectedUser>([
   "screen-reader",
@@ -192,8 +207,8 @@ export function parseEvidencePacket(value: unknown): EvidencePacketV1 {
     auditId,
     capturedAt,
     captureMode,
-    observation: stringAt(item.observation, "evidence.observation", 2_000),
-    taskContext: stringAt(item.taskContext, "evidence.taskContext", 1_000),
+    observation: stringAt(item.observation, "evidence.observation", EVIDENCE_EDITABLE_LIMITS.observation),
+    taskContext: stringAt(item.taskContext, "evidence.taskContext", EVIDENCE_EDITABLE_LIMITS.taskContext),
     page: {
       title: stringAt(page.title, "evidence.page.title", 300),
       url: stringAt(page.url, "evidence.page.url", 2_048),
@@ -373,4 +388,107 @@ export function parseNativeRequest(value: unknown): NativeRequestV1 {
     };
   }
   throw new ContractValidationError("unsupported request type", "request.type");
+}
+
+export function parseNativeResponse(value: unknown): NativeResponseV1 {
+  const item = objectAt(value, "response");
+  const requestId = stringAt(item.requestId, "response.requestId", 64, 1);
+  if (!UUID.test(requestId)) throw new ContractValidationError("invalid UUID", "response.requestId");
+  const type = stringAt(item.type, "response.type", 40);
+
+  // A peer with a different protocol version must still be able to explain the
+  // incompatibility. Successful response bodies always require an exact match.
+  if (type === "error") {
+    const protocolVersion = numberAt(item.protocolVersion, "response.protocolVersion", 0, Number.MAX_SAFE_INTEGER);
+    if (!Number.isInteger(protocolVersion)) {
+      throw new ContractValidationError("expected an integer", "response.protocolVersion");
+    }
+    if (item.ok !== false) throw new ContractValidationError("expected false", "response.ok");
+    const code = stringAt(item.code, "response.code", 40) as Extract<NativeResponseV1, { ok: false }>["code"];
+    if (!NATIVE_ERROR_CODES.has(code)) throw new ContractValidationError("unsupported error code", "response.code");
+    return {
+      protocolVersion,
+      requestId,
+      ok: false,
+      type,
+      code,
+      message: stringAt(item.message, "response.message", 500, 1),
+      retryable: booleanAt(item.retryable, "response.retryable"),
+    };
+  }
+
+  exactVersion(item.protocolVersion, NATIVE_PROTOCOL_VERSION, "response.protocolVersion");
+  if (item.ok !== true) throw new ContractValidationError("expected true", "response.ok");
+  if (type === "pong") {
+    return {
+      protocolVersion: NATIVE_PROTOCOL_VERSION,
+      requestId,
+      ok: true,
+      type,
+      appVersion: stringAt(item.appVersion, "response.appVersion", 80, 1),
+    };
+  }
+  if (type === "audits:list") {
+    if (!Array.isArray(item.audits) || item.audits.length > 100) {
+      throw new ContractValidationError("expected no more than 100 items", "response.audits");
+    }
+    return {
+      protocolVersion: NATIVE_PROTOCOL_VERSION,
+      requestId,
+      ok: true,
+      type,
+      audits: item.audits.map((candidate, index) => {
+        const audit = objectAt(candidate, `response.audits[${index}]`);
+        const id = stringAt(audit.id, `response.audits[${index}].id`, 48, 1);
+        if (!AUDIT_ID.test(id)) throw new ContractValidationError("invalid audit ID", `response.audits[${index}].id`);
+        const standard = stringAt(audit.standard, `response.audits[${index}].standard`, 20) as "WCAG 2.2 A" | "WCAG 2.2 AA";
+        if (standard !== "WCAG 2.2 A" && standard !== "WCAG 2.2 AA") {
+          throw new ContractValidationError("unsupported standard", `response.audits[${index}].standard`);
+        }
+        return {
+          id,
+          project: stringAt(audit.project, `response.audits[${index}].project`, 120, 1),
+          target: stringAt(audit.target, `response.audits[${index}].target`, 2_000),
+          standard,
+          active: booleanAt(audit.active, `response.audits[${index}].active`),
+          updatedAt: numberAt(audit.updatedAt, `response.audits[${index}].updatedAt`, 0, 4_500_000_000_000),
+        };
+      }),
+    };
+  }
+  if (type === "finding:generated") {
+    return {
+      protocolVersion: NATIVE_PROTOCOL_VERSION,
+      requestId,
+      ok: true,
+      type,
+      draft: parseAiFindingDraft(item.draft),
+    };
+  }
+  if (type === "finding:saved" || type === "finding:queued") {
+    const findingKey = stringAt(item.findingKey, "response.findingKey", 64, 1);
+    if (!UUID.test(findingKey)) throw new ContractValidationError("invalid finding key", "response.findingKey");
+    if (type === "finding:saved") {
+      return {
+        protocolVersion: NATIVE_PROTOCOL_VERSION,
+        requestId,
+        ok: true,
+        type,
+        findingKey,
+      };
+    }
+    const draftSource = stringAt(item.draftSource, "response.draftSource", 10) as "local" | "ai";
+    if (draftSource !== "local" && draftSource !== "ai") {
+      throw new ContractValidationError("unsupported draft source", "response.draftSource");
+    }
+    return {
+      protocolVersion: NATIVE_PROTOCOL_VERSION,
+      requestId,
+      ok: true,
+      type,
+      findingKey,
+      draftSource,
+    };
+  }
+  throw new ContractValidationError("unsupported response type", "response.type");
 }

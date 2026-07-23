@@ -83,7 +83,6 @@ export class FunnelTelemetryService {
       return { attempted: false, accepted: false, reason: "prerequisite" };
     }
 
-    await this.store.set(STATE_KEY, { attempted: [...state.attempted, event] } satisfies TelemetryState);
     try {
       const response = await this.fetcher(this.endpoint, {
         method: "POST",
@@ -91,6 +90,11 @@ export class FunnelTelemetryService {
         body: JSON.stringify({ event }),
         signal: AbortSignal.timeout(5_000),
       });
+      // Only terminal responses consume the one-shot event. Server failures
+      // and other non-terminal responses remain eligible for a later retry.
+      if (response.ok || (response.status >= 400 && response.status < 500)) {
+        await this.store.set(STATE_KEY, { attempted: [...state.attempted, event] } satisfies TelemetryState);
+      }
       return response.ok
         ? { attempted: true, accepted: true }
         : { attempted: true, accepted: false, reason: "unavailable" };

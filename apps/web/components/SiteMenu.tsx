@@ -53,7 +53,7 @@ export function SiteMenu({ children }: { children: ReactNode }) {
       onToggle={() => setOpen(Boolean(ref.current?.open))}
     >
       <summary aria-label={open ? "Close navigation menu" : "Open navigation menu"} className="site-menu__trigger">
-        <MenuIcon size={16} />
+        <MenuIcon size={20} />
         <span>Menu</span>
       </summary>
       <div className="site-menu__panel">{children}</div>

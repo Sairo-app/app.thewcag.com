@@ -1,5 +1,6 @@
 import { SEVERITY_COLORS, TARGET_MIN, type Shape } from "./model";
 import { handlesFor } from "./geometry";
+import { requireCanvas2d } from "./canvas";
 
 export interface RenderOpts {
   selectedId?: number | null;
@@ -77,7 +78,7 @@ function drawShape(
         const tiny = document.createElement("canvas");
         tiny.width = Math.max(1, Math.round(w / block));
         tiny.height = Math.max(1, Math.round(h / block));
-        tiny.getContext("2d")!.drawImage(image, x, y, w, h, 0, 0, tiny.width, tiny.height);
+        requireCanvas2d(tiny).drawImage(image, x, y, w, h, 0, 0, tiny.width, tiny.height);
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(tiny, 0, 0, tiny.width, tiny.height, x, y, w, h);
         ctx.imageSmoothingEnabled = true;

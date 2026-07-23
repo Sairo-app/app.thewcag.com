@@ -44,6 +44,7 @@ function setup() {
   return {
     coordinator: new CaptureCoordinator(capture, captures, windows),
     captures,
+    windows,
   };
 }
 
@@ -92,5 +93,31 @@ describe("CaptureCoordinator scope", () => {
       undefined,
       {},
     );
+  });
+
+  it("tags a completed overlay capture with its coordinator session", async () => {
+    const { coordinator, windows } = setup();
+    const session = await coordinator.begin("capture", "aud-a1234567");
+    await coordinator.complete(session.sessionId, {
+      mode: "capture",
+      rect: { x: 0, y: 0, width: 1, height: 1 },
+      pngDataUrl: FRAME.dataUrl,
+    });
+
+    expect(windows.sendToMain).toHaveBeenCalledWith("capture:saved", {
+      ...ENTRY,
+      sessionId: session.sessionId,
+    });
+  });
+
+  it("broadcasts cancellation for the active coordinator session", async () => {
+    const { coordinator, windows } = setup();
+    const session = await coordinator.begin("capture");
+    coordinator.cancel();
+
+    expect(windows.broadcast).toHaveBeenCalledWith("capture:cancelled", {
+      sessionId: session.sessionId,
+    });
+    expect(windows.closeOverlays).toHaveBeenCalled();
   });
 });

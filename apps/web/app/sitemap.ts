@@ -24,12 +24,15 @@ export const PUBLIC_ROUTES: { path: string; priority: number; changeFrequency: M
   { path: "/terms", priority: 0.3, changeFrequency: "yearly" },
 ];
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  const lastModified = new Date("2026-07-22T00:00:00.000Z");
+export function buildSitemap(lastModified = new Date()): MetadataRoute.Sitemap {
   return PUBLIC_ROUTES.map(({ path, priority, changeFrequency }) => ({
     url: `${SITE_URL}${path}`,
     lastModified,
     changeFrequency,
     priority,
   }));
+}
+
+export default function sitemap(): MetadataRoute.Sitemap {
+  return buildSitemap();
 }

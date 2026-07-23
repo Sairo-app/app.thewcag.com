@@ -65,7 +65,7 @@ function pngBase64(): string {
   return Buffer.concat([signature, chunk("IHDR", header), chunk("IEND")]).toString("base64");
 }
 
-function request(token?: string) {
+function request(token?: string, overrides: Record<string, unknown> = {}) {
   return new NextRequest("https://app.thewcag.com/api/device/screenshots", {
     method: "POST",
     headers: {
@@ -78,6 +78,7 @@ function request(token?: string) {
       description: "Auditor-approved public description",
       imageBase64: pngBase64(),
       issues: [{ n: 1, sc: "2.4.7", label: "Focus hidden", severity: "major", note: "Keep focus visible" }],
+      ...overrides,
     }),
   });
 }
@@ -159,7 +160,16 @@ describe("device report publishing", () => {
   });
 
   it("publishes for the authenticated token owner with R2 mocked at the boundary", async () => {
-    const response = await POST(request("valid-token"));
+    const response = await POST(request("valid-token", {
+      title: "t".repeat(200),
+      issues: [{
+        n: 1,
+        sc: ["1.4.3", "4.1.2"],
+        label: "Multi-criterion finding",
+        severity: "major",
+        note: "Keep every mapping",
+      }],
+    }));
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -176,7 +186,8 @@ describe("device report publishing", () => {
     expect(boundary.insertedReport).toHaveBeenCalledWith(expect.objectContaining({
       slug: "AbCdEf1234",
       userId: "user-owner",
-      title: "Keyboard focus evidence",
+      title: "t".repeat(160),
+      issues: [expect.objectContaining({ sc: ["1.4.3", "4.1.2"] })],
       availabilityStatus: "active",
     }));
     expect(boundary.insertedReport).not.toHaveBeenCalledWith(

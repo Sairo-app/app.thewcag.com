@@ -47,7 +47,7 @@ export default function AccessibilityProgramManagementPage() {
           },
         ],
       }} />
-      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-16">
+      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-12">
         <h1>Accessibility program trends grounded in owned audit history</h1>
         <p>
           TheWCAG uses confirmed findings, stable component references, remediation transitions, and retest decisions already stored in local audits. It shows operational patterns without inventing a pass rate, conformance score, or percentage that hides untested criteria.
@@ -60,7 +60,7 @@ export default function AccessibilityProgramManagementPage() {
         <section aria-labelledby="metrics-heading">
           <h2 id="metrics-heading">Four operational metrics with explicit denominators</h2>
           <div className="mt-6 overflow-x-auto">
-            <table className="w-full text-left text-sm">
+            <table className="w-full text-left type-body">
               <thead><tr><th scope="col">Metric</th><th scope="col">How it is calculated</th></tr></thead>
               <tbody>{METRICS.map(([name, detail]) => <tr key={name}><th scope="row">{name}</th><td>{detail}</td></tr>)}</tbody>
             </table>

@@ -13,6 +13,7 @@ import {
   findingHasEvidence,
   referencedEvidenceCaptureIds,
 } from "../shared/finding-evidence";
+import { findingReferenceWithId } from "../shared/finding-references";
 
 export interface ChecklistExportEntry {
   result: "untested" | "pass" | "fail" | "na";
@@ -327,7 +328,7 @@ export function buildAuditMarkdown(input: AuditExportInput): string {
   } else {
     findings.forEach((finding, index) => {
       lines.push(
-        `### ${finding.reference || String(index + 1)}. ${heading(finding.title)}`,
+        `### ${findingReferenceWithId(finding, String(index + 1))}. ${heading(finding.title)}`,
         "",
         `- Finding ID: ${finding.id}`,
         `- Criterion: ${value(finding.wcag, "Needs mapping")}`,
@@ -408,7 +409,7 @@ export function buildAuditMarkdown(input: AuditExportInput): string {
       );
       actionFindings.forEach((finding) => {
         lines.push(
-          `| ${finding.severity} | ${cell(finding.reference || finding.title)} | ${cell(finding.recommendation || finding.expectedResult || "Review and remediate the documented barrier.")} | ${cell(value(finding.owner, "Unassigned"))} | ${cell(value(finding.dueDate, "Not scheduled"))} |`,
+          `| ${finding.severity} | ${cell(findingReferenceWithId(finding, finding.title))} | ${cell(finding.recommendation || finding.expectedResult || "Review and remediate the documented barrier.")} | ${cell(value(finding.owner, "Unassigned"))} | ${cell(value(finding.dueDate, "Not scheduled"))} |`,
         );
       });
     } else {
@@ -423,7 +424,7 @@ export function buildAuditMarkdown(input: AuditExportInput): string {
     for (const capture of captures) {
       const references = findings
         .filter((finding) => findingEvidenceCaptureIds(finding).includes(capture.id))
-        .map((finding) => finding.reference || finding.title)
+        .map((finding) => findingReferenceWithId(finding, finding.title))
         .join(", ");
       lines.push(`| ${cell(capture.title)} | ${cell(references || "Unassigned capture")} | ${capture.width} × ${capture.height} | ${capture.issues} | ${new Date(capture.createdAt).toISOString()} |`);
     }
@@ -592,7 +593,10 @@ export function buildAuditHtml(input: AuditExportInput): string {
             .filter((title): title is string => Boolean(title))
             .join(", ");
           const criterion = WCAG_CRITERIA.find((item) => item.sc === finding.wcag);
-          const findingLabel = finding.reference || `Finding ${index + 1}`;
+          const findingLabel = findingReferenceWithId(
+            finding,
+            `Finding ${index + 1}`,
+          );
           const steps = finding.reproductionSteps?.length
             ? `<section><h4>Reproduction steps</h4><ol>${finding.reproductionSteps
                 .map((step) => `<li>${escapeHtml(step, "")}</li>`)
@@ -618,7 +622,7 @@ export function buildAuditHtml(input: AuditExportInput): string {
             : "";
           return `<article class="finding" id="finding-${index + 1}">
             <header>
-              <span class="finding-number">Finding ${escapeHtml(finding.reference, String(index + 1).padStart(2, "0"))}</span>
+              <span class="finding-number">Finding ${escapeHtml(findingLabel, String(index + 1).padStart(2, "0"))}</span>
               <code class="finding-id">${escapeHtml(finding.id, "Identity unavailable")}</code>
               <h3>${escapeHtml(finding.title, "Untitled finding")}</h3>
               <div class="finding-tags">
@@ -658,7 +662,7 @@ export function buildAuditHtml(input: AuditExportInput): string {
     ? captures.map((capture) => {
         const references = findings
           .filter((finding) => findingEvidenceCaptureIds(finding).includes(capture.id))
-          .map((finding) => finding.reference || finding.title)
+          .map((finding) => findingReferenceWithId(finding, finding.title))
           .join(", ");
         return `<tr><th scope="row">${escapeHtml(capture.title, "Untitled capture")}</th><td>${escapeHtml(references, "Unassigned capture")}</td><td>${capture.width} × ${capture.height}</td><td>${capture.issues}</td></tr>`;
       }).join("")
@@ -694,7 +698,10 @@ export function buildAuditHtml(input: AuditExportInput): string {
     .join("");
   const actionPlanRows = prioritizedFindings(findings)
     .map((finding, index) => {
-      const findingLabel = finding.reference || `Finding ${index + 1}`;
+      const findingLabel = findingReferenceWithId(
+        finding,
+        `Finding ${index + 1}`,
+      );
       const ticket = finding.ticketLink
         ? reportLink(finding.ticketLink.url, `Open ticket ${finding.ticketLink.key}`, finding.ticketLink.key)
         : escapeHtml(finding.ticket, "Not linked");
@@ -757,57 +764,57 @@ export function buildAuditHtml(input: AuditExportInput): string {
   <meta name="dcterms.created" content="${escapeHtml(generatedAt.toISOString(), "")}">
   <title>Accessibility audit report - ${escapeHtml(audit.project, "Untitled audit")}</title>
   <style>
-    :root { color-scheme: light; --ink:#1f2933; --body:#4f5c68; --line:#d8d0c3; --paper:#fffdf8; --canvas:#f5eddd; --orange:#a9380b; --green:#28745d; --red:#ad342e; --yellow:#8b5b18; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    :root { color-scheme: light; --ink:#1f2933; --body:#4f5c68; --line:#d8d0c3; --paper:#fffdf8; --canvas:#f5eddd; --orange:#a9380b; --green:#28745d; --red:#ad342e; --yellow:#8b5b18; --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-5:20px; --space-6:24px; --space-8:32px; --space-10:40px; --space-12:48px; --control-height-standard:44px; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
     * { box-sizing:border-box; }
     html { background:var(--canvas); color:var(--ink); }
-    body { max-width:1100px; margin:0 auto; padding:40px 32px 64px; background:var(--paper); font-size:15px; line-height:1.55; }
-    .skip { position:absolute; left:-999px; top:8px; padding:8px 12px; background:var(--ink); color:white; }
+    body { max-width:1100px; margin:0 auto; padding:var(--space-10) var(--space-8) calc(var(--space-12) + var(--space-4)); background:var(--paper); font-size:15px; line-height:1.55; }
+    .skip { position:absolute; left:-999px; top:8px; min-height:var(--control-height-standard); padding:var(--space-2) var(--space-3); background:var(--ink); color:white; }
     .skip:focus { left:8px; }
     h1,h2,h3,h4 { line-height:1.2; text-wrap:balance; }
-    h1 { max-width:18ch; margin:12px 0 10px; font-size:38px; letter-spacing:-.025em; }
-    h2 { margin:42px 0 14px; padding-bottom:8px; border-bottom:2px solid var(--ink); font-size:24px; }
+    h1 { max-width:18ch; margin:var(--space-3) 0 var(--space-2); font-size:38px; }
+    h2 { margin:var(--space-10) 0 var(--space-3); padding-bottom:var(--space-2); border-bottom:2px solid var(--ink); font-size:24px; }
     h3 { margin:0; font-size:20px; }
-    h4 { margin:0 0 6px; font-size:14px; }
-    p { max-width:75ch; margin:7px 0; color:var(--body); }
+    h4 { margin:0 0 var(--space-1); font-size:14px; }
+    p { max-width:75ch; margin:var(--space-2) 0; color:var(--body); }
     a { color:var(--orange); text-decoration:underline; text-decoration-thickness:.08em; text-underline-offset:.16em; }
     a:focus-visible { outline:3px solid var(--orange); outline-offset:3px; }
-    .report-header { padding-bottom:28px; border-bottom:1px solid var(--line); }
+    .report-header { padding-bottom:var(--space-6); border-bottom:1px solid var(--line); }
     .brand { color:var(--orange); font-weight:800; }
-    .report-meta,.summary { display:flex; flex-wrap:wrap; gap:8px 18px; color:var(--body); }
-    .outcome { display:inline-block; margin-top:16px; padding:7px 10px; border:1px solid var(--line); border-radius:7px; background:var(--canvas); font-weight:700; }
-    .summary { margin-top:20px; padding:16px 0; border-top:1px solid var(--line); }
+    .report-meta,.summary { display:flex; flex-wrap:wrap; gap:var(--space-2) var(--space-4); color:var(--body); }
+    .outcome { display:inline-block; margin-top:var(--space-4); padding:var(--space-2); border:1px solid var(--line); border-radius:7px; background:var(--canvas); font-weight:700; }
+    .summary { margin-top:var(--space-5); padding:var(--space-4) 0; border-top:1px solid var(--line); }
     .summary div { min-width:140px; }
     .summary strong { display:block; font-size:22px; color:var(--ink); }
     .summary span { color:var(--body); font-size:13px; }
-    .prose-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px 30px; }
+    .prose-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-5) var(--space-8); }
     .prose-grid section { min-width:0; }
     .prose-grid .wide { grid-column:1/-1; }
     .table-wrap { width:100%; overflow-x:auto; border:1px solid var(--line); border-radius:8px; }
     table { width:100%; border-collapse:collapse; font-size:13px; }
-    caption { padding:10px 12px; text-align:left; font-weight:700; }
-    th,td { padding:8px 10px; border-top:1px solid var(--line); text-align:left; vertical-align:top; }
+    caption { padding:var(--space-2) var(--space-3); text-align:left; font-weight:700; }
+    th,td { padding:var(--space-2); border-top:1px solid var(--line); text-align:left; vertical-align:top; }
     thead th { background:var(--canvas); border-top:0; }
     tbody th { white-space:nowrap; }
-    .tag { display:inline-block; padding:3px 6px; border-radius:5px; background:#ece7dd; color:var(--ink); font-size:12px; font-weight:700; text-transform:capitalize; }
+    .tag { display:inline-block; padding:var(--space-1); border-radius:5px; background:#ece7dd; color:var(--ink); font-size:12px; font-weight:700; text-transform:capitalize; }
     .severity-blocker,.result-fail { color:#7d3028; background:#f4dcda; }
     .severity-major { color:#744b13; background:#f6e8c7; }
     .severity-minor,.result-na { color:#315c88; background:#dce8f2; }
     .result-pass { color:#205d49; background:#dcece5; }
     .response-required { color:#744b13; font-weight:700; }
-    .finding { margin:0 0 18px; border:1px solid var(--line); border-radius:10px; break-inside:avoid; }
-    .finding > header { padding:16px; border-bottom:1px solid var(--line); }
-    .finding-number { color:var(--orange); font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; }
-    .finding-id { display:block; margin:4px 0 7px; color:var(--body); font-size:10px; overflow-wrap:anywhere; }
-    .finding-tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+    .finding { margin:0 0 var(--space-4); border:1px solid var(--line); border-radius:10px; break-inside:avoid; }
+    .finding > header { padding:var(--space-4); border-bottom:1px solid var(--line); }
+    .finding-number { color:var(--orange); font-size:12px; font-weight:800; text-transform:uppercase; }
+    .finding-id { display:block; margin:var(--space-1) 0 var(--space-2); color:var(--body); font-size:10px; overflow-wrap:anywhere; }
+    .finding-tags { display:flex; flex-wrap:wrap; gap:var(--space-1); margin-top:var(--space-2); }
     dl { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); margin:0; background:#faf6ee; }
-    dl div { padding:10px 14px; border-bottom:1px solid var(--line); }
+    dl div { padding:var(--space-2) var(--space-3); border-bottom:1px solid var(--line); }
     dt { color:var(--body); font-size:12px; font-weight:700; }
-    dd { margin:3px 0 0; overflow-wrap:anywhere; }
-    .finding-body { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px 24px; padding:16px; }
+    dd { margin:var(--space-1) 0 0; overflow-wrap:anywhere; }
+    .finding-body { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-4) var(--space-6); padding:var(--space-4); }
     .finding-body section { min-width:0; }
-    .empty-copy { padding:18px; border:1px solid var(--line); border-radius:8px; }
-    footer { margin-top:42px; padding-top:16px; border-top:1px solid var(--line); color:var(--body); font-size:12px; }
-    @media (max-width:700px) { body { padding:24px 18px 40px; } .prose-grid,.finding-body,dl { grid-template-columns:1fr; } .prose-grid .wide { grid-column:auto; } h1 { font-size:30px; } }
+    .empty-copy { padding:var(--space-4); border:1px solid var(--line); border-radius:8px; }
+    footer { margin-top:var(--space-10); padding-top:var(--space-4); border-top:1px solid var(--line); color:var(--body); font-size:12px; }
+    @media (max-width:700px) { body { padding:var(--space-6) var(--space-4) var(--space-10); } .prose-grid,.finding-body,dl { grid-template-columns:1fr; } .prose-grid .wide { grid-column:auto; } h1 { font-size:30px; } }
     @page { size:A4; margin:16mm 14mm 18mm; }
     @media print { html { background:white; } body { max-width:none; padding:0; print-color-adjust:exact; -webkit-print-color-adjust:exact; } h2,h3,h4 { break-after:avoid-page; } .finding { break-inside:avoid; } .table-wrap { overflow:visible; } tbody th { white-space:normal; } th,td { overflow-wrap:break-word; } thead { display:table-header-group; } tr { break-inside:avoid; } a { color:inherit; } .skip { display:none; } }
   </style>

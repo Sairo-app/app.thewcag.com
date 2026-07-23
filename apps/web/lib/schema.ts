@@ -1,5 +1,7 @@
 import {
   boolean,
+  check,
+  date,
   index,
   integer,
   jsonb,
@@ -7,21 +9,36 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 // ---- Auth.js (Drizzle adapter) standard tables ----
-export const users = pgTable("user", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  name: text("name"),
-  email: text("email").notNull().unique(),
-  emailVerified: timestamp("emailVerified", { mode: "date" }),
-  image: text("image"),
-  // White-label branding: an organization's logo, name, and accent color,
-  // applied to every report this user shares. All optional (null = TheWCAG).
-  brandName: text("brand_name"),
-  brandColor: text("brand_color"),
-  brandLogoKey: text("brand_logo_key"),
-});
+export const users = pgTable(
+  "user",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    name: text("name"),
+    email: text("email").notNull().unique(),
+    emailVerified: timestamp("emailVerified", { mode: "date" }),
+    image: text("image"),
+    // White-label branding: an organization's logo, name, and accent color,
+    // applied to every report this user shares. All optional (null = TheWCAG).
+    brandName: text("brand_name"),
+    brandColor: text("brand_color"),
+    brandLogoKey: text("brand_logo_key"),
+    brandAssetToken: text("brand_asset_token")
+      .notNull()
+      .default(sql`'br_' || replace(gen_random_uuid()::text, '-', '')`)
+      .unique(),
+  },
+  (t) => ({
+    brandAssetTokenFormat: check(
+      "user_brand_asset_token_format",
+      sql`${t.brandAssetToken} ~ '^br_[0-9a-f]{32}$'`,
+    ),
+  }),
+);
 
 export const accounts = pgTable(
   "account",
@@ -63,14 +80,20 @@ export const desktopDevices = pgTable(
   {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
     userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    tokenHash: text("token_hash").notNull().unique(),
+    tokenHash: text("token_hash").unique(),
+    claimCodeHash: text("claim_code_hash"),
+    claimExpiresAt: timestamp("claim_expires_at"),
+    claimedAt: timestamp("claimed_at"),
     deviceName: text("device_name"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     lastSeenAt: timestamp("last_seen_at"),
     expiresAt: timestamp("expires_at"),
     revokedAt: timestamp("revoked_at"),
   },
-  (t) => ({ userIdx: index("desktop_device_user_idx").on(t.userId) }),
+  (t) => ({
+    userIdx: index("desktop_device_user_idx").on(t.userId),
+    claimCodeHashIdx: uniqueIndex("desktop_device_claim_code_hash_unique").on(t.claimCodeHash),
+  }),
 );
 
 // ---- Shared reports (image blob lives in R2; metadata here) ----
@@ -78,14 +101,19 @@ export type ReportIssueSeverity = "blocker" | "major" | "minor";
 export type ReportRemediationStatus = "open" | "retest" | "fixed" | "accepted";
 
 export interface ReportIssue {
-  id: string;
+  /** Missing only on damaged or not-yet-backfilled legacy report data. */
+  id?: string;
   n: number;
-  sc?: string;
+  sc?: string[];
   label: string;
   severity: ReportIssueSeverity;
   note: string;
   /** Optional for backwards compatibility with reports published before status was shared. */
   status?: ReportRemediationStatus;
+}
+
+export interface IdentifiedReportIssue extends ReportIssue {
+  id: string;
 }
 
 export const reports = pgTable(
@@ -111,6 +139,41 @@ export const reports = pgTable(
     userIdx: index("report_user_idx").on(t.userId),
     availabilityIdx: index("report_availability_idx").on(t.availabilityStatus, t.graceEndsAt),
     retentionIdx: index("report_retention_idx").on(t.availabilityStatus, t.retentionDeleteAt),
+  }),
+);
+
+// Daily report analytics deduplication. visitorHash is a keyed, report/day-
+// scoped digest; raw client addresses are never stored and hashes cannot be
+// correlated across reports or days.
+export const reportViews = pgTable(
+  "report_view",
+  {
+    reportSlug: text("report_slug").notNull().references(() => reports.slug, {
+      onDelete: "cascade",
+      onUpdate: "cascade",
+    }),
+    visitorHash: text("visitor_hash").notNull(),
+    viewedOn: date("viewed_on", { mode: "string" }).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.reportSlug, t.visitorHash, t.viewedOn] }),
+    viewedOnIdx: index("report_view_viewed_on_idx").on(t.viewedOn),
+  }),
+);
+
+// Persistent per-IP sign-in reservations. ipHash is keyed and contains no raw
+// address; old rows can be pruned after the one-hour enforcement window.
+export const authSigninAttempts = pgTable(
+  "auth_signin_attempt",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    ipHash: text("ip_hash").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    ipCreatedIdx: index("auth_signin_attempt_ip_created_idx").on(t.ipHash, t.createdAt),
+    createdIdx: index("auth_signin_attempt_created_idx").on(t.createdAt),
   }),
 );
 
@@ -231,6 +294,8 @@ export const aiGenerations = pgTable(
 );
 
 export type Report = typeof reports.$inferSelect;
+export type ReportView = typeof reportViews.$inferSelect;
+export type AuthSigninAttempt = typeof authSigninAttempts.$inferSelect;
 export type DesktopDevice = typeof desktopDevices.$inferSelect;
 export type AiGeneration = typeof aiGenerations.$inferSelect;
 export type BillingCustomer = typeof billingCustomers.$inferSelect;

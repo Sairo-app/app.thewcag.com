@@ -10,20 +10,21 @@ import type {
   PlatformInfo,
   WorkspaceTool,
 } from "../src/shared/desktop";
-import { assertTrustedSender, safeExternalUrl } from "./security";
+import { assertTrustedSender, confirmableExternalUrl, safeExternalUrl } from "./security";
 import type { AuthService } from "./services/auth";
 import type { AiAuthoringService } from "./services/ai-authoring";
 import type { CaptureCoordinator } from "./services/capture-coordinator";
 import type { CaptureRepository } from "./services/captures";
 import type { ScreenCaptureService } from "./services/screen-capture";
 import type { SettingsService } from "./services/settings";
-import type { JsonStore } from "./services/store";
+import { isFindingsStoreKey, type JsonStore } from "./services/store";
 import type { UpdateService } from "./services/updater";
 import type { TicketConnectorService } from "./services/ticket-connectors";
 import type { FunnelTelemetryService } from "./services/funnel-telemetry";
 import { parseDesktopTelemetryRequest } from "./services/funnel-telemetry";
 import type { WindowManager } from "./windows";
 import { discoverWebsite } from "./services/scope-discovery";
+import { assertRendererStoreAccess } from "./services/store-access";
 
 interface Services {
   ai: AiAuthoringService;
@@ -143,6 +144,18 @@ export function registerIpc(services: Services): void {
     else window.maximize();
   });
   register("window:close", (event) => currentWindow(event).close());
+  register("annotate:flush-complete", (event, payload) => {
+    if (viewFromUrl(event.sender.getURL()) !== "annotate") {
+      throw new Error("Annotation save acknowledgement came from the wrong window");
+    }
+    const value = asObject(payload);
+    return services.windows.acknowledgeAnnotationFlush(
+      event.sender.id,
+      stringField(value, "token", 64),
+      value.ok === true,
+      typeof value.message === "string" ? stringField(value, "message", 500) : undefined,
+    );
+  });
 
   register("screen:permission", () => services.capture.permissionStatus());
   register("screen:request-permission", () => services.capture.requestPermission());
@@ -181,7 +194,7 @@ export function registerIpc(services: Services): void {
       },
     );
     services.windows.sendToMain("capture:saved", entry);
-    if (value.silent !== true) services.windows.openAnnotate(entry.id);
+    if (value.silent !== true) await services.windows.openAnnotate(entry.id);
     return entry;
   });
 
@@ -192,9 +205,9 @@ export function registerIpc(services: Services): void {
       value.unscoped === true,
     );
   });
-  register("capture:open", (_event, payload) => {
+  register("capture:open", async (_event, payload) => {
     const id = stringField(asObject(payload), "id", 100);
-    services.windows.openAnnotate(id);
+    await services.windows.openAnnotate(id);
   });
   register("capture:read-document", (_event, payload) => services.captures.readDocument(stringField(asObject(payload), "id", 100)));
   register("capture:read-data", (_event, payload) => {
@@ -250,17 +263,39 @@ export function registerIpc(services: Services): void {
     discoverWebsite(stringField(asObject(payload), "target", 2_048)),
   );
 
-  register("store:get", (_event, payload) => services.store.getRaw(stringField(asObject(payload), "key", 64)));
+  register("store:get", (_event, payload) => {
+    const key = stringField(asObject(payload), "key", 64);
+    assertRendererStoreAccess("store:get", key);
+    return services.store.getRaw(key);
+  });
   register("store:set", async (_event, payload) => {
     const value = asObject(payload);
-    await services.store.setRaw(stringField(value, "key", 64), stringField(value, "json", 10 * 1024 * 1024));
+    const key = stringField(value, "key", 64);
+    assertRendererStoreAccess("store:set", key);
+    if (isFindingsStoreKey(key)) {
+      throw new Error("Finding documents require keyed mutation operations");
+    }
+    await services.store.setRaw(key, stringField(value, "json", 10 * 1024 * 1024));
   });
-  register("store:remove", (_event, payload) =>
-    services.store.remove(stringField(asObject(payload), "key", 64)),
-  );
+  register("store:remove", (_event, payload) => {
+    const key = stringField(asObject(payload), "key", 64);
+    assertRendererStoreAccess("store:remove", key);
+    return services.store.remove(key);
+  });
   register("store:add-findings", (_event, payload) => {
     const value = asObject(payload);
     return services.store.addFindings(value.items, typeof value.auditId === "string" ? stringField(value, "auditId", 48) : undefined);
+  });
+  register("store:mutate-findings", (_event, payload) => {
+    const value = asObject(payload);
+    const encoded = JSON.stringify(value.mutations);
+    if (typeof encoded !== "string" || Buffer.byteLength(encoded, "utf8") > 10 * 1024 * 1024) {
+      throw new Error("Finding mutations are too large");
+    }
+    return services.store.mutateFindings(
+      stringField(value, "key", 64),
+      value.mutations,
+    );
   });
   register("audit:activate", (_event, payload) => services.captureCoordinator.activateAudit(stringField(asObject(payload), "auditId", 48)));
   register("workspace:navigate", (event, payload) => {
@@ -385,7 +420,31 @@ export function registerIpc(services: Services): void {
   register("clipboard:write-text", (_event, payload) => clipboard.writeText(stringField(asObject(payload), "text", 2 * 1024 * 1024)));
   register("clipboard:write-image", (_event, payload) => clipboard.writeImage(nativeImage.createFromDataURL(stringField(asObject(payload), "pngDataUrl", 50 * 1024 * 1024))));
   register("shell:show-item", (_event, payload) => shell.showItemInFolder(stringField(asObject(payload), "path", 4_096)));
-  register("shell:open-external", (_event, payload) => shell.openExternal(safeExternalUrl(stringField(asObject(payload), "url", 2_048))));
+  register("shell:open-external", async (event, payload) => {
+    const value = asObject(payload);
+    const rawUrl = stringField(value, "url", 2_048);
+    const kind = value.kind === undefined ? "trusted" : stringField(value, "kind", 32);
+    if (kind === "audited-page") {
+      const url = confirmableExternalUrl(rawUrl);
+      const response = await dialog.showMessageBox(currentWindow(event), {
+        type: "warning",
+        buttons: ["Open page", "Cancel"],
+        defaultId: 1,
+        cancelId: 1,
+        noLink: true,
+        title: "Open audited page?",
+        message: "Open this audited page in your default browser?",
+        detail: `${new URL(url).origin}\n\n${url}\n\nOnly continue if you recognize and trust this destination.`,
+      });
+      if (response.response !== 0) return false;
+      await shell.openExternal(url);
+      return true;
+    }
+    if (kind !== "trusted") throw new Error("Invalid external URL policy");
+    const url = safeExternalUrl(rawUrl, await services.tickets.externalOrigins());
+    await shell.openExternal(url);
+    return true;
+  });
 
   register("update:check", () => services.updates.check(true));
   register("update:install", () => services.updates.install());

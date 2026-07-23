@@ -6,6 +6,8 @@ import type {
   AppSettings,
   CaptureEntry,
   DesktopEvent,
+  Finding,
+  FindingMutation,
   InvokeChannel,
   PlatformInfo,
   UpdateState,
@@ -53,6 +55,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 const listeners = new Map<DesktopEvent, Set<(payload: unknown) => void>>();
+const FINDINGS_STORAGE_KEY = /^(?:findings(?:-aud-[a-z0-9-]{6,36})?|standalone-findings)$/;
 
 function previewPlatform(): PlatformInfo {
   const mac = /Mac|iPhone|iPad/.test(navigator.platform);
@@ -72,6 +75,33 @@ function getLocal(key: string): string | null {
 
 function setLocal(key: string, json: string): void {
   try { localStorage.setItem(`thewcag:${key}`, json); } catch { /* preview storage is best effort */ }
+}
+
+function applyPreviewFindingMutations(
+  current: Finding[],
+  mutations: FindingMutation[],
+): Finding[] {
+  const next = [...current];
+  for (const mutation of mutations) {
+    if (mutation.type === "put") {
+      const index = next.findIndex((finding) => finding.key === mutation.finding.key);
+      if (index < 0) next.push(mutation.finding);
+      else next[index] = mutation.finding;
+      continue;
+    }
+    const index = next.findIndex(
+      (finding) => finding.key === mutation.key || Boolean(mutation.id && finding.id === mutation.id),
+    );
+    if (mutation.type === "remove") {
+      if (index >= 0) next.splice(index, 1);
+      continue;
+    }
+    if (index < 0) throw new Error(`Finding ${mutation.key} no longer exists`);
+    const updated: Finding = { ...next[index], ...mutation.patch, id: next[index].id, key: next[index].key };
+    for (const field of mutation.unset ?? []) delete (updated as unknown as Record<string, unknown>)[field];
+    next[index] = updated;
+  }
+  return next;
 }
 
 function previewAiState(): PreviewAiState {
@@ -137,6 +167,7 @@ async function previewInvoke<T>(channel: InvokeChannel, payload?: unknown): Prom
   const value = (payload ?? {}) as Record<string, unknown>;
   switch (channel) {
     case "app:platform": return previewPlatform() as T;
+    case "annotate:flush-complete": return undefined as T;
     case "settings:get": {
       const saved = JSON.parse(getLocal("settings") ?? "{}") as Partial<AppSettings>;
       return {
@@ -157,10 +188,21 @@ async function previewInvoke<T>(channel: InvokeChannel, payload?: unknown): Prom
     case "store:remove": try { localStorage.removeItem(`thewcag:${String(value.key)}`); } catch { /* preview storage is best effort */ } return undefined as T;
     case "store:add-findings": {
       const key = typeof value.auditId === "string" ? `findings-${value.auditId}` : "findings";
-      const prior = JSON.parse(getLocal(key) ?? "[]") as unknown[];
-      const items = Array.isArray(value.items) ? value.items : [];
-      setLocal(key, JSON.stringify([...items, ...prior]));
-      return undefined as T;
+      const prior = JSON.parse(getLocal(key) ?? "[]") as Finding[];
+      const items = Array.isArray(value.items) ? value.items as Finding[] : [];
+      const next = [...prior, ...items.filter((item) => !prior.some((priorItem) => priorItem.key === item.key))];
+      setLocal(key, JSON.stringify(next));
+      return next as T;
+    }
+    case "store:mutate-findings": {
+      const key = String(value.key);
+      const prior = JSON.parse(getLocal(key) ?? "[]") as Finding[];
+      const next = applyPreviewFindingMutations(
+        prior,
+        Array.isArray(value.mutations) ? value.mutations as FindingMutation[] : [],
+      );
+      setLocal(key, JSON.stringify(next));
+      return next as T;
     }
     case "capture:create": {
       const rawPngDataUrl = String(value.pngDataUrl ?? "");
@@ -272,7 +314,12 @@ async function previewInvoke<T>(channel: InvokeChannel, payload?: unknown): Prom
     case "report:publish": return `https://app.thewcag.com/s/preview-${Date.now().toString(36)}` as T;
     case "update:check": return { status: "current", message: "Preview build" } satisfies UpdateState as T;
     case "clipboard:write-text": await navigator.clipboard?.writeText(String(value.text ?? "")); return undefined as T;
-    case "shell:open-external": window.open(String(value.url), "_blank", "noopener"); return undefined as T;
+    case "shell:open-external": {
+      const url = String(value.url);
+      if (value.kind === "audited-page" && !window.confirm(`Open this audited page?\n\n${url}`)) return false as T;
+      window.open(url, "_blank", "noopener");
+      return true as T;
+    }
     case "capture:begin":
     case "capture:fullscreen":
     case "capture:open":
@@ -311,7 +358,67 @@ export async function getStored<T>(key: string, fallback: T): Promise<T> {
 }
 
 export function setStored<T>(key: string, value: T): Promise<void> {
+  if (FINDINGS_STORAGE_KEY.test(key) || key === "finding-identities") {
+    return Promise.reject(new Error("Finding documents require keyed mutation operations"));
+  }
   return desktop.invoke("store:set", { key, json: JSON.stringify(value) });
+}
+
+function sameStoredValue(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+export function saveStoredFindings(
+  key: string,
+  previous: Finding[],
+  next: Finding[],
+): Promise<Finding[]> {
+  if (!FINDINGS_STORAGE_KEY.test(key)) {
+    return Promise.reject(new Error("Invalid findings storage key"));
+  }
+  const previousByKey = new Map(previous.map((finding) => [finding.key, finding]));
+  const nextKeys = new Set(next.map((finding) => finding.key));
+  const mutations: FindingMutation[] = [];
+  for (const finding of next) {
+    const prior = previousByKey.get(finding.key);
+    if (!prior || prior.id !== finding.id) {
+      mutations.push({ type: "put", finding });
+      continue;
+    }
+    const patch: Record<string, unknown> = {};
+    const unset: string[] = [];
+    const fields = new Set([...Object.keys(prior), ...Object.keys(finding)]);
+    fields.delete("id");
+    fields.delete("key");
+    for (const field of fields) {
+      const nextHasField = Object.prototype.hasOwnProperty.call(finding, field) &&
+        (finding as unknown as Record<string, unknown>)[field] !== undefined;
+      const priorHasField = Object.prototype.hasOwnProperty.call(prior, field) &&
+        (prior as unknown as Record<string, unknown>)[field] !== undefined;
+      if (!nextHasField) {
+        if (priorHasField) unset.push(field);
+        continue;
+      }
+      const nextValue = (finding as unknown as Record<string, unknown>)[field];
+      const priorValue = (prior as unknown as Record<string, unknown>)[field];
+      if (!priorHasField || !sameStoredValue(priorValue, nextValue)) patch[field] = nextValue;
+    }
+    if (Object.keys(patch).length || unset.length) {
+      mutations.push({
+        type: "patch",
+        key: finding.key,
+        id: finding.id,
+        patch: patch as Partial<Omit<Finding, "id" | "key">>,
+        ...(unset.length ? { unset: unset as Array<Exclude<keyof Finding, "id" | "key">> } : {}),
+      });
+    }
+  }
+  for (const finding of previous) {
+    if (!nextKeys.has(finding.key)) {
+      mutations.push({ type: "remove", key: finding.key, id: finding.id });
+    }
+  }
+  return desktop.invoke<Finding[]>("store:mutate-findings", { key, mutations });
 }
 
 export async function listCaptures(

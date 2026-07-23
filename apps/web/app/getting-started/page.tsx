@@ -69,7 +69,7 @@ function GuideFigure({
       </div>
       <figcaption>
         <p><strong>{title}</strong>{children}</p>
-        <a href={src} target="_blank" rel="noreferrer">Open full-size screenshot <ArrowRightIcon size={14} /></a>
+        <a href={src} target="_blank" rel="noreferrer">Open full-size screenshot <ArrowRightIcon size={16} /></a>
       </figcaption>
     </figure>
   );
@@ -78,7 +78,7 @@ function GuideFigure({
 function DoneWhen({ children }: { children: ReactNode }) {
   return (
     <div className="guide-done">
-      <CheckIcon size={18} />
+      <CheckIcon size={20} />
       <p><strong>Continue when</strong>{children}</p>
     </div>
   );
@@ -121,7 +121,7 @@ export default function GettingStartedPage() {
             Start from the browser component where a website problem appears, or follow the normal desktop workflow from a bundled, network-free sample. Both paths meet in the same reviewable local finding record. The screenshots below come from the current macOS build; Windows follows the same four-stage structure with platform-specific shortcut labels.
           </p>
           <div className="guide-actions">
-            <GuideDownloadLink className="button button--primary"><DownloadIcon size={17} />Download TheWCAG</GuideDownloadLink>
+            <GuideDownloadLink className="button button--primary"><DownloadIcon size={16} />Download TheWCAG</GuideDownloadLink>
             <a href="#install" className="button button--secondary">Start the guide <ArrowRightIcon size={16} /></a>
           </div>
           <GuideTelemetryConsent />

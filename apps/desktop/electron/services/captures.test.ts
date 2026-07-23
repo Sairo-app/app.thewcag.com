@@ -6,6 +6,13 @@ import { assertAuditId, assertCaptureId, CaptureRepository } from "./captures";
 
 const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 
+function pngWithDimensions(width: number, height: number): string {
+  const bytes = Buffer.from(PNG.split(",")[1], "base64");
+  bytes.writeUInt32BE(width, 16);
+  bytes.writeUInt32BE(height, 20);
+  return `data:image/png;base64,${bytes.toString("base64")}`;
+}
+
 describe("capture identifiers", () => {
   it("accepts generated ids and rejects traversal", () => {
     expect(() => assertCaptureId("cap-mabc1234-deadbeef")).not.toThrow();
@@ -51,6 +58,20 @@ describe("capture identifiers", () => {
         sampleItemId: "sample-checkout",
         testRunId: "run-forms",
       });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects captures that cannot be represented safely by annotation canvases", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "thewcag-captures-"));
+    try {
+      const captures = new CaptureRepository(directory);
+      await expect(captures.create(
+        pngWithDimensions(8_193, 1),
+        "Oversized capture",
+      )).rejects.toThrow(/annotation limit.*smaller area/i);
+      await expect(captures.list(undefined, true)).resolves.toEqual([]);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

@@ -18,7 +18,7 @@ import {
   Lightbulb,
   Plus,
   Warning,
-} from "@phosphor-icons/react";
+} from "../Icon";
 import type { OverlayResult, WorkspaceStage } from "../../shared/desktop";
 import { desktop } from "../api";
 import type { AuditSessionSelection } from "../audit-coverage";
@@ -195,7 +195,7 @@ export function InspectView({
             essential action.
           </p>
           <button style={{ backgroundColor: fg, color: bg }}>
-            Primary action <ArrowRight size={16} />
+            Primary action <ArrowRight size={20} />
           </button>
         </div>
         <div className="ratio-badge">
@@ -216,7 +216,7 @@ export function InspectView({
               onClick={() => void begin("foreground")}
               aria-label="Sample foreground"
             >
-              <Crosshair size={17} />
+              <Crosshair size={20} />
             </button>
             <label>
               <span>Foreground</span>
@@ -231,10 +231,12 @@ export function InspectView({
               className="mini-icon"
               onClick={() =>
                 void desktop.invoke("clipboard:write-text", { text: fg })
+                  .then(() => show("Foreground color copied"))
+                  .catch((error) => show(messageFromError(error, "The foreground color could not be copied."), true))
               }
               aria-label="Copy foreground"
             >
-              <Copy size={16} />
+              <Copy size={20} />
             </button>
           </div>
           <button
@@ -245,7 +247,7 @@ export function InspectView({
             }}
             aria-label="Swap colors"
           >
-            <ArrowsLeftRight size={17} />
+            <ArrowsLeftRight size={20} />
           </button>
           <div className="color-row">
             <button
@@ -254,7 +256,7 @@ export function InspectView({
               onClick={() => void begin("background")}
               aria-label="Sample background"
             >
-              <Crosshair size={17} />
+              <Crosshair size={20} />
             </button>
             <label>
               <span>Background</span>
@@ -269,10 +271,12 @@ export function InspectView({
               className="mini-icon"
               onClick={() =>
                 void desktop.invoke("clipboard:write-text", { text: bg })
+                  .then(() => show("Background color copied"))
+                  .catch((error) => show(messageFromError(error, "The background color could not be copied."), true))
               }
               aria-label="Copy background"
             >
-              <Copy size={16} />
+              <Copy size={20} />
             </button>
           </div>
           <Button
@@ -294,9 +298,9 @@ export function InspectView({
             </div>
             <StatusBadge tone={passes ? "success" : "danger"}>
               {passes ? (
-                <Check size={14} weight="bold" />
+                <Check size={16} />
               ) : (
-                <Warning size={14} weight="fill" />
+                <Warning size={16} weight="fill" />
               )}
               {MODES[mode].sc}
             </StatusBadge>
@@ -315,9 +319,9 @@ export function InspectView({
               <div key={check.label}>
                 <span className={check.pass ? "check-pass" : "check-fail"}>
                   {check.pass ? (
-                    <Check size={15} weight="bold" />
+                    <Check size={16} />
                   ) : (
-                    <Warning size={15} weight="fill" />
+                    <Warning size={16} weight="fill" />
                   )}
                 </span>
                 <span>
@@ -340,7 +344,7 @@ export function InspectView({
 
       {!passes && suggestions.length ? (
         <section className="suggestion-strip">
-          <Lightbulb size={20} weight="duotone" />
+          <Lightbulb size={20} />
           <div>
             <strong>Closest passing foregrounds</strong>
             <p>Keep the background and adjust only the text color.</p>
@@ -402,7 +406,7 @@ export function InspectView({
                     {item.fg} · {item.bg}
                   </small>
                 </span>
-                <ArrowRight size={15} />
+                <ArrowRight size={20} />
               </button>
             ))}
           </div>

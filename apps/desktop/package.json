@@ -1,7 +1,7 @@
 {
   "name": "@accessibility-build/desktop",
   "productName": "TheWCAG",
-  "version": "3.0.7",
+  "version": "3.0.8",
   "description": "A production accessibility audit workstation for macOS and Windows.",
   "author": "TheWCAG",
   "homepage": "https://app.thewcag.com",

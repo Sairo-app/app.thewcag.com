@@ -7,7 +7,7 @@ import {
   ClipboardText,
   NotePencil,
   WarningCircle,
-} from "@phosphor-icons/react";
+} from "./Icon";
 import type {
   AuditSampleItem,
   AuditTestRun,
@@ -15,7 +15,7 @@ import type {
   Finding,
   WorkspaceStage,
 } from "../shared/desktop";
-import { desktop, getStored, listCaptures, setStored } from "./api";
+import { desktop, getStored, listCaptures, saveStoredFindings, setStored } from "./api";
 import { findNextAuditSession, type AuditSessionSelection } from "./audit-coverage";
 import { auditStoreKey, type RecordAuditActivity } from "./audits";
 import { Button, Field, StatusBadge, Toast } from "./components";
@@ -89,9 +89,9 @@ export function GuidedAuditSession({
     return request;
   }
 
-  function persistFindings(next: Finding[]) {
-    const request = findingWriteQueue.current.then(() => setStored(findingsKey, next));
-    findingWriteQueue.current = request.catch(() => undefined);
+  function persistFindings(next: Finding[], previous: Finding[] = findings) {
+    const request = findingWriteQueue.current.then(() => saveStoredFindings(findingsKey, previous, next));
+    findingWriteQueue.current = request.then(() => undefined, () => undefined);
     return request;
   }
 
@@ -149,6 +149,15 @@ export function GuidedAuditSession({
       setCaptures((current) => [entry, ...current.filter((item) => item.id !== entry.id)]);
     }),
     [auditId],
+  );
+  useEffect(
+    () => desktop.on<{ key: string | null }>("findings:changed", ({ key }) => {
+      if (key !== null && key !== findingsKey) return;
+      void getStored<Finding[]>(findingsKey, [])
+        .then(setFindings)
+        .catch((error) => show(messageFromError(error), true));
+    }),
+    [findingsKey],
   );
 
   const sample = selection
@@ -352,8 +361,8 @@ export function GuidedAuditSession({
     };
     const next = [finding, ...findings];
     try {
-      await persistFindings(next);
-      setFindings(next);
+      const saved = await persistFindings(next);
+      setFindings(saved);
       setEditorOpen(false);
       await recordActivity({
         kind: "finding",
@@ -396,7 +405,7 @@ export function GuidedAuditSession({
     <section className="guided-session" aria-labelledby="guided-session-title">
       <Toast message={message} />
       <div className="guided-session-heading">
-        <div className="guided-session-icon"><ClipboardText size={24} weight="duotone" /></div>
+        <div className="guided-session-icon"><ClipboardText size={24} /></div>
         <div>
           <span className="section-label">Guided audit session</span>
           <h2 id="guided-session-title">Keep the current test in one place</h2>
@@ -412,14 +421,14 @@ export function GuidedAuditSession({
         <div className="guided-session-empty"><span>Loading the current audit plan…</span></div>
       ) : !sampleItems.length ? (
         <div className="guided-session-empty">
-          <WarningCircle size={22} weight="duotone" />
+          <WarningCircle size={20} />
           <div><strong>Plan the representative sample first</strong><p>The session uses the exact locations approved in Plan.</p></div>
           <Button icon={ArrowRight} onClick={() => onNavigate("plan")}>Open plan</Button>
         </div>
       ) : !selection || !sample ? (
         <div className="guided-launch">
           <div>
-            {nextSelection ? <ClipboardText size={25} weight="duotone" /> : <CheckCircle size={25} weight="fill" />}
+            {nextSelection ? <ClipboardText size={24} /> : <CheckCircle size={24} weight="fill" />}
             <span>
               <strong>{nextSelection ? "Ready for the next planned test" : "All planned testing is complete"}</strong>
               <p>{nextSelection ? "One action will select and start the next available sample and guided run." : "Use the coverage map in Plan to review traceability or reopen a completed test."}</p>
@@ -536,7 +545,7 @@ export function GuidedAuditSession({
                 </>
               ) : (
                 <div className="guided-no-run">
-                  <ClipboardText size={23} weight="duotone" />
+                  <ClipboardText size={24} />
                   <div><strong>Sample-led review</strong><p>Use the inspection tools below, record scope notes here, and attach evidence or findings to this sample.</p></div>
                   <Field label="Sample notes">
                     <textarea rows={4} value={sample.notes} onChange={(event) => patchSample({ notes: event.target.value })} />
@@ -551,8 +560,8 @@ export function GuidedAuditSession({
                 <strong>{contextCaptures.length + contextFindings.length}</strong>
               </div>
               <div className="guided-record-metrics">
-                <button type="button" onClick={() => onNavigate("evidence")}><Camera size={18} /><strong>{contextCaptures.length}</strong><span>captures</span></button>
-                <button type="button" onClick={() => onNavigate("evidence")}><NotePencil size={18} /><strong>{contextFindings.length}</strong><span>findings</span></button>
+                <button type="button" onClick={() => onNavigate("evidence")}><Camera size={20} /><strong>{contextCaptures.length}</strong><span>captures</span></button>
+                <button type="button" onClick={() => onNavigate("evidence")}><NotePencil size={20} /><strong>{contextFindings.length}</strong><span>findings</span></button>
               </div>
               <Button variant="primary" icon={NotePencil} onClick={openFindingEditor}>Create finding</Button>
               <Button icon={Camera} disabled={captureBusy} onClick={() => void captureEvidence()}>

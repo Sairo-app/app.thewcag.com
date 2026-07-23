@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { dodoClient, requireDodoHostedUrl } from "@/lib/billing/dodo";
@@ -10,7 +10,14 @@ import { BillingSessionRateLimitError, completeBillingSession, reserveBillingSes
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const fetchSite = req.headers.get("sec-fetch-site")?.toLowerCase();
+  if (fetchSite !== "same-origin" && fetchSite !== "none") {
+    return NextResponse.json(
+      { error: "cross_site_request_rejected" },
+      { status: 403, headers: { "Cache-Control": "no-store" } },
+    );
+  }
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return NextResponse.redirect(`${SITE_URL}/signin?callbackUrl=/account`);

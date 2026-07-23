@@ -33,10 +33,43 @@ export function hardenWebContents(contents: WebContents): void {
   contents.on("will-attach-webview", (event) => event.preventDefault());
 }
 
-export function safeExternalUrl(raw: unknown, allowedOrigin = "https://app.thewcag.com"): string {
+const APP_ORIGIN = "https://app.thewcag.com";
+const CURATED_EXTERNAL_HOSTNAMES = new Set([
+  "www.w3.org",
+  "w3.org",
+  "platform.openai.com",
+  "console.anthropic.com",
+  "openrouter.ai",
+]);
+
+function parsedExternalUrl(raw: unknown, protocols: ReadonlySet<string>): URL {
   if (typeof raw !== "string" || raw.length > 2_048) throw new Error("Invalid external URL");
   const url = new URL(raw);
-  const allowed = new URL(allowedOrigin);
-  if (url.protocol !== "https:" || url.origin !== allowed.origin) throw new Error("External URL is not allowed");
+  if (!protocols.has(url.protocol) || !url.hostname || url.username || url.password) {
+    throw new Error("External URL is not allowed");
+  }
+  return url;
+}
+
+/** Validate a link against fixed trusted hosts and encrypted connector origins. */
+export function safeExternalUrl(raw: unknown, configuredOrigins: Iterable<string> = []): string {
+  const url = parsedExternalUrl(raw, new Set(["https:"]));
+  if (url.origin === APP_ORIGIN || CURATED_EXTERNAL_HOSTNAMES.has(url.hostname.toLowerCase())) {
+    return url.toString();
+  }
+  for (const configuredOrigin of configuredOrigins) {
+    try {
+      const allowed = new URL(configuredOrigin);
+      if (allowed.protocol === "https:" && allowed.origin === url.origin) return url.toString();
+    } catch {
+      // Ignore malformed values rather than broadening the policy.
+    }
+  }
+  throw new Error("External URL is not allowed");
+}
+
+/** Validate an audited-page target before the main process asks for consent. */
+export function confirmableExternalUrl(raw: unknown): string {
+  const url = parsedExternalUrl(raw, new Set(["http:", "https:"]));
   return url.toString();
 }

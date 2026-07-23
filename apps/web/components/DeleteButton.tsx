@@ -21,17 +21,17 @@ export function DeleteButton({ slug }: { slug: string }) {
       <span>
         <button
           onClick={() => { setError(""); setConfirming(true); }}
-          className="inline-flex items-center gap-1 text-xs text-muted hover:text-red-700"
+          className="inline-flex items-center gap-1 type-callout text-muted hover:text-red-700"
         >
-          <TrashIcon size={13} />
+          <TrashIcon size={20} />
           Delete
         </button>
-        {error ? <span role="alert" className="ml-2 text-xs text-red-700">{error}</span> : null}
+        {error ? <span role="alert" className="ml-2 type-callout text-red-700">{error}</span> : null}
       </span>
     );
   }
   return (
-    <span className="flex items-center gap-2 text-xs">
+    <span className="flex items-center gap-2 type-callout">
       <button
         ref={confirmRef}
         disabled={pending}

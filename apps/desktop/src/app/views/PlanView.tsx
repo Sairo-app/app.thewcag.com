@@ -11,7 +11,7 @@ import {
   Trash,
   UploadSimple,
   WarningCircle,
-} from "@phosphor-icons/react";
+} from "../Icon";
 import type {
   AuditProject,
   AuditSampleItem,
@@ -591,7 +591,7 @@ export function PlanView({
       <Toast message={message} />
       <section className="audit-scoper" aria-labelledby="audit-scoper-title">
         <div className="audit-scoper-heading">
-          <div className="audit-scoper-icon"><MagicWand size={22} weight="duotone" /></div>
+          <div className="audit-scoper-icon"><MagicWand size={20} /></div>
           <div>
             <span className="section-label">Built-in scoper</span>
             <h2 id="audit-scoper-title">Build an audit-ready scope</h2>
@@ -693,7 +693,7 @@ export function PlanView({
                 className="text-action audit-scoper-reset"
                 onClick={() => setScoperFeatures(null)}
               >
-                <ArrowCounterClockwise size={14} /> Reset feature detection
+                <ArrowCounterClockwise size={20} /> Reset feature detection
               </button>
             ) : null}
           </fieldset>
@@ -805,7 +805,7 @@ export function PlanView({
                 if (template) setTemplateToDelete(template);
               }}
             >
-              <Trash size={16} />
+              <Trash size={20} />
             </button>
           ) : null}
         </div>
@@ -828,7 +828,7 @@ export function PlanView({
           {readiness.ready ? (
             <CheckCircle size={24} weight="fill" />
           ) : (
-            <ClipboardText size={24} weight="duotone" />
+            <ClipboardText size={24} />
           )}
         </div>
         <div className="plan-status-copy">
@@ -1084,14 +1084,14 @@ export function PlanView({
                   aria-label={`Remove ${item.label} from the sample`}
                   onClick={() => setItemToDelete(item)}
                 >
-                  <Trash size={16} />
+                  <Trash size={20} />
                 </button>
               </article>
             ))}
           </div>
         ) : (
           <div className="sample-empty">
-            <WarningCircle size={21} weight="duotone" />
+            <WarningCircle size={20} />
             <div>
               <strong>No structured sample yet</strong>
               <p>Add the critical tasks and representative interface types that will be tested.</p>
@@ -1235,7 +1235,7 @@ export function PlanView({
           </div>
         ) : (
           <div className="sample-empty">
-            <ClipboardText size={21} weight="duotone" />
+            <ClipboardText size={20} />
             <div>
               <strong>No guided test runs yet</strong>
               <p>Add the scripts that match the tasks and content in this audit.</p>

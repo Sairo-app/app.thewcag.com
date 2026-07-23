@@ -1,9 +1,9 @@
 import NextAuth from "next-auth";
 import Resend from "next-auth/providers/resend";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
-import { and, gt, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { accounts, sessions, users, verificationTokens } from "@/lib/schema";
+import { createRateLimitedVerificationToken } from "@/lib/auth-rate-limit";
 
 const hasResend = Boolean(process.env.AUTH_RESEND_KEY);
 const FROM = process.env.AUTH_EMAIL_FROM ?? "TheWCAG <noreply@updates.onchange.app>";
@@ -35,21 +35,21 @@ function magicLinkEmail(url: string): { subject: string; html: string; text: str
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f4;padding:32px 12px;">
     <tr><td align="center">
       <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;max-width:440px;background:#ffffff;border:1px solid #e7e5e4;border-radius:14px;">
-        <tr><td style="padding:28px 32px 0;">
-          <div style="font:700 18px ${font};color:#1c1917;letter-spacing:-0.01em;">The<span style="color:#c2410c;">WCAG</span></div>
+        <tr><td style="padding:32px 32px 0;">
+          <div style="font:700 18px ${font};color:#1c1917;">The<span style="color:#c2410c;">WCAG</span></div>
         </td></tr>
-        <tr><td style="padding:18px 32px 0;">
-          <h1 style="margin:0;font:700 20px ${font};color:#1c1917;letter-spacing:-0.01em;">Sign in to TheWCAG</h1>
-          <p style="margin:10px 0 0;font:400 14px/1.6 ${font};color:#57534e;">Click the button below to finish signing in. This link expires in 24 hours and can be used once.</p>
+        <tr><td style="padding:20px 32px 0;">
+          <h1 style="margin:0;font:700 20px ${font};color:#1c1917;">Sign in to TheWCAG</h1>
+          <p style="margin:12px 0 0;font:400 14px/1.6 ${font};color:#57534e;">Click the button below to finish signing in. This link expires in 24 hours and can be used once.</p>
         </td></tr>
-        <tr><td style="padding:22px 32px 0;">
+        <tr><td style="padding:24px 32px 0;">
           <a href="${safeUrl}" style="display:inline-block;background:#c2410c;color:#ffffff;text-decoration:none;font:600 14px ${font};padding:12px 24px;border-radius:10px;">Sign in</a>
         </td></tr>
         <tr><td style="padding:20px 32px 0;">
           <p style="margin:0;font:400 13px/1.5 ${font};color:#78716c;">Or paste this link into your browser:</p>
-          <p style="margin:6px 0 0;font:400 12px/1.5 ${font};word-break:break-all;"><a href="${safeUrl}" style="color:#c2410c;text-decoration:underline;">${safeUrl}</a></p>
+          <p style="margin:8px 0 0;font:400 12px/1.5 ${font};word-break:break-all;"><a href="${safeUrl}" style="color:#c2410c;text-decoration:underline;">${safeUrl}</a></p>
         </td></tr>
-        <tr><td style="padding:24px 32px 28px;">
+        <tr><td style="padding:24px 32px 24px;">
           <div style="border-top:1px solid #e7e5e4;margin:0 0 16px;"></div>
           <p style="margin:0;font:400 12px/1.5 ${font};color:#a8a29e;">If you didn't request this, you can safely ignore this email. No changes will be made to any account.</p>
         </td></tr>
@@ -68,14 +68,19 @@ If you didn't request this, you can safely ignore this email.`;
   return { subject, html, text };
 }
 
+const adapter = DrizzleAdapter(db, {
+  usersTable: users,
+  accountsTable: accounts,
+  sessionsTable: sessions,
+  verificationTokensTable: verificationTokens,
+});
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: !isProduction || Boolean(process.env.AUTH_URL) || trustsForwardedHost,
-  adapter: DrizzleAdapter(db, {
-    usersTable: users,
-    accountsTable: accounts,
-    sessionsTable: sessions,
-    verificationTokensTable: verificationTokens,
-  }),
+  adapter: {
+    ...adapter,
+    createVerificationToken: createRateLimitedVerificationToken,
+  },
   providers: [
     Resend({
       apiKey: process.env.AUTH_RESEND_KEY ?? "dev",
@@ -89,16 +94,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
           console.log(`\n\n==== DEV MAGIC LINK (${identifier}) ====\n${url}\n========================================\n\n`);
           return;
-        }
-        const [rate] = await db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(verificationTokens)
-          .where(and(
-            sql`lower(${verificationTokens.identifier}) = ${identifier.toLowerCase()}`,
-            gt(verificationTokens.expires, new Date()),
-          ));
-        if (Number(rate?.count ?? 0) > 5) {
-          throw new Error("Too many active sign-in links. Use the newest email or wait for the existing links to expire.");
         }
         const { subject, html, text } = magicLinkEmail(url);
         const res = await fetch("https://api.resend.com/emails", {
@@ -117,7 +112,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   session: { strategy: "database" },
-  pages: { signIn: "/signin", verifyRequest: "/signin/check" },
+  pages: { signIn: "/signin", verifyRequest: "/signin/check", error: "/signin/error" },
   callbacks: {
     redirect({ url, baseUrl }) {
       const canonical = new URL(process.env.AUTH_URL || baseUrl);

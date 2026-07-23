@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { PlanChoice } from "@/lib/billing/plans";
 
@@ -8,13 +8,22 @@ export function PricingCheckoutButton({
   plan,
   signedIn,
   configured,
+  autoStart = false,
 }: {
   plan: PlanChoice;
   signedIn: boolean;
   configured: boolean;
+  autoStart?: boolean;
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const autoStarted = useRef(false);
+
+  useEffect(() => {
+    if (!autoStart || !signedIn || !configured || autoStarted.current) return;
+    autoStarted.current = true;
+    void checkout();
+  }, [autoStart, configured, signedIn]);
   if (!signedIn) {
     return (
       <Link href={`/signin?callbackUrl=${encodeURIComponent(`/pricing?plan=${plan}`)}`} className="pricing-card__button">
@@ -54,7 +63,7 @@ export function PricingCheckoutButton({
       <button type="button" onClick={checkout} disabled={pending} className="pricing-card__button">
         {pending ? "Opening secure checkout…" : "Choose Pro"}
       </button>
-      {error ? <p role="alert" className="mt-2 text-sm text-red-700">{error}</p> : null}
+      {error ? <p role="alert" className="mt-2 type-body text-red-700">{error}</p> : null}
     </>
   );
 }

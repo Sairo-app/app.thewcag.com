@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   AuditActivity,
   AuditBrief,
+  Finding,
   AuditProject,
   AuditScopeFeature,
   AuditScopeProfile,
   AuditTargetType,
 } from "../shared/desktop";
-import { desktop, getStored, listCaptures, setStored } from "./api";
+import { desktop, getStored, listCaptures, saveStoredFindings, setStored } from "./api";
+import { findingEvidenceStoreKeys } from "../shared/finding-evidence";
 
 export {
   DEFAULT_TICKET_FIELD_MAPPINGS,
@@ -87,6 +89,7 @@ const AUDIT_SECTIONS = Object.keys(SECTION_DEFAULTS) as AuditSection[];
 
 export interface AuditDeletionServices {
   listCaptures: (auditId: string) => Promise<Array<{ id: string }>>;
+  getFindings: (key: string) => Promise<Finding[]>;
   deleteCapture: (id: string) => Promise<unknown>;
   removeStoreKey: (key: string) => Promise<unknown>;
 }
@@ -106,13 +109,21 @@ export async function deleteAuditData(
   auditId: string,
   services: AuditDeletionServices = {
     listCaptures,
+    getFindings: (key) => getStored<Finding[]>(key, []),
     deleteCapture: (id) => desktop.invoke("capture:delete", { id }),
     removeStoreKey: (key) => desktop.invoke("store:remove", { key }),
   },
 ): Promise<void> {
-  const captures = await services.listCaptures(auditId);
+  const findingsKey = auditStoreKey(auditId, "findings");
+  const [captures, findings] = await Promise.all([
+    services.listCaptures(auditId),
+    services.getFindings(findingsKey),
+  ]);
   await Promise.all([
     ...captures.map((capture) => services.deleteCapture(capture.id)),
+    ...findingEvidenceStoreKeys(findings).map((key) =>
+      services.removeStoreKey(key),
+    ),
     ...auditDeletionKeys(auditId).map((key) => services.removeStoreKey(key)),
   ]);
 }
@@ -221,7 +232,12 @@ async function migrateLegacyAudit(legacy: AuditBrief): Promise<{
           LEGACY_KEYS[section],
           SECTION_DEFAULTS[section],
         );
-        await setStored(auditStoreKey(audit.id, section), value);
+        const key = auditStoreKey(audit.id, section);
+        if (section === "findings") {
+          await saveStoredFindings(key, [], value as Finding[]);
+        } else {
+          await setStored(key, value);
+        }
       },
     ),
   );

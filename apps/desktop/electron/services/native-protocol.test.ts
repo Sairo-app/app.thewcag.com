@@ -7,6 +7,7 @@ import {
   type EvidencePacketV1,
 } from "@accessibility-build/audit-contracts";
 import { findingFromDraft, handleNativeRequest } from "./native-protocol";
+import { ManagedAiHttpError } from "./managed-ai-error";
 
 function evidence(): EvidencePacketV1 {
   return {
@@ -129,7 +130,36 @@ describe("native extension protocol", () => {
     expect(generateFinding).not.toHaveBeenCalled();
   });
 
-  it("treats a repeated evidence save as idempotent", async () => {
+  it.each([
+    [402, "quota-exceeded", false],
+    [429, "quota-exceeded", true],
+    [503, "generation-failed", true],
+  ] as const)("maps managed AI HTTP %i without message guessing", async (status, code, retryable) => {
+    const message = status === 402 ? "Managed AI authoring requires Pro." : `Managed AI failed with ${status}.`;
+    const response = await handleNativeRequest({
+      protocolVersion: NATIVE_PROTOCOL_VERSION,
+      requestId: "e1f6ebf8-8f42-4373-a3d2-3ea5b64f0ac7",
+      type: "finding:generate",
+      evidence: evidence(),
+    }, {
+      store: { get: vi.fn(), set: vi.fn(), addFindings: vi.fn(), remove: vi.fn() },
+      ai: {
+        generateFinding: vi.fn().mockRejectedValue(
+          new ManagedAiHttpError(status, message),
+        ),
+      },
+      appVersion: "3.0.0",
+    });
+
+    expect(response).toEqual(expect.objectContaining({
+      ok: false,
+      code,
+      message,
+      retryable,
+    }));
+  });
+
+  it("treats the immutable finding ID as an idempotency key", async () => {
     const addFindings = vi.fn();
     const set = vi.fn();
     const get = async <T,>(key: string, fallback: T): Promise<T> => {
@@ -144,7 +174,10 @@ describe("native extension protocol", () => {
         updatedAt: 10,
         createdAt: 1,
       }] as T;
-      if (key === "findings-aud-checkout1") return [{ key: evidence().id }] as T;
+      if (key === "findings-aud-checkout1") return [{
+        id: evidence().findingId,
+        key: "existing-finding-key",
+      }] as T;
       return fallback;
     };
     const response = await handleNativeRequest({
@@ -162,7 +195,7 @@ describe("native extension protocol", () => {
     expect(response).toEqual(expect.objectContaining({
       ok: true,
       type: "finding:saved",
-      findingKey: evidence().id,
+      findingKey: "existing-finding-key",
     }));
     expect(addFindings).not.toHaveBeenCalled();
     expect(set).not.toHaveBeenCalled();

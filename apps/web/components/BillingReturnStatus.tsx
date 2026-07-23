@@ -26,7 +26,7 @@ export function BillingReturnStatus() {
   }, []);
 
   if (state === "checking") return <p role="status">Confirming your subscription…</p>;
-  if (state === "active") return <><p role="status" className="font-semibold text-green-800">Pro is active on your account.</p><Link href="/account" className="mt-4 inline-flex rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Open account</Link></>;
-  if (state === "waiting") return <><p role="status">Your payment was returned successfully, but confirmation is still arriving. This usually takes only a moment.</p><Link href="/account" className="mt-4 inline-flex rounded-lg border border-border px-4 py-2 text-sm font-semibold">Check account</Link></>;
+  if (state === "active") return <><p role="status" className="font-semibold text-green-800">Pro is active on your account.</p><Link href="/account" className="mt-4 inline-flex rounded-lg bg-primary px-4 py-2 type-body font-semibold text-primary-foreground">Open account</Link></>;
+  if (state === "waiting") return <><p role="status">Your payment was returned successfully, but confirmation is still arriving. This usually takes only a moment.</p><Link href="/account" className="mt-4 inline-flex rounded-lg border border-border px-4 py-2 type-body font-semibold">Check account</Link></>;
   return <><p role="alert">We could not refresh the subscription status. Your payment is not affected.</p><Link href="/account" className="mt-4 underline">Check account</Link></>;
 }

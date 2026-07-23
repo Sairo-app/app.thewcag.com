@@ -483,6 +483,17 @@ export class TicketConnectorService {
     };
   }
 
+  /** Origins whose credentials/configuration are present in the encrypted vault. */
+  async externalOrigins(): Promise<string[]> {
+    const connectors = (await this.readVault())?.connectors;
+    if (!connectors) return [];
+    const origins = new Set<string>();
+    if (connectors.jira?.id === "jira") origins.add(connectors.jira.baseUrl);
+    if (connectors.linear?.id === "linear") origins.add("https://linear.app");
+    if (connectors.github?.id === "github") origins.add("https://github.com");
+    return [...origins];
+  }
+
   async saveConnector(input: unknown): Promise<TicketConnectorConfiguration> {
     const value = asObject(input);
     const id = connectorId(value.connector);

@@ -5,7 +5,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type ComponentType,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
@@ -34,7 +33,8 @@ import {
   Trash,
   UserCircle,
   X,
-} from "@phosphor-icons/react";
+} from "./Icon";
+import type { IconComponent } from "./Icon";
 import type {
   AppSettings,
   AuditActivity,
@@ -50,7 +50,7 @@ import type {
   WorkspaceTool,
   WorkspaceUtility,
 } from "../shared/desktop";
-import { desktop, getStored, listCaptures, setStored } from "./api";
+import { desktop, getStored, listCaptures, saveStoredFindings, setStored } from "./api";
 import { auditStoreKey, useAuditWorkspace } from "./audits";
 import {
   parseAuditPackage,
@@ -60,7 +60,7 @@ import {
 import { normalizeFindingReferences } from "../shared/finding-references";
 import { auditPlanProgress, auditStartReadiness } from "./audit-plan";
 import type { AuditSessionSelection } from "./audit-coverage";
-import { messageFromError } from "./hooks";
+import { messageFromError, useTransientMessage } from "./hooks";
 import {
   ConfirmDialog,
   IconButton,
@@ -89,10 +89,7 @@ type Route = WorkspaceStage | WorkspaceUtility;
 const COMPACT_LAYOUT_QUERY = "(max-width: 1040px)";
 const COACH_MARKS_KEY = "first-run-coach-marks-v1";
 type CoachMarkId = "contrast" | "capture" | "vision";
-type IconType = ComponentType<{
-  size?: number;
-  weight?: "bold" | "regular" | "duotone";
-}>;
+type IconType = IconComponent;
 
 const STAGES: {
   id: WorkspaceStage;
@@ -265,12 +262,12 @@ function FirstRunExperience({
               disabled={busy}
               onClick={onStartSample}
             >
-              <BookOpenText size={18} weight="duotone" />
+              <BookOpenText size={20} />
               {busy ? "Preparing sample" : "Guided sample audit"}
-              <ArrowRight size={17} weight="bold" />
+              <ArrowRight size={20} />
             </button>
             <button type="button" className="button button-secondary" disabled={busy} onClick={onCreateBlank}>
-              <Plus size={17} weight="bold" /> Create blank audit
+              <Plus size={20} /> Create blank audit
             </button>
             <button type="button" className="text-action" disabled={busy} onClick={onImport}>
               Import an audit package
@@ -293,7 +290,7 @@ function FirstRunExperience({
             {STAGES.map(({ id, label, icon: Icon }, index) => (
               <li key={id}>
                 <span>{index + 1}</span>
-                <Icon size={20} weight="duotone" />
+                <Icon size={20} />
                 <strong>{label}</strong>
                 <small>{[
                   "Read the completed local scope",
@@ -340,7 +337,7 @@ function CoachMark({
         </div>
       </div>
       <button type="button" className="coach-dismiss" aria-label={`Dismiss ${title} tip`} onClick={() => onDismiss(id)}>
-        <X size={16} />
+        <X size={20} />
       </button>
     </aside>
   );
@@ -358,11 +355,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
   const [commandOpen, setCommandOpen] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
-  const [notice, setNotice] = useState<{
-    text: string;
-    error: boolean;
-    title?: string;
-  } | null>(null);
+  const [notice, showNotice, clearNotice] = useTransientMessage(5000);
   const [activity, setActivity] = useState<AuditActivity[]>([]);
   const taskContentRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
@@ -441,7 +434,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
   }, []);
   useEffect(() => {
     if (auditWorkspaceError) {
-      setNotice({ text: auditWorkspaceError, error: true, title: "Audit storage problem" });
+      showNotice(auditWorkspaceError, true, "Audit storage problem");
     }
   }, [auditWorkspaceError]);
   const activeAuditIdRef = useRef(activeAudit?.id ?? "");
@@ -524,12 +517,11 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     () =>
       desktop.on<{ text: string; error?: boolean }>("notification", (value) => {
         const error = Boolean(value.error);
-        setNotice({
-          text: error ? messageFromError(new Error(value.text)) : value.text,
+        showNotice(
+          error ? messageFromError(new Error(value.text)) : value.text,
           error,
-          title: error ? "Action not completed" : undefined,
-        });
-        window.setTimeout(() => setNotice(null), 5000);
+          error ? "Action not completed" : undefined,
+        );
       }),
     [],
   );
@@ -579,7 +571,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
       setPlanSections({ auditId: activeAudit.id, sampleItems, testRuns });
     }).catch((error) => {
       if (!cancelled) {
-        setNotice({ text: messageFromError(error), error: true, title: "Audit data could not be loaded" });
+        showNotice(messageFromError(error), true, "Audit data could not be loaded");
       }
     });
     return () => {
@@ -630,11 +622,11 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
       !startReadiness.ready
     ) {
       setActive("plan");
-      setNotice({
-        text: startReadiness.blockers[0] || "Complete the audit setup before starting inspection.",
-        error: true,
-        title: "Finish audit setup",
-      });
+      showNotice(
+        startReadiness.blockers[0] || "Complete the audit setup before starting inspection.",
+        true,
+        "Finish audit setup",
+      );
       return;
     }
     if (route === "share" && startReadiness?.ready) {
@@ -660,7 +652,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     setNewAuditName("");
     setSwitcherOpen(false);
     setActive("plan");
-    setNotice({ text: `${audit.project} created`, error: false });
+    showNotice(`${audit.project} created`);
   }
 
   async function exportAuditPackage() {
@@ -733,7 +725,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
       title: "Complete audit package exported",
       detail: `${captures.length} captures and ${findings.length} findings`,
     });
-    setNotice({ text: "Integrity-checked audit package exported", error: false });
+    showNotice("Integrity-checked audit package exported");
   }
 
   async function installAuditPackage(
@@ -782,7 +774,8 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
       }
       const remapCapture = (id: string | undefined) =>
         id ? captureMap.get(id) : undefined;
-      const findings = normalizeFindingReferences(payload.sections.findings).findings.map(
+      const normalizedFindings = normalizeFindingReferences(payload.sections.findings);
+      const findings = normalizedFindings.findings.map(
         (finding) => ({
           ...finding,
           evidenceCaptureIds: finding.evidenceCaptureIds
@@ -808,6 +801,24 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
             : `Integrity verified. Exported ${payload.exportedAt}.`,
           createdAt: Date.now(),
         },
+        ...(normalizedFindings.referenceChanges.length
+          ? [{
+              id: crypto.randomUUID(),
+              auditId: imported.id,
+              kind: "updated" as const,
+              title: `${normalizedFindings.referenceChanges.length} colliding finding ${normalizedFindings.referenceChanges.length === 1 ? "reference was" : "references were"} reassigned`,
+              detail: [
+                ...normalizedFindings.referenceChanges.slice(0, 12).map(
+                  (change) =>
+                    `${change.previousReference} → ${change.assignedReference} (${change.id})`,
+                ),
+                ...(normalizedFindings.referenceChanges.length > 12
+                  ? [`${normalizedFindings.referenceChanges.length - 12} more changes`]
+                  : []),
+              ].join("; "),
+              createdAt: Date.now(),
+            }]
+          : []),
         ...payload.sections.activity.map((entry) => ({
           ...entry,
           id: crypto.randomUUID(),
@@ -817,7 +828,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
       await Promise.all([
         setStored(auditStoreKey(imported.id, "sampleItems"), payload.sections.sampleItems),
         setStored(auditStoreKey(imported.id, "testRuns"), payload.sections.testRuns),
-        setStored(auditStoreKey(imported.id, "findings"), findings),
+        saveStoredFindings(auditStoreKey(imported.id, "findings"), [], findings),
         setStored(auditStoreKey(imported.id, "findingViews"), payload.sections.findingViews),
         setStored(auditStoreKey(imported.id, "checklist"), payload.sections.checklist),
         setStored(auditStoreKey(imported.id, "history"), payload.sections.history),
@@ -856,10 +867,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     const payload = await parseAuditPackage(text);
     const imported = await installAuditPackage(payload, "import");
     setActive("plan");
-    setNotice({
-      text: `${imported.project} imported with verified integrity`,
-      error: false,
-    });
+    showNotice(`${imported.project} imported with verified integrity`);
   }
 
   async function startGuidedSample() {
@@ -870,10 +878,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
       const sample = createGuidedSampleAuditPackage();
       const imported = await installAuditPackage(sample, "demo");
       setActive("plan");
-      setNotice({
-        text: `${imported.project} is ready. Start at Plan, then use Next to move through all four stages. Evidence is attached inside each finding.`,
-        error: false,
-      });
+      showNotice(`${imported.project} is ready. Start at Plan, then use Next to move through all four stages. Evidence is attached inside each finding.`);
       window.setTimeout(() => document.getElementById("audit-workspace-main")?.focus(), 0);
     } catch (error) {
       setFirstRunMessage(messageFromError(error, "The guided sample could not be prepared."));
@@ -886,7 +891,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     const audit = createAudit("Untitled audit");
     setActive("plan");
     setFirstRunMessage("");
-    setNotice({ text: `${audit.project} created`, error: false });
+    showNotice(`${audit.project} created`);
   }
 
   async function deleteDemoAudit() {
@@ -895,12 +900,12 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     const removed = await discardAudit(activeAudit.id);
     setDemoDeleteConfirm(false);
     if (!removed) {
-      setNotice({ text: "The demo could not be removed cleanly.", error: true });
+      showNotice("The demo could not be removed cleanly.", true);
       return;
     }
     setActive("plan");
     setFirstRunMessage(`${name} and all of its local sample data were removed.`);
-    setNotice({ text: `${name} removed`, error: false });
+    showNotice(`${name} removed`);
   }
 
   function onCommandKey(event: ReactKeyboardEvent<HTMLInputElement>) {
@@ -950,7 +955,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
         <a className="skip-link" href="#standalone-capture-main">Skip to Screenshot tool</a>
         <header>
           <button type="button" className="button button-secondary" onClick={() => setStandaloneCaptureLibrary(false)}>
-            <ArrowLeft size={17} /> Back
+            <ArrowLeft size={20} /> Back
           </button>
           <div><span className="section-label">No audit required</span><strong>Screenshot tool</strong></div>
           <span className="local-only-badge">Stored locally</span>
@@ -978,7 +983,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
         onOpenCaptureLibrary={() => setStandaloneCaptureLibrary(true)}
         onOpenExtensionGuide={() => void desktop.invoke("shell:open-external", {
           url: "https://app.thewcag.com/getting-started#browser-extension",
-        })}
+        }).catch((error) => setFirstRunMessage(messageFromError(error, "The browser guide could not be opened.")))}
         onStartSample={() => void startGuidedSample()}
       />
     );
@@ -1132,7 +1137,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
           Skip demo tips
         </a>
       ) : null}
-      <Toast message={notice} onClose={() => setNotice(null)} />
+      <Toast message={notice} onClose={clearNotice} />
       <aside className="stage-rail" aria-label="Audit workflow">
         <button
           className="rail-brand"
@@ -1153,7 +1158,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
               onClick={() => navigate(id)}
             >
               <span className="stage-number">{number}</span>
-              <Icon size={19} weight={active === id ? "duotone" : "regular"} />
+              <Icon size={20} weight={active === id ? "fill" : "regular"} />
               <span>{label}</span>
               <small>{stageStats[Number(number) - 1]}</small>
             </button>
@@ -1167,7 +1172,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
             onClick={() => navigate(CAPTURE_LIBRARY.id)}
           >
             <span className="stage-number">—</span>
-            <SquaresFour size={19} weight={active === CAPTURE_LIBRARY.id ? "duotone" : "regular"} />
+            <SquaresFour size={20} weight={active === CAPTURE_LIBRARY.id ? "fill" : "regular"} />
             <span>{CAPTURE_LIBRARY.label}</span>
             <small>{stats.findings} findings · {stats.captures} captures</small>
           </button>
@@ -1184,7 +1189,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
               title={title}
               onClick={() => navigate(id)}
             >
-              <Icon size={18} weight={active === id ? "duotone" : "regular"} />
+              <Icon size={20} weight={active === id ? "fill" : "regular"} />
               <span>{label}</span>
             </button>
           ))}
@@ -1208,7 +1213,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
           {standalone ? (
             <div className="project-switcher standalone-tool-indicator">
               <span className="project-glyph">
-                <Camera size={17} weight="duotone" />
+                <Camera size={16} />
               </span>
               <span className="project-name">Independent workspace</span>
             </div>
@@ -1219,11 +1224,11 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
               aria-haspopup="dialog"
             >
               <span className="project-glyph">
-                <BookOpenText size={17} weight="duotone" />
+                <BookOpenText size={20} />
               </span>
               <span className="project-name">{activeAudit.project}</span>
               {activeAudit.demo ? <span className="demo-badge">Demo</span> : null}
-              <CaretDown size={14} />
+              <CaretDown size={20} />
             </button>
           )}
           <button
@@ -1232,7 +1237,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
             title="Search tools and commands"
             onClick={() => setCommandOpen(true)}
           >
-            <MagnifyingGlass size={17} />
+            <MagnifyingGlass size={20} />
             <span>Search tools and commands</span>
             <kbd>{platform.platform === "macos" ? "⌘" : "Ctrl"} K</kbd>
           </button>
@@ -1246,14 +1251,15 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
                     className="demo-delete-action"
                     onClick={() => setDemoDeleteConfirm(true)}
                   >
-                    <Trash size={16} /> Delete demo
+                    <Trash size={20} /> Delete demo
                   </button>
                 ) : null}
                 <IconButton
                   label="Open first audit guide"
-                  onClick={() => void desktop.invoke("shell:open-external", { url: "https://app.thewcag.com/getting-started" })}
+                  onClick={() => void desktop.invoke("shell:open-external", { url: "https://app.thewcag.com/getting-started" })
+                    .catch((error) => showNotice(messageFromError(error, "The audit guide could not be opened."), true))}
                 >
-                  <BookOpenText size={18} />
+                  <BookOpenText size={20} />
                 </IconButton>
                 <IconButton
                   label={inspector ? "Hide audit panel" : "Show audit panel"}
@@ -1262,7 +1268,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
                   ariaControls="audit-context-panel"
                   onClick={() => setInspector((value) => !value)}
                 >
-                  <SidebarSimple size={18} weight="bold" />
+                  <SidebarSimple size={20} />
                 </IconButton>
               </>
             ) : null}
@@ -1270,7 +1276,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
               label="Account and settings"
               onClick={() => navigate("settings")}
             >
-              <UserCircle size={19} />
+              <UserCircle size={20} />
             </IconButton>
           </div>
         </header>
@@ -1371,7 +1377,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
               <div className="inspector-section">
                 <span className="inspector-label">Conformance</span>
                 <div className="context-value">
-                  <CheckSquare size={18} weight="duotone" />
+                  <CheckSquare size={20} />
                   <span>{activeAudit.standard}</span>
                 </div>
               </div>
@@ -1401,7 +1407,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
                 </p>
               </div>
               <div className="inspector-callout">
-                <Check size={18} weight="bold" />
+                <Check size={20} />
                 <div>
                   <strong>Private until published</strong>
                   <p>
@@ -1420,13 +1426,13 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
             aria-expanded={activityOpen}
           >
             <span className="activity-glyph">
-              <ClockCounterClockwise size={15} />
+              <ClockCounterClockwise size={20} />
             </span>
             <span>Activity</span>
             <span className="activity-copy">
               {activity[0]?.title || "Audit ready"}
             </span>
-            <CaretDown className={activityOpen ? "turned" : ""} size={14} />
+            <CaretDown className={activityOpen ? "turned" : ""} size={20} />
           </button>
           {activityOpen ? (
             <div className="activity-panel">
@@ -1437,7 +1443,9 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
                     item.url &&
                     void desktop.invoke("shell:open-external", {
                       url: item.url,
+                      kind: "audited-page",
                     })
+                      .catch((error) => showNotice(messageFromError(error, "The audited page could not be opened."), true))
                   }
                 >
                   <span>
@@ -1470,7 +1478,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
         className="command-palette"
       >
         <div className="command-input">
-          <MagnifyingGlass size={19} />
+          <MagnifyingGlass size={20} />
           <input
             autoFocus
             value={query}
@@ -1492,7 +1500,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
             aria-label="Close command palette"
             onClick={() => setCommandOpen(false)}
           >
-            <X size={17} />
+            <X size={20} />
           </button>
         </div>
         <p className="command-group-label">
@@ -1509,7 +1517,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
               onMouseEnter={() => setCommandIndex(index)}
               onClick={() => navigate(id)}
             >
-              <Icon size={19} />
+              <Icon size={20} />
               <span>{label}</span>
               <span className="command-hint">Open</span>
             </button>
@@ -1517,7 +1525,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
         </div>
         <div className="command-footer">
           <span>
-            <Command size={15} /> Arrow keys to move
+            <Command size={16} /> Arrow keys to move
           </span>
           <span>Enter to open</span>
           <span>Esc to close</span>
@@ -1539,7 +1547,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
             aria-label="Close audit switcher"
             onClick={() => setSwitcherOpen(false)}
           >
-            <X size={18} />
+            <X size={20} />
           </button>
         </div>
         <div className="audit-list">
@@ -1562,7 +1570,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
                   <small>{audit.target || audit.standard}</small>
                 </span>
                 {audit.id === activeId ? (
-                  <Check size={18} weight="bold" />
+                  <Check size={20} />
                 ) : null}
               </button>
             ))}
@@ -1579,7 +1587,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
                 onClick={() => {
                   restoreAudit(audit.id);
                   setSwitcherOpen(false);
-                  setNotice({ text: `${audit.project} restored`, error: false });
+                  showNotice(`${audit.project} restored`);
                 }}
               >
                 <span className="project-avatar">
@@ -1589,7 +1597,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
                   <strong>{audit.project}</strong>
                   <small>Archived · select to restore</small>
                 </span>
-                <Archive size={17} />
+                <Archive size={20} />
               </button>
             ))}
         </div>
@@ -1609,7 +1617,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
             />
           </label>
           <button className="button button-primary" type="submit">
-            <Plus size={17} weight="bold" />
+            <Plus size={20} />
             Create
           </button>
         </form>
@@ -1624,7 +1632,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
               setArchiveConfirm(true);
             }}
           >
-            <Archive size={16} />
+            <Archive size={20} />
             Archive current
           </button>
         </div>

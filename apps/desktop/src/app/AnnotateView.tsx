@@ -4,7 +4,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type ComponentType,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { contrastRatio, rgbToHex } from "@accessibility-build/a11y-core";
@@ -32,7 +31,8 @@ import {
   TextT,
   Trash,
   X,
-} from "@phosphor-icons/react";
+} from "./Icon";
+import type { IconComponent } from "./Icon";
 import type { CaptureEntry, Finding, Point } from "../shared/desktop";
 import { desktop, listCaptures } from "./api";
 import { Button, Field, StatusBadge, Toast } from "./components";
@@ -52,14 +52,13 @@ import {
   type Tool,
 } from "../lib/annotate/model";
 import { renderDoc } from "../lib/annotate/render";
+import { canvasPngDataUrl, requireCanvas2d } from "../lib/annotate/canvas";
+import { appendUndoSnapshot } from "../lib/annotate/history";
 
 const TOOLS: {
   id: Tool;
   label: string;
-  icon: ComponentType<{
-    size?: number;
-    weight?: "bold" | "regular" | "duotone";
-  }>;
+  icon: IconComponent;
 }[] = [
   { id: "select", label: "Select", icon: Cursor },
   { id: "crop", label: "Crop", icon: Crop },
@@ -104,6 +103,9 @@ export function AnnotateView() {
   >(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const baseRef = useRef<HTMLCanvasElement | null>(null);
+  const flushSaveRef = useRef<() => Promise<boolean>>(async () => false);
+  const saveQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
+  const textEditRef = useRef<{ key: string; timer: number } | null>(null);
   const [message, show, clearMessage] = useTransientMessage(6000);
   const toolsSize = usePersistedPanelSize(
     "layout-annotation-tools-width-v1",
@@ -131,15 +133,17 @@ export function AnnotateView() {
         const next = new Image();
         next.crossOrigin = "anonymous";
         next.onload = () => {
-          const base = document.createElement("canvas");
-          base.width = next.naturalWidth;
-          base.height = next.naturalHeight;
-          base
-            .getContext("2d", { willReadFrequently: true })!
-            .drawImage(next, 0, 0);
-          baseRef.current = base;
-          setImage(next);
-          setLoaded(true);
+          try {
+            const base = document.createElement("canvas");
+            base.width = next.naturalWidth;
+            base.height = next.naturalHeight;
+            requireCanvas2d(base, { willReadFrequently: true }).drawImage(next, 0, 0);
+            baseRef.current = base;
+            setImage(next);
+            setLoaded(true);
+          } catch (error) {
+            show(messageFromError(error), true, "Capture cannot be annotated");
+          }
         };
         next.onerror = () =>
           show(
@@ -155,13 +159,39 @@ export function AnnotateView() {
   }, [id]);
 
   useEffect(() => {
-    draw();
+    try {
+      draw();
+    } catch (error) {
+      show(messageFromError(error), true, "Capture cannot be rendered");
+    }
   }, [image, doc, draft, selected]);
   useEffect(() => {
     if (!loaded) return;
     const timer = window.setTimeout(() => void save(false), 600);
     return () => clearTimeout(timer);
   }, [doc, loaded]);
+  useEffect(
+    () => () => {
+      if (textEditRef.current) clearTimeout(textEditRef.current.timer);
+    },
+    [],
+  );
+  useEffect(() => desktop.on<{ token: string }>("annotate:flush", ({ token }) => {
+    const body = document.body;
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    body.inert = true;
+    void flushSaveRef.current().then(async (ok) => {
+      const accepted = await desktop.invoke<boolean>("annotate:flush-complete", {
+        token,
+        ok,
+        message: ok ? undefined : "The open annotation could not be saved; its window was kept open",
+      });
+      if (!ok || !accepted) body.inert = false;
+    }).catch((error) => {
+      body.inert = false;
+      show(messageFromError(error), true, "Save acknowledgement failed");
+    });
+  }), []);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const editable = ["INPUT", "TEXTAREA", "SELECT"].includes(
@@ -218,7 +248,10 @@ export function AnnotateView() {
     return () => window.removeEventListener("keydown", onKey);
   }, [selected, undo, redo, doc]);
 
-  function draw(forExport = false): HTMLCanvasElement | null {
+  function draw(
+    forExport = false,
+    documentToDraw: AnnotationDoc = doc,
+  ): HTMLCanvasElement | null {
     const canvas = canvasRef.current;
     if (!canvas || !image) return null;
     if (
@@ -228,9 +261,12 @@ export function AnnotateView() {
       canvas.width = image.naturalWidth;
       canvas.height = image.naturalHeight;
     }
-    const ctx = canvas.getContext("2d")!;
+    const ctx = requireCanvas2d(canvas);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    renderDoc(ctx, image, draft ? [...doc.shapes, draft] : doc.shapes, {
+    const shapes = !forExport && draft
+      ? [...documentToDraw.shapes, draft]
+      : documentToDraw.shapes;
+    renderDoc(ctx, image, shapes, {
       selectedId: forExport ? null : selected,
       forExport,
     });
@@ -251,10 +287,30 @@ export function AnnotateView() {
       ),
     };
   }
-  function commit(next: AnnotationDoc) {
-    setUndo((items) => [...items.slice(-39), doc]);
+  function finishTextEdit() {
+    if (textEditRef.current) clearTimeout(textEditRef.current.timer);
+    textEditRef.current = null;
+  }
+  function commit(next: AnnotationDoc, textEditKey?: string) {
+    const continuingTextEdit = Boolean(
+      textEditKey && textEditRef.current?.key === textEditKey,
+    );
+    setUndo((items) =>
+      appendUndoSnapshot(items, doc, continuingTextEdit),
+    );
     setRedo([]);
     setDoc(next);
+    if (!textEditKey) {
+      finishTextEdit();
+      return;
+    }
+    if (textEditRef.current) clearTimeout(textEditRef.current.timer);
+    textEditRef.current = {
+      key: textEditKey,
+      timer: window.setTimeout(() => {
+        textEditRef.current = null;
+      }, 600),
+    };
   }
   function addShape(shape: Omit<Shape, "id">) {
     const next = { ...shape, id: doc.nextId };
@@ -262,14 +318,14 @@ export function AnnotateView() {
     setSelected(next.id);
     return next;
   }
-  function updateSelected(patch: Partial<Shape>) {
+  function updateSelected(patch: Partial<Shape>, textField?: "text" | "note") {
     if (!selected) return;
     commit({
       ...doc,
       shapes: doc.shapes.map((shape) =>
         shape.id === selected ? { ...shape, ...patch } : shape,
       ),
-    });
+    }, textField ? `${selected}:${textField}` : undefined);
   }
   function removeSelected() {
     if (!selected) return;
@@ -280,6 +336,7 @@ export function AnnotateView() {
     setSelected(null);
   }
   function undoOnce() {
+    finishTextEdit();
     const prior = undo.at(-1);
     if (!prior) return;
     setRedo((items) => [...items, doc]);
@@ -287,6 +344,7 @@ export function AnnotateView() {
     setUndo((items) => items.slice(0, -1));
   }
   function redoOnce() {
+    finishTextEdit();
     const next = redo.at(-1);
     if (!next) return;
     setUndo((items) => [...items, doc]);
@@ -416,17 +474,36 @@ export function AnnotateView() {
         width = Math.round(Math.abs(end.x - drag.start.x)),
         height = Math.round(Math.abs(end.y - drag.start.y));
       if (width > 10 && height > 10) {
-        const crop = document.createElement("canvas");
-        crop.width = width;
-        crop.height = height;
-        crop
-          .getContext("2d")!
-          .drawImage(baseRef.current, x, y, width, height, 0, 0, width, height);
-        await desktop.invoke("capture:create", {
-          pngDataUrl: crop.toDataURL("image/png"),
-          title: `${capture?.title || "Capture"} crop`,
-          auditId: capture?.auditId,
-        });
+        const saved = await save(false);
+        if (!saved) {
+          setDrag(null);
+          return;
+        }
+        try {
+          const crop = document.createElement("canvas");
+          crop.width = width;
+          crop.height = height;
+          requireCanvas2d(crop).drawImage(
+            baseRef.current,
+            x,
+            y,
+            width,
+            height,
+            0,
+            0,
+            width,
+            height,
+          );
+          const cropped = await desktop.invoke<CaptureEntry>("capture:create", {
+            pngDataUrl: canvasPngDataUrl(crop),
+            title: `${capture?.title || "Capture"} crop`,
+            auditId: capture?.auditId,
+            silent: true,
+          });
+          await desktop.invoke("capture:open", { id: cropped.id });
+        } catch (error) {
+          show(messageFromError(error), true, "Crop could not be created");
+        }
       }
       setDrag(null);
       return;
@@ -435,9 +512,9 @@ export function AnnotateView() {
       const next = { ...draft, id: doc.nextId, x2: end.x, y2: end.y };
       if (Math.hypot(next.x2 - next.x1, next.y2 - next.y1) > 3) {
         if (next.kind === "probe" && baseRef.current) {
-          const ctx = baseRef.current.getContext("2d", {
+          const ctx = requireCanvas2d(baseRef.current, {
               willReadFrequently: true,
-            })!,
+            }),
             a = ctx.getImageData(
               Math.round(next.x1),
               Math.round(next.y1),
@@ -469,31 +546,41 @@ export function AnnotateView() {
     setDrag(null);
   }
 
-  async function save(notify = true) {
-    if (!id) return;
+  function save(notify = true): Promise<boolean> {
+    const snapshot = doc;
+    const persist = () => persistDocument(snapshot, notify);
+    const queued = saveQueueRef.current.then(persist, persist);
+    saveQueueRef.current = queued;
+    return queued;
+  }
+
+  async function persistDocument(
+    snapshot: AnnotationDoc,
+    notify: boolean,
+  ): Promise<boolean> {
+    if (!id) return false;
     setSaving(true);
     try {
       await desktop.invoke("capture:save-document", {
         id,
-        json: JSON.stringify(doc),
+        json: JSON.stringify(snapshot),
       });
-      const canvas = draw(true);
+      const canvas = draw(true, snapshot);
       if (canvas) {
         const thumb = document.createElement("canvas"),
           scale = Math.min(1, 480 / canvas.width);
         thumb.width = Math.max(1, Math.round(canvas.width * scale));
         thumb.height = Math.max(1, Math.round(canvas.height * scale));
-        thumb
-          .getContext("2d")!
-          .drawImage(canvas, 0, 0, thumb.width, thumb.height);
+        requireCanvas2d(thumb).drawImage(canvas, 0, 0, thumb.width, thumb.height);
         await desktop.invoke("capture:save-thumbnail", {
           id,
-          pngDataUrl: thumb.toDataURL("image/png"),
+          pngDataUrl: canvasPngDataUrl(thumb),
         });
         draw(false);
       }
       if (notify) show("Capture saved");
       setRetryAction(null);
+      return true;
     } catch (error) {
       setRetryAction("save");
       show(
@@ -504,17 +591,19 @@ export function AnnotateView() {
         true,
         "Save incomplete",
       );
+      return false;
     } finally {
       setSaving(false);
     }
   }
+  flushSaveRef.current = () => save(false);
   async function exportPng(copy = false) {
     if (exporting) return;
     setExporting(copy ? "copy" : "export");
     try {
       const canvas = draw(true);
       if (!canvas) throw new Error("The capture is not ready yet");
-      const pngDataUrl = canvas.toDataURL("image/png");
+      const pngDataUrl = canvasPngDataUrl(canvas);
       if (copy) {
         await desktop.invoke("clipboard:write-image", { pngDataUrl });
         show("Annotated capture copied");
@@ -686,9 +775,10 @@ export function AnnotateView() {
         <div className="annotate-drag">
           <button
             aria-label="Close annotation"
-            onClick={() => void desktop.invoke("window:close")}
+            onClick={() => void desktop.invoke("window:close")
+              .catch((error) => show(messageFromError(error, "The annotation window could not be closed."), true))}
           >
-            <ArrowLeft size={16} />
+            <ArrowLeft size={20} />
           </button>
           <span>
             <strong>{capture?.title || "Annotation workspace"}</strong>
@@ -701,10 +791,10 @@ export function AnnotateView() {
         </div>
         <div className="history-actions">
           <button disabled={!undo.length} onClick={undoOnce} aria-label="Undo">
-            <ArrowUUpLeft size={16} />
+            <ArrowUUpLeft size={20} />
           </button>
           <button disabled={!redo.length} onClick={redoOnce} aria-label="Redo">
-            <ArrowUUpRight size={16} />
+            <ArrowUUpRight size={20} />
           </button>
         </div>
         <div className="annotate-actions">
@@ -771,7 +861,7 @@ export function AnnotateView() {
                 setSelected(null);
               }}
             >
-              <Icon size={19} weight={tool === value ? "duotone" : "regular"} />
+              <Icon size={20} weight={tool === value ? "fill" : "regular"} />
               <span>{label}</span>
             </button>
           ))}
@@ -839,7 +929,7 @@ export function AnnotateView() {
             <div className="shape-editor">
               <div className="shape-kind">
                 <span className="shape-icon">
-                  <NotePencil size={18} />
+                  <NotePencil size={20} />
                 </span>
                 <div>
                   <strong>
@@ -849,7 +939,7 @@ export function AnnotateView() {
                   <small>Annotation {selectedShape.id}</small>
                 </div>
                 <button aria-label="Delete annotation" onClick={removeSelected}>
-                  <Trash size={16} />
+                  <Trash size={20} />
                 </button>
               </div>
               {selectedShape.kind === "badge" ? (
@@ -867,14 +957,13 @@ export function AnnotateView() {
                       disabled={!selectedShape.findingId}
                       onClick={() => {
                         if (selectedShape.findingId) {
-                          void desktop.invoke("clipboard:write-text", {
-                            text: selectedShape.findingId,
-                          });
-                          show("Finding ID copied");
+                          void desktop.invoke("clipboard:write-text", { text: selectedShape.findingId })
+                            .then(() => show("Finding ID copied"))
+                            .catch((error) => show(messageFromError(error, "The finding ID could not be copied."), true));
                         }
                       }}
                     >
-                      <Clipboard size={15} />
+                      <Clipboard size={20} />
                     </button>
                   </div>
                   <Field label="Issue type">
@@ -929,8 +1018,9 @@ export function AnnotateView() {
                   <input
                     value={selectedShape.text || ""}
                     onChange={(event) =>
-                      updateSelected({ text: event.target.value })
+                      updateSelected({ text: event.target.value }, "text")
                     }
+                    onBlur={finishTextEdit}
                   />
                 </Field>
               ) : null}
@@ -965,8 +1055,9 @@ export function AnnotateView() {
                 <textarea
                   value={selectedShape.note || ""}
                   onChange={(event) =>
-                    updateSelected({ note: event.target.value })
+                    updateSelected({ note: event.target.value }, "note")
                   }
+                  onBlur={finishTextEdit}
                   placeholder="Describe the problem and recommended fix."
                 />
               </Field>

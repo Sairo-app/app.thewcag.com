@@ -21,7 +21,8 @@ import {
   Sparkle,
   Trash,
   WarningCircle,
-} from "@phosphor-icons/react";
+  type IconSize,
+} from "../Icon";
 import type {
   Account,
   AiConfiguration,
@@ -105,11 +106,11 @@ const PROVIDERS = [
   },
 ] as const;
 
-function ProviderIcon({ id, size = 20 }: { id: AiProviderId; size?: number }) {
-  if (id === "thewcag") return <CloudCheck size={size} weight="duotone" />;
-  if (id === "openai") return <OpenAiLogo size={size} weight="duotone" />;
-  if (id === "anthropic") return <Sparkle size={size} weight="duotone" />;
-  return <Network size={size} weight="duotone" />;
+function ProviderIcon({ id, size = 20 }: { id: AiProviderId; size?: IconSize }) {
+  if (id === "thewcag") return <CloudCheck size={size} />;
+  if (id === "openai") return <OpenAiLogo size={size} />;
+  if (id === "anthropic") return <Sparkle size={size} />;
+  return <Network size={size} />;
 }
 
 export function SettingsView({
@@ -120,6 +121,7 @@ export function SettingsView({
   const [settings, setSettings] = useState<AppSettings>(DEFAULTS);
   const [permission, setPermission] = useState<string>("unknown");
   const [account, setAccount] = useState<Account>({ signedIn: false });
+  const [accountRefreshing, setAccountRefreshing] = useState(false);
   const [aiConfiguration, setAiConfiguration] = useState<AiConfiguration>(EMPTY_AI_CONFIGURATION);
   const [editingProvider, setEditingProvider] = useState<AiProviderId>("thewcag");
   const [apiKeys, setApiKeys] = useState<Partial<Record<ApiKeyProviderId, string>>>({});
@@ -145,7 +147,9 @@ export function SettingsView({
     const stopUpdate = desktop.on<UpdateState>("update:state", setUpdate);
     const stopAccount = desktop.on(
       "account:changed",
-      () => void desktop.invoke<Account>("auth:account").then(setAccount),
+      () => void desktop.invoke<Account>("auth:account")
+        .then(setAccount)
+        .catch((error) => show(messageFromError(error, "Account status could not be refreshed."), true)),
     );
     return () => {
       stopUpdate();
@@ -184,6 +188,24 @@ export function SettingsView({
       show("Complete sign in in your browser");
     } catch (error) {
       show(messageFromError(error), true);
+    }
+  }
+  async function refreshAccount() {
+    if (accountRefreshing) return;
+    setAccountRefreshing(true);
+    try {
+      const refreshed = await desktop.invoke<Account>("auth:account");
+      setAccount(refreshed);
+      show(
+        refreshed.featuresState === "unavailable"
+          ? "Account services are still unavailable. Last-known access is preserved."
+          : "Account status refreshed",
+        refreshed.featuresState === "unavailable",
+      );
+    } catch (error) {
+      show(messageFromError(error, "Account status could not be refreshed."), true);
+    } finally {
+      setAccountRefreshing(false);
     }
   }
   async function checkUpdate() {
@@ -387,11 +409,11 @@ export function SettingsView({
                   </span>
                   {status?.active ? (
                     <span className="ai-provider-state" aria-label="Active" title="Active provider">
-                      <CheckCircle size={15} weight="fill" />
+                      <CheckCircle size={20} weight="fill" />
                     </span>
                   ) : status?.configured && provider.id !== "thewcag" ? (
                     <span className="ai-provider-state" aria-label="Saved" title="Key saved">
-                      <LockKey size={15} weight="duotone" />
+                      <LockKey size={20} />
                     </span>
                   ) : null}
                 </button>
@@ -401,7 +423,7 @@ export function SettingsView({
 
           <div className="ai-provider-detail">
             <div className="ai-provider-detail-heading">
-              <span className="ai-provider-detail-icon"><ProviderIcon id={editingProvider} size={23} /></span>
+              <span className="ai-provider-detail-icon"><ProviderIcon id={editingProvider} size={24} /></span>
               <div>
                 <div className="ai-provider-title-line">
                   <h3>{selectedProvider.name}</h3>
@@ -423,7 +445,7 @@ export function SettingsView({
               <div className="ai-provider-form">
                 {!aiConfiguration.secureStorageAvailable ? (
                   <div className="ai-storage-warning" role="alert">
-                    <WarningCircle size={18} weight="fill" />
+                    <WarningCircle size={20} weight="fill" />
                     Secure credential storage is unavailable. API keys cannot be saved on this computer.
                   </div>
                 ) : null}
@@ -453,7 +475,7 @@ export function SettingsView({
                         title={visibleKey === selectedKeyProvider ? "Hide API key" : "Show API key"}
                         onClick={() => setVisibleKey(visibleKey === selectedKeyProvider ? null : selectedKeyProvider)}
                       >
-                        {visibleKey === selectedKeyProvider ? <EyeSlash size={17} /> : <Eye size={17} />}
+                        {visibleKey === selectedKeyProvider ? <EyeSlash size={20} /> : <Eye size={20} />}
                       </button>
                     </div>
                   </Field>
@@ -504,7 +526,8 @@ export function SettingsView({
                   <Button
                     variant="quiet"
                     icon={ArrowSquareOut}
-                    onClick={() => void desktop.invoke("shell:open-external", { url: selectedProvider.keyUrl })}
+                    onClick={() => void desktop.invoke("shell:open-external", { url: selectedProvider.keyUrl })
+                      .catch((error) => show(messageFromError(error, "The API key page could not be opened."), true))}
                   >
                     Get API key
                   </Button>
@@ -520,7 +543,7 @@ export function SettingsView({
                   ) : null}
                 </div>
                 <div className="ai-data-note">
-                  <ShieldCheck size={18} weight="duotone" />
+                  <ShieldCheck size={20} />
                   <p>
                     Encrypted with {secureStorageName}. Approved evidence goes directly from this computer to {selectedProvider.name}; your key never passes through TheWCAG servers.
                   </p>
@@ -529,19 +552,28 @@ export function SettingsView({
             ) : (
               <div className="ai-cloud-panel">
                 <div>
-                  <strong>{!account.signedIn ? "Sign in required" : account.features?.managedAi.enabled ? "Ready with Pro" : "Pro is required for managed AI"}</strong>
+                  <strong>{!account.signedIn ? "Sign in required" : account.featuresState === "unavailable" ? "Plan status temporarily unavailable" : account.features?.managedAi.enabled ? "Ready with Pro" : "Pro is required for managed AI"}</strong>
                   <p>
                     The managed service keeps provider setup out of the app. Local structured drafts and AI providers using your own key remain free.
                   </p>
                 </div>
                 <div className="ai-provider-actions">
-                  {!account.signedIn ? (
+                  {account.signedIn && account.featuresState === "unavailable" ? (
+                    <Button icon={ArrowClockwise} disabled={accountRefreshing} onClick={() => void refreshAccount()}>
+                      {accountRefreshing ? "Retrying" : "Retry status"}
+                    </Button>
+                  ) : !account.signedIn ? (
                     <Button variant="primary" icon={SignIn} onClick={() => void signIn()}>
                       Sign in
                     </Button>
-                  ) : null}
-                  {account.signedIn && !account.features?.managedAi.enabled ? (
-                    <Button icon={ArrowSquareOut} onClick={() => void desktop.invoke("shell:open-external", { url: account.actions?.upgradeUrl || "https://app.thewcag.com/pricing" })}>View Pro</Button>
+                  ) : !account.features?.managedAi.enabled ? (
+                    <Button
+                      icon={ArrowSquareOut}
+                      onClick={() => void desktop.invoke("shell:open-external", { url: account.actions?.upgradeUrl || "https://app.thewcag.com/pricing" })
+                        .catch((error) => show(messageFromError(error, "The pricing page could not be opened."), true))}
+                    >
+                      View Pro
+                    </Button>
                   ) : (
                     <Button
                       icon={CloudCheck}
@@ -577,7 +609,7 @@ export function SettingsView({
           ] as const).map(([key, label]) => (
             <Field key={key} label={label}>
               <div className="shortcut-input">
-                <Key size={15} />
+                <Key size={16} />
                 <input
                   maxLength={12}
                   value={settings.checklistShortcuts[key]}
@@ -617,7 +649,7 @@ export function SettingsView({
               }
             >
               <div className="shortcut-input">
-                <Key size={15} />
+                <Key size={16} />
                 <input
                   value={settings.shortcuts[key]}
                   onChange={(event) =>
@@ -651,9 +683,9 @@ export function SettingsView({
             }
           >
             {permission === "granted" ? (
-              <CheckCircle size={21} weight="fill" />
+              <CheckCircle size={20} weight="fill" />
             ) : (
-              <WarningCircle size={21} weight="fill" />
+              <WarningCircle size={20} weight="fill" />
             )}
           </div>
           <div>
@@ -686,7 +718,7 @@ export function SettingsView({
         <div className="account-grid">
           <article>
             <div className="settings-card-icon">
-              <Fingerprint size={21} weight="duotone" />
+              <Fingerprint size={20} />
             </div>
             <div>
               <strong>
@@ -696,9 +728,13 @@ export function SettingsView({
               </strong>
               <p>
                 {account.signedIn
-                  ? account.plan === "pro" && account.features
-                    ? `Pro · ${account.features.managedAi.used} of ${account.features.managedAi.limit} managed AI drafts · ${account.features.hostedReports.active} of ${account.features.hostedReports.limit} hosted reports`
-                    : "Free · local audits, exports, and bring-your-own-key AI"
+                  ? account.featuresState === "unavailable"
+                    ? account.features
+                      ? `Last-known ${account.plan === "pro" ? "Pro" : "Free"} access · reconnect to refresh usage`
+                      : "Plan status temporarily unavailable · retry before using hosted services"
+                    : account.plan === "pro" && account.features
+                      ? `Pro · ${account.features.managedAi.used} of ${account.features.managedAi.limit} managed AI drafts · ${account.features.hostedReports.active} of ${account.features.hostedReports.limit} hosted reports`
+                      : "Free · local audits, exports, and bring-your-own-key AI"
                   : "Sign in only when you are ready to publish a shareable report."}
               </p>
             </div>
@@ -725,22 +761,27 @@ export function SettingsView({
           </article>
           <article>
             <div className="settings-card-icon">
-              <CloudCheck size={21} weight="duotone" />
+              <CloudCheck size={20} />
             </div>
             <div>
-              <strong>{account.plan === "pro" ? "Pro hosted services" : "Optional hosted services"}</strong>
-              <p>{account.plan === "pro" ? `Subscription ${account.subscription?.status || "active"}. Billing and invoices open securely in your browser.` : "Managed AI and hosted client links are available with Pro; every local audit feature stays free."}</p>
+              <strong>{account.featuresState === "unavailable" ? "Hosted service status unavailable" : account.plan === "pro" ? "Pro hosted services" : "Optional hosted services"}</strong>
+              <p>{account.featuresState === "unavailable" ? "The last-known plan is preserved until the account service reconnects." : account.plan === "pro" ? `Subscription ${account.subscription?.status || "active"}. Billing and invoices open securely in your browser.` : "Managed AI and hosted client links are available with Pro; every local audit feature stays free."}</p>
             </div>
-            <Button
+            {account.featuresState === "unavailable" ? (
+              <Button icon={ArrowClockwise} disabled={accountRefreshing} onClick={() => void refreshAccount()}>
+                {accountRefreshing ? "Retrying" : "Retry"}
+              </Button>
+            ) : <Button
               icon={ArrowSquareOut}
-              onClick={() => void desktop.invoke("shell:open-external", { url: account.actions?.billingUrl || account.actions?.upgradeUrl || "https://app.thewcag.com/pricing" })}
+              onClick={() => void desktop.invoke("shell:open-external", { url: account.actions?.billingUrl || account.actions?.upgradeUrl || "https://app.thewcag.com/pricing" })
+                .catch((error) => show(messageFromError(error, "The billing page could not be opened."), true))}
             >
               {account.actions?.canManageBilling ? "Manage billing" : "View Pro"}
-            </Button>
+            </Button>}
           </article>
           <article>
             <div className="settings-card-icon">
-              <CloudArrowUp size={21} weight="duotone" />
+              <CloudArrowUp size={20} />
             </div>
             <div>
               <strong>TheWCAG {platform.version}</strong>
@@ -757,7 +798,8 @@ export function SettingsView({
               <Button
                 variant="primary"
                 icon={DownloadSimple}
-                onClick={() => void desktop.invoke("update:install")}
+                onClick={() => void desktop.invoke("update:install")
+                  .catch((error) => show(messageFromError(error, "The update could not be installed."), true))}
               >
                 Restart and update
               </Button>
@@ -775,7 +817,7 @@ export function SettingsView({
       </section>
 
       <section className="privacy-strip">
-        <LockKey size={20} weight="duotone" />
+        <LockKey size={20} />
         <div>
           <strong>Private by default</strong>
           <p>

@@ -5,7 +5,7 @@ import {
   ClipboardText,
   LinkSimple,
   WarningCircle,
-} from "@phosphor-icons/react";
+} from "./Icon";
 import type { WorkspaceStage } from "../shared/desktop";
 import type { AuditCoverage, AuditSessionSelection } from "./audit-coverage";
 import { auditTestRunComplete } from "./audit-plan";
@@ -63,9 +63,9 @@ export function AuditCoverageMap({
       </div>
 
       <div className="coverage-summary" aria-label="Coverage summary">
-        <span><CheckCircle size={17} weight="fill" /><strong>{coverage.complete}</strong> covered</span>
-        <span><WarningCircle size={17} weight="fill" /><strong>{coverage.gaps}</strong> need attention</span>
-        <span><ClipboardText size={17} weight="duotone" /><strong>{coverage.blocked}</strong> blocked</span>
+        <span><CheckCircle size={16} weight="fill" /><strong>{coverage.complete}</strong> covered</span>
+        <span><WarningCircle size={16} weight="fill" /><strong>{coverage.gaps}</strong> need attention</span>
+        <span><ClipboardText size={16} /><strong>{coverage.blocked}</strong> blocked</span>
       </div>
 
       {coverage.rows.length ? (
@@ -152,7 +152,7 @@ export function AuditCoverageMap({
         </div>
       ) : (
         <div className="coverage-empty">
-          <ClipboardText size={23} weight="duotone" />
+          <ClipboardText size={24} />
           <div>
             <strong>Add a representative sample to build the map</strong>
             <p>Every sample item becomes one traceable coverage row.</p>
@@ -162,7 +162,7 @@ export function AuditCoverageMap({
 
       {unassigned ? (
         <div className="coverage-unassigned">
-          <LinkSimple size={19} />
+          <LinkSimple size={20} />
           <div>
             <strong>{unassigned} existing {unassigned === 1 ? "record needs" : "records need"} assignment review</strong>
             <p>

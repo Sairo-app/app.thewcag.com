@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { billingSubscriptions, billingWebhookEvents, desktopDevices, reports, users } from "@/lib/schema";
+import { requireAdmin } from "@/lib/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,9 @@ function formatDate(d: Date | null): string {
 }
 
 export default async function AdminOverview() {
+  const admin = await requireAdmin();
+  if (!admin) notFound();
+
   const [[userAgg], [reportAgg], [deviceAgg], [proAgg], [webhookFailureAgg], recentUsers, recentReports] = await Promise.all([
     db.select({ n: sql<number>`count(*)::int` }).from(users),
     db
@@ -58,46 +63,46 @@ export default async function AdminOverview() {
     <div className="space-y-8">
       <section aria-label="Key metrics" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
         {KPIS.map((k) => (
-          <Link key={k.label} href={k.href} className="card block p-4 transition-shadow hover:shadow-md">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted">{k.label}</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums tracking-tight">{k.value}</p>
+          <Link key={k.label} href={k.href} className="card block p-4 hover:bg-card-2">
+            <p className="type-callout font-medium uppercase text-muted">{k.label}</p>
+            <p className="mt-1 type-title-2 font-bold tabular-nums ">{k.value}</p>
           </Link>
         ))}
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section aria-label="Recent sign-ins" className="card p-5">
-          <h2 className="text-sm font-semibold">Recent sign-ins</h2>
+          <h2 className="type-body font-semibold">Recent sign-ins</h2>
           <ul className="mt-3 divide-y divide-border">
             {recentUsers.map((u) => (
-              <li key={u.email} className="flex items-center justify-between gap-3 py-2 text-sm">
+              <li key={u.email} className="flex items-center justify-between gap-3 py-2 type-body">
                 <span className="min-w-0 truncate">{u.email}</span>
-                <span className="flex shrink-0 items-center gap-2 text-xs text-muted">
+                <span className="flex shrink-0 items-center gap-2 type-callout text-muted">
                   {u.brand && (
-                    <span className="rounded-md bg-primary/10 px-2 py-0.5 font-medium text-primary">brand</span>
+                    <span className="rounded-md bg-primary/10 px-2 py-1 font-medium text-primary">brand</span>
                   )}
                   {formatDate(u.verified)}
                 </span>
               </li>
             ))}
-            {recentUsers.length === 0 && <li className="py-2 text-sm text-muted">No users yet.</li>}
+            {recentUsers.length === 0 && <li className="py-2 type-body text-muted">No users yet.</li>}
           </ul>
         </section>
 
         <section aria-label="Latest reports" className="card p-5">
-          <h2 className="text-sm font-semibold">Latest reports</h2>
+          <h2 className="type-body font-semibold">Latest reports</h2>
           <ul className="mt-3 divide-y divide-border">
             {recentReports.map((r) => (
-              <li key={r.slug} className="flex items-center justify-between gap-3 py-2 text-sm">
+              <li key={r.slug} className="flex items-center justify-between gap-3 py-2 type-body">
                 <Link href={`/s/${r.slug}`} className="min-w-0 truncate hover:underline">
                   {r.title}
                 </Link>
-                <span className="shrink-0 text-xs tabular-nums text-muted">
+                <span className="shrink-0 type-callout tabular-nums text-muted">
                   {r.views} views, {formatDate(r.created)}
                 </span>
               </li>
             ))}
-            {recentReports.length === 0 && <li className="py-2 text-sm text-muted">No reports yet.</li>}
+            {recentReports.length === 0 && <li className="py-2 type-body text-muted">No reports yet.</li>}
           </ul>
         </section>
       </div>

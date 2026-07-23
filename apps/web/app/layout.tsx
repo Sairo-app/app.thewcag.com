@@ -1,25 +1,26 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { JetBrains_Mono, Manrope, Source_Sans_3 } from "next/font/google";
 import { PRODUCT_DESCRIPTION, SITE_URL, SOCIAL_IMAGE } from "@/lib/seo";
 import "./globals.css";
 
 const sourceSans = Source_Sans_3({
   subsets: ["latin"],
-  variable: "--font-body",
+  variable: "--font-body-loaded",
   display: "swap",
 });
 
 const manrope = Manrope({
   subsets: ["latin"],
   weight: ["600", "700", "800"],
-  variable: "--font-display",
+  variable: "--font-display-loaded",
   display: "swap",
 });
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
-  variable: "--font-mono-face",
+  variable: "--font-mono-loaded",
   display: "swap",
 });
 
@@ -68,7 +69,10 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Nonce-based CSP requires request-time rendering so Next can apply the
+  // middleware nonce to its framework scripts.
+  await headers();
   return (
     <html lang="en">
       <body className={`${sourceSans.variable} ${manrope.variable} ${jetbrainsMono.variable}`}>

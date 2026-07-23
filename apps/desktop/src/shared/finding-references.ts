@@ -3,6 +3,19 @@ import { createFindingId, isFindingId } from "@accessibility-build/audit-contrac
 
 const REFERENCE = /^F-(\d{3,})$/;
 
+export interface FindingReferenceChange {
+  id: string;
+  previousReference: string;
+  assignedReference: string;
+}
+
+export function findingReferenceWithId(
+  finding: Pick<Finding, "id" | "reference">,
+  fallback = "Unreferenced",
+): string {
+  return `${finding.reference?.trim() || fallback} · ${finding.id}`;
+}
+
 export function nextFindingReference(findings: Finding[]): string {
   const highest = findings.reduce((maximum, finding) => {
     const match = finding.reference?.match(REFERENCE);
@@ -14,11 +27,13 @@ export function nextFindingReference(findings: Finding[]): string {
 export function normalizeFindingReferences(findings: Finding[]): {
   findings: Finding[];
   changed: boolean;
+  referenceChanges: FindingReferenceChange[];
 } {
   const used = new Set<string>();
   const usedIds = new Set<string>();
   let next = 1;
   let changed = false;
+  const referenceChanges: FindingReferenceChange[] = [];
   const normalized = findings.map((finding) => {
     let identity = finding.id;
     if (!isFindingId(identity) || usedIds.has(identity)) {
@@ -41,7 +56,14 @@ export function normalizeFindingReferences(findings: Finding[]): {
     next += 1;
     used.add(reference);
     changed = true;
+    if (current && REFERENCE.test(current) && used.has(current)) {
+      referenceChanges.push({
+        id: identity,
+        previousReference: current,
+        assignedReference: reference,
+      });
+    }
     return { ...finding, id: identity, reference };
   });
-  return { findings: normalized, changed };
+  return { findings: normalized, changed, referenceChanges };
 }

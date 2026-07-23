@@ -43,8 +43,8 @@ export default function WcagContrastPage() {
           })),
         }}
       />
-      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-16">
-        <h1 className="text-3xl font-bold tracking-tight">
+      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-12">
+        <h1 className="type-title-1 font-bold ">
           WCAG color contrast requirements, explained
         </h1>
         <p className="mt-3 max-w-2xl text-muted">
@@ -54,9 +54,9 @@ export default function WcagContrastPage() {
         </p>
 
         <section className="mt-12">
-          <h2 className="text-xl font-bold tracking-tight">The minimums (Success Criterion 1.4.3, AA)</h2>
+          <h2 className="type-title-2 font-bold ">The minimums (Success Criterion 1.4.3, AA)</h2>
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-left text-sm">
+            <table className="w-full text-left type-body">
               <thead>
                 <tr className="border-b border-border text-muted">
                   <th scope="col" className="py-2 pr-4 font-medium">What</th>
@@ -83,8 +83,8 @@ export default function WcagContrastPage() {
         </section>
 
         <section className="mt-12">
-          <h2 className="text-xl font-bold tracking-tight">Non-text contrast (1.4.11)</h2>
-          <p className="mt-3 text-sm text-muted">
+          <h2 className="type-title-2 font-bold ">Non-text contrast (1.4.11)</h2>
+          <p className="mt-3 type-body text-muted">
             Added in WCAG 2.1, this criterion extends the 3:1 minimum to interactive components
             (buttons, inputs, focus indicators) and to graphical objects needed to understand
             content (icons, chart lines). It is frequently missed because teams only check body text.
@@ -92,8 +92,8 @@ export default function WcagContrastPage() {
         </section>
 
         <section className="mt-12">
-          <h2 className="text-xl font-bold tracking-tight">How the ratio is calculated</h2>
-          <p className="mt-3 text-sm text-muted">
+          <h2 className="type-title-2 font-bold ">How the ratio is calculated</h2>
+          <p className="mt-3 type-body text-muted">
             Contrast ratio is <span className="font-mono">(L1 + 0.05) / (L2 + 0.05)</span>, where L1
             and L2 are the relative luminance of the lighter and darker color. The result ranges from
             1:1 (no contrast) to 21:1 (pure black on pure white). Because luminance is perceptual,
@@ -102,8 +102,8 @@ export default function WcagContrastPage() {
         </section>
 
         <section className="mt-12 rounded-xl border border-border bg-card p-6">
-          <h2 className="text-lg font-bold tracking-tight">Check any pixel on your screen</h2>
-          <p className="mt-2 text-sm text-muted">
+          <h2 className="type-title-3 font-bold ">Check any pixel on your screen</h2>
+          <p className="mt-2 type-body text-muted">
             TheWCAG computes the exact ratio as you pick two colors from any app, shows the
             selected WCAG AA target, and provides APCA as a separate comparison. Sample every
             material foreground/background pair when gradients or imagery are involved.
@@ -111,13 +111,13 @@ export default function WcagContrastPage() {
           <div className="mt-4 flex flex-wrap gap-3">
             <Link
               href="/download"
-              className="inline-flex items-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
+              className="inline-flex items-center rounded-lg bg-primary px-4 py-3 type-body font-semibold text-primary-foreground hover:opacity-90"
             >
               Download TheWCAG
             </Link>
             <Link
               href="/color-contrast-checker"
-              className="inline-flex items-center rounded-lg border border-border px-4 py-2.5 text-sm font-medium hover:bg-card"
+              className="inline-flex items-center rounded-lg border border-border px-4 py-3 type-body font-medium hover:bg-card"
             >
               About the contrast checker
             </Link>
@@ -125,12 +125,12 @@ export default function WcagContrastPage() {
         </section>
 
         <section className="mt-12">
-          <h2 className="text-xl font-bold tracking-tight">FAQ</h2>
+          <h2 className="type-title-2 font-bold ">FAQ</h2>
           <dl className="mt-4 space-y-5">
             {FAQ.map((f) => (
               <div key={f.q}>
-                <dt className="text-sm font-semibold">{f.q}</dt>
-                <dd className="mt-1 text-sm text-muted">{f.a}</dd>
+                <dt className="type-body font-semibold">{f.q}</dt>
+                <dd className="mt-1 type-body text-muted">{f.a}</dd>
               </div>
             ))}
           </dl>

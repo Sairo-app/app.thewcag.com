@@ -52,8 +52,8 @@ export default function ApcaContrastPage() {
           })),
         }}
       />
-      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-16">
-        <h1 className="text-3xl font-bold tracking-tight">APCA vs the WCAG 2 contrast ratio</h1>
+      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-12">
+        <h1 className="type-title-1 font-bold ">APCA vs the WCAG 2 contrast ratio</h1>
         <p className="mt-3 max-w-2xl text-muted">
           APCA (Accessible Perceptual Contrast Algorithm) is the contrast model being developed for
           WCAG 3. Instead of a single ratio like 4.5:1, it produces an <strong>Lc value</strong>{" "}
@@ -62,10 +62,10 @@ export default function ApcaContrastPage() {
         </p>
 
         <section className="mt-12" aria-labelledby="differences">
-          <h2 id="differences" className="text-xl font-bold tracking-tight">
+          <h2 id="differences" className="type-title-2 font-bold ">
             What actually changes
           </h2>
-          <ul className="mt-4 space-y-3 text-sm text-muted">
+          <ul className="mt-4 space-y-3 type-body text-muted">
             <li className="rounded-xl border border-border bg-card p-4">
               <strong className="text-foreground">Polarity matters.</strong> White text on a dark
               surface and dark text on a white surface with the same WCAG ratio do not read equally
@@ -85,50 +85,50 @@ export default function ApcaContrastPage() {
         </section>
 
         <section className="mt-12" aria-labelledby="thresholds">
-          <h2 id="thresholds" className="text-xl font-bold tracking-tight">
+          <h2 id="thresholds" className="type-title-2 font-bold ">
             Lc thresholds at a glance
           </h2>
           <div className="mt-4 overflow-x-auto rounded-xl border border-border">
-            <table className="w-full min-w-[420px] text-sm">
+            <table className="w-full min-w-[420px] type-body">
               <thead>
-                <tr className="border-b border-border bg-card text-left text-xs uppercase tracking-wide text-muted">
-                  <th scope="col" className="px-4 py-2.5 font-medium">Lc value</th>
-                  <th scope="col" className="px-4 py-2.5 font-medium">Good for</th>
+                <tr className="border-b border-border bg-card text-left type-callout uppercase text-muted">
+                  <th scope="col" className="px-4 py-3 font-medium">Lc value</th>
+                  <th scope="col" className="px-4 py-3 font-medium">Good for</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {LC_TABLE.map(([lc, use]) => (
                   <tr key={lc}>
-                    <td className="px-4 py-2.5 font-mono text-xs">{lc}</td>
-                    <td className="px-4 py-2.5 text-muted">{use}</td>
+                    <td className="px-4 py-3 font-mono type-callout">{lc}</td>
+                    <td className="px-4 py-3 text-muted">{use}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-xs text-muted">
+          <p className="mt-3 type-callout text-muted">
             Values are magnitudes. An Lc of -75 (light text on dark) is as strong as +75. Thresholds
             summarize the current APCA guidance and may shift before WCAG 3 ships.
           </p>
         </section>
 
         <section className="mt-12" aria-labelledby="faq">
-          <h2 id="faq" className="text-xl font-bold tracking-tight">
+          <h2 id="faq" className="type-title-2 font-bold ">
             Common questions
           </h2>
           <dl className="mt-5 space-y-5">
             {FAQ.map((f) => (
               <div key={f.q}>
-                <dt className="text-base font-semibold">{f.q}</dt>
-                <dd className="mt-1.5 text-sm text-muted">{f.a}</dd>
+                <dt className="type-headline font-semibold">{f.q}</dt>
+                <dd className="mt-2 type-body text-muted">{f.a}</dd>
               </div>
             ))}
           </dl>
         </section>
 
-        <section className="mt-14 rounded-xl border border-border bg-card p-6">
-          <h2 className="text-lg font-bold tracking-tight">Read both numbers from any pixel</h2>
-          <p className="mt-2 text-sm text-muted">
+        <section className="mt-12 rounded-xl border border-border bg-card p-6">
+          <h2 className="type-title-3 font-bold ">Read both numbers from any pixel</h2>
+          <p className="mt-2 type-body text-muted">
             TheWCAG&apos;s desktop picker reports the WCAG 2.2 ratio with the selected AA verdict{" "}
             <em>and</em> the APCA Lc value for any two pixels on screen in any app, not just the
             browser. Also try the{" "}
@@ -139,7 +139,7 @@ export default function ApcaContrastPage() {
           </p>
           <Link
             href="/download"
-            className="mt-4 inline-flex items-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
+            className="mt-4 inline-flex items-center rounded-lg bg-primary px-4 py-3 type-body font-semibold text-primary-foreground hover:opacity-90"
           >
             Download free for macOS &amp; Windows
           </Link>

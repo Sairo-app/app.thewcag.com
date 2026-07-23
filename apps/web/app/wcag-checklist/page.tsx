@@ -72,54 +72,54 @@ export default function WcagChecklistPage() {
           url: `${SITE_URL}/wcag-checklist`,
         }}
       />
-      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-16">
-        <h1 className="text-3xl font-bold tracking-tight">WCAG 2.2 AA checklist</h1>
+      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-12">
+        <h1 className="type-title-1 font-bold ">WCAG 2.2 AA checklist</h1>
         <p className="mt-3 max-w-2xl text-muted">
           This page highlights frequently tested criteria across the four POUR principles, each with a plain-language starting point. It is not the complete standard and does not replace normative WCAG guidance. The desktop app includes every WCAG 2.2 Level A and AA criterion applicable to your selected target, manual verification prompts, W3C references, notes, and finding traceability.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
             href="/download"
-            className="inline-flex items-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
+            className="inline-flex items-center rounded-lg bg-primary px-4 py-3 type-body font-semibold text-primary-foreground hover:opacity-90"
           >
             Open the complete checklist in the app
           </Link>
           <Link
             href="/wcag-contrast"
-            className="inline-flex items-center rounded-lg border border-border px-4 py-2.5 text-sm font-medium hover:bg-card"
+            className="inline-flex items-center rounded-lg border border-border px-4 py-3 type-body font-medium hover:bg-card"
           >
             Contrast guide
           </Link>
         </div>
 
         {GROUPS.map((g) => (
-          <section key={g.heading} className="mt-14" aria-labelledby={g.heading}>
-            <h2 id={g.heading} className="text-xl font-bold tracking-tight">
+          <section key={g.heading} className="mt-12" aria-labelledby={g.heading}>
+            <h2 id={g.heading} className="type-title-2 font-bold ">
               {g.heading}
             </h2>
-            <p className="mt-2 text-sm text-muted">{g.intro}</p>
+            <p className="mt-2 type-body text-muted">{g.intro}</p>
             <ul className="mt-5 space-y-4">
               {g.items.map((c) => (
                 <li key={c.sc} className="rounded-xl border border-border bg-card p-4">
-                  <h3 className="text-sm font-semibold">
-                    <span className="mr-2 rounded bg-primary/10 px-1.5 py-0.5 font-mono text-xs text-primary">{c.sc}</span>
+                  <h3 className="type-body font-semibold">
+                    <span className="mr-2 rounded bg-primary/10 px-2 py-1 font-mono type-callout text-primary">{c.sc}</span>
                     {c.name}
                   </h3>
-                  <p className="mt-1.5 text-sm text-muted">{c.test}</p>
+                  <p className="mt-2 type-body text-muted">{c.test}</p>
                 </li>
               ))}
             </ul>
           </section>
         ))}
 
-        <section className="mt-14 rounded-xl border border-border bg-card p-6">
-          <h2 className="text-lg font-bold tracking-tight">Use the complete checklist inside the audit</h2>
-          <p className="mt-2 text-sm text-muted">
+        <section className="mt-12 rounded-xl border border-border bg-card p-6">
+          <h2 className="type-title-3 font-bold ">Use the complete checklist inside the audit</h2>
+          <p className="mt-2 type-body text-muted">
             TheWCAG combines deterministic tools for contrast and target measurement with guided manual decisions for every supported Level A and AA criterion. Failed criteria link to findings, not-applicable decisions require rationale at delivery, and exports preserve the complete decision record.
           </p>
           <Link
             href="/download"
-            className="mt-4 inline-flex items-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
+            className="mt-4 inline-flex items-center rounded-lg bg-primary px-4 py-3 type-body font-semibold text-primary-foreground hover:opacity-90"
           >
             Download free for macOS &amp; Windows
           </Link>

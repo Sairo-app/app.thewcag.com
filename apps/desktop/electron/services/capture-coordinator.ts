@@ -53,7 +53,7 @@ export class CaptureCoordinator {
       captureContext,
     );
     this.windows.sendToMain("capture:saved", entry);
-    this.windows.openAnnotate(entry.id);
+    await this.windows.openAnnotate(entry.id);
     return entry;
   }
 
@@ -73,8 +73,8 @@ export class CaptureCoordinator {
         auditId,
         context,
       );
-      this.windows.sendToMain("capture:saved", entry);
-      this.windows.openAnnotate(entry.id);
+      this.windows.sendToMain("capture:saved", { ...entry, sessionId });
+      await this.windows.openAnnotate(entry.id);
       return entry;
     }
     this.windows.sendToMain("capture:result", result);
@@ -82,11 +82,13 @@ export class CaptureCoordinator {
   }
 
   cancel(): void {
+    const sessionId = this.sessionId;
     this.sessionId = null;
     this.firstColor = null;
     this.sessionAuditId = undefined;
     this.activeContext = {};
     this.windows.closeOverlays();
+    if (sessionId) this.windows.broadcast("capture:cancelled", { sessionId });
   }
 
   async sample(sessionId: string, color: PickedColor): Promise<{ complete: boolean }> {

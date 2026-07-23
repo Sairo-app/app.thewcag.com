@@ -74,8 +74,8 @@ export default function AltTextGuidePage() {
           })),
         }}
       />
-      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-16">
-        <h1 className="text-3xl font-bold tracking-tight">How to write alt text</h1>
+      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-12">
+        <h1 className="type-title-1 font-bold ">How to write alt text</h1>
         <p className="mt-3 max-w-2xl text-muted">
           Alt text is the most common accessibility failure on the web and one of the easiest to
           fix. The rules below cover WCAG 1.1.1 in practice: what to write, when to write nothing,
@@ -83,7 +83,7 @@ export default function AltTextGuidePage() {
         </p>
 
         <section className="mt-12" aria-labelledby="rules">
-          <h2 id="rules" className="text-xl font-bold tracking-tight">
+          <h2 id="rules" className="type-title-2 font-bold ">
             The rules that cover 95% of cases
           </h2>
           <ol className="mt-5 space-y-6">
@@ -91,13 +91,13 @@ export default function AltTextGuidePage() {
               <li key={r.title} className="flex gap-4">
                 <span
                   aria-hidden="true"
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary type-body font-semibold text-primary-foreground"
                 >
                   {i + 1}
                 </span>
                 <div>
-                  <h3 className="text-base font-semibold">{r.title}</h3>
-                  <p className="mt-1 text-sm text-muted">{r.body}</p>
+                  <h3 className="type-headline font-semibold">{r.title}</h3>
+                  <p className="mt-1 type-body text-muted">{r.body}</p>
                 </div>
               </li>
             ))}
@@ -105,33 +105,33 @@ export default function AltTextGuidePage() {
         </section>
 
         <section className="mt-12" aria-labelledby="examples">
-          <h2 id="examples" className="text-xl font-bold tracking-tight">
+          <h2 id="examples" className="type-title-2 font-bold ">
             Before and after
           </h2>
           <div className="mt-4 overflow-x-auto rounded-xl border border-border">
-            <table className="w-full min-w-[480px] text-sm">
+            <table className="w-full min-w-[480px] type-body">
               <thead>
-                <tr className="border-b border-border bg-card text-left text-xs uppercase tracking-wide text-muted">
-                  <th scope="col" className="px-4 py-2.5 font-medium">Weak</th>
-                  <th scope="col" className="px-4 py-2.5 font-medium">Better</th>
+                <tr className="border-b border-border bg-card text-left type-callout uppercase text-muted">
+                  <th scope="col" className="px-4 py-3 font-medium">Weak</th>
+                  <th scope="col" className="px-4 py-3 font-medium">Better</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 <tr>
-                  <td className="px-4 py-2.5 font-mono text-xs text-muted">alt=&quot;chart.png&quot;</td>
-                  <td className="px-4 py-2.5">alt=&quot;Bar chart: mobile sign-ups overtook desktop in June&quot;</td>
+                  <td className="px-4 py-3 font-mono type-callout text-muted">alt=&quot;chart.png&quot;</td>
+                  <td className="px-4 py-3">alt=&quot;Bar chart: mobile sign-ups overtook desktop in June&quot;</td>
                 </tr>
                 <tr>
-                  <td className="px-4 py-2.5 font-mono text-xs text-muted">alt=&quot;icon&quot;</td>
-                  <td className="px-4 py-2.5">alt=&quot;Delete draft&quot; (the button&apos;s action)</td>
+                  <td className="px-4 py-3 font-mono type-callout text-muted">alt=&quot;icon&quot;</td>
+                  <td className="px-4 py-3">alt=&quot;Delete draft&quot; (the button&apos;s action)</td>
                 </tr>
                 <tr>
-                  <td className="px-4 py-2.5 font-mono text-xs text-muted">alt=&quot;photo of our team at the offsite smiling&quot;</td>
-                  <td className="px-4 py-2.5">alt=&quot;The 12-person team at the 2025 offsite in Lisbon&quot;</td>
+                  <td className="px-4 py-3 font-mono type-callout text-muted">alt=&quot;photo of our team at the offsite smiling&quot;</td>
+                  <td className="px-4 py-3">alt=&quot;The 12-person team at the 2025 offsite in Lisbon&quot;</td>
                 </tr>
                 <tr>
-                  <td className="px-4 py-2.5 font-mono text-xs text-muted">(no alt attribute)</td>
-                  <td className="px-4 py-2.5">alt=&quot;&quot; for decoration; never omit the attribute</td>
+                  <td className="px-4 py-3 font-mono type-callout text-muted">(no alt attribute)</td>
+                  <td className="px-4 py-3">alt=&quot;&quot; for decoration; never omit the attribute</td>
                 </tr>
               </tbody>
             </table>
@@ -139,22 +139,22 @@ export default function AltTextGuidePage() {
         </section>
 
         <section className="mt-12" aria-labelledby="faq">
-          <h2 id="faq" className="text-xl font-bold tracking-tight">
+          <h2 id="faq" className="type-title-2 font-bold ">
             Common questions
           </h2>
           <dl className="mt-5 space-y-5">
             {FAQ.map((f) => (
               <div key={f.q}>
-                <dt className="text-base font-semibold">{f.q}</dt>
-                <dd className="mt-1.5 text-sm text-muted">{f.a}</dd>
+                <dt className="type-headline font-semibold">{f.q}</dt>
+                <dd className="mt-2 type-body text-muted">{f.a}</dd>
               </div>
             ))}
           </dl>
         </section>
 
-        <section className="mt-14 rounded-xl border border-border bg-card p-6">
-          <h2 className="text-lg font-bold tracking-tight">Audit the rest of the page too</h2>
-          <p className="mt-2 text-sm text-muted">
+        <section className="mt-12 rounded-xl border border-border bg-card p-6">
+          <h2 className="type-title-3 font-bold ">Audit the rest of the page too</h2>
+          <p className="mt-2 type-body text-muted">
             Alt text is one criterion. TheWCAG&apos;s free desktop app checks the visual ones:
             contrast, target size, and color-blind safety anywhere on screen, and turns findings into
             a shareable report. See the{" "}
@@ -165,7 +165,7 @@ export default function AltTextGuidePage() {
           </p>
           <Link
             href="/download"
-            className="mt-4 inline-flex items-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
+            className="mt-4 inline-flex items-center rounded-lg bg-primary px-4 py-3 type-body font-semibold text-primary-foreground hover:opacity-90"
           >
             Download free for macOS &amp; Windows
           </Link>

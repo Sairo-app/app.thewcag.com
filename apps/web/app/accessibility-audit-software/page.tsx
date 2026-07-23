@@ -62,7 +62,7 @@ export default function AccessibilityAuditSoftwarePage() {
           ],
         }}
       />
-      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-16">
+      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-12">
         <h1>Accessibility audit software built around evidence</h1>
         <p>
           TheWCAG is a local-first audit workstation for professional accessibility evaluation. It keeps planning, manual testing, screenshots, findings, WCAG decisions, remediation, retesting, and delivery in one project record.
@@ -88,7 +88,7 @@ export default function AccessibilityAuditSoftwarePage() {
         <section aria-labelledby="capabilities-heading">
           <h2 id="capabilities-heading">What is included</h2>
           <div className="mt-6 overflow-x-auto">
-            <table className="w-full text-left text-sm">
+            <table className="w-full text-left type-body">
               <thead><tr><th scope="col">Area</th><th scope="col">Built-in support</th></tr></thead>
               <tbody>
                 {CAPABILITIES.map(([title, body]) => (

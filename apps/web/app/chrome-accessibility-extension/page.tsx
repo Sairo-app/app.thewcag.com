@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Footer, JsonLd } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { ProductLinks } from "@/components/ProductLinks";
-import { CheckIcon } from "@/components/icons";
+import { ArrowRightIcon, CheckIcon } from "@/components/icons";
 import { breadcrumbJsonLd, createPageMetadata, SITE_URL } from "@/lib/seo";
 
 const REPOSITORY = "https://github.com/Sairo-app/app.thewcag.com/tree/main/apps/extension";
@@ -82,7 +82,7 @@ export default function ChromeAccessibilityExtensionPage() {
           ],
         }}
       />
-      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-16">
+      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-12">
         <h1>Capture a website issue where you find it</h1>
         <p>
           TheWCAG&apos;s Chrome extension turns a browser observation into a desktop review item. Select the affected component, write the issue while the page is in front of you, and send its approved screenshot and semantic context to the local audit—without pretending that automation made the final decision.
@@ -149,9 +149,9 @@ export default function ChromeAccessibilityExtensionPage() {
           <h2 id="connection-heading">How the extension, desktop app, and website connect</h2>
           <div className="connection-map mt-6">
             <div><strong>Chrome extension</strong><p>Captures the selected webpage evidence, your observation, and the exact payload you approve.</p></div>
-            <span aria-hidden="true">→</span>
+            <ArrowRightIcon size={16} />
             <div><strong>Desktop app</strong><p>Validates the message, stores the screenshot and context locally, and queues a finding for auditor review.</p></div>
-            <span aria-hidden="true">→</span>
+            <ArrowRightIcon size={16} />
             <div><strong>Website service</strong><p>Handles browser sign-in, authorized AI generation, optional report publishing, downloads, and account management.</p></div>
           </div>
           <p className="mt-5">

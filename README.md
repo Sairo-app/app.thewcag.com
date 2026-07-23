@@ -338,6 +338,7 @@ node --env-file=.env.local scripts/dev-seed.mjs
 |---|---|---|
 | `NEXT_PUBLIC_APP_URL` | Web | Canonical application origin, callbacks, report links, metadata, sitemap, and robots output. |
 | `AUTH_SECRET` | Auth | Auth.js signing secret. Generate a strong random value in production. |
+| `AUTH_TRUST_HOST` | Auth behind a proxy | Set to `true` only when a trusted reverse proxy supplies forwarded host headers. Keep `AUTH_URL` set to the canonical origin. |
 | `AUTH_RESEND_KEY` | Production auth | Resend API key for magic-link email. If absent in development, the link is logged. |
 | `AUTH_EMAIL_FROM` | Auth | Resend-verified sender address. |
 | `DATABASE_URL` | Data features | Postgres connection for Auth.js, devices, users, reports, and branding. |
@@ -361,6 +362,7 @@ Desktop and extension builds also use:
 | Variable | Required for | Purpose |
 |---|---|---|
 | `THEWCAG_EXTENSION_ID` | Paired extension releases | Exact 32-character Chrome extension ID embedded into the native-host allowlist. In GitHub Actions this is a repository variable, not a secret. |
+| `MAIN_VITE_SITE_URL` | Desktop web integration | Optional canonical HTTPS origin used by desktop sign-in, hosted reports, and funnel telemetry. Defaults to `https://app.thewcag.com`; override only for a trusted local or staging deployment. |
 
 Never commit `.env` files, signing credentials, private updater keys, database credentials, or R2 secrets. The repository ignores local environment variants and retains only examples.
 

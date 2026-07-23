@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { ChartBarHorizontal, Info, WarningCircle } from "@phosphor-icons/react";
+import { ChartBarHorizontal, Info, WarningCircle } from "../Icon";
 import type {
   AuditProject,
   AuditSampleItem,
@@ -72,7 +72,7 @@ function ChartTablePanel({
           <h2 id={`${chartId}-heading`}>{title}</h2>
           <p>{description}</p>
         </div>
-        <ChartBarHorizontal size={22} weight="duotone" aria-hidden="true" />
+        <ChartBarHorizontal size={20} aria-hidden="true" />
       </div>
       <div className="program-chart-table">
         <figure
@@ -100,7 +100,7 @@ export function ProgramDashboardView({ metrics }: { metrics: ProgramMetrics }) {
   return (
     <div className="program-dashboard">
       <section className="program-boundary" aria-labelledby="program-boundary-title">
-        <Info size={20} weight="duotone" aria-hidden="true" />
+        <Info size={20} aria-hidden="true" />
         <div>
           <h2 id="program-boundary-title">Operational trends, not conformance</h2>
           <p>
@@ -247,7 +247,7 @@ export function ProgramDashboardView({ metrics }: { metrics: ProgramMetrics }) {
         />
       ) : (
         <section className="program-empty" aria-labelledby="program-empty-title">
-          <WarningCircle size={24} weight="duotone" aria-hidden="true" />
+          <WarningCircle size={24} aria-hidden="true" />
           <div>
             <h2 id="program-empty-title">No component history yet</h2>
             <p>Link confirmed findings to representative sample items of type Component to build longitudinal hotspots and recurrence history.</p>
@@ -297,7 +297,7 @@ export function ProgramDashboard({ audits }: { audits: AuditProject[] }) {
   if (error) {
     return (
       <section className="program-empty" role="alert">
-        <WarningCircle size={24} weight="duotone" aria-hidden="true" />
+        <WarningCircle size={24} aria-hidden="true" />
         <div><h2>Program data could not be loaded</h2><p>{error}</p></div>
       </section>
     );

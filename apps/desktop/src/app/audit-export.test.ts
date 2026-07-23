@@ -64,6 +64,7 @@ describe("complete audit export", () => {
     expect(output).toContain("Payment dialog");
     expect(output).toContain("F-014");
     expect(output).toContain(finding.id);
+    expect(output).toContain(`F-014 · ${finding.id}`);
     expect(output).toContain("Duplicated from: F-003");
     expect(output).toContain("Saved payment dialog");
     expect(output).toContain("release candidate exposes the control name");
@@ -133,8 +134,12 @@ describe("complete audit export", () => {
       .find((heading) => heading.textContent === "Evidence inventory")
       ?.nextElementSibling;
     expect(evidenceInventory?.textContent).toContain("F-021");
+    expect(evidenceInventory?.textContent).toContain(finding.id);
     expect(evidenceInventory?.textContent).toContain("Unassigned capture");
     expect(document.querySelector(".finding")?.textContent).toContain("Keyboard focus before, Keyboard focus after");
+    expect(document.querySelector(".finding-number")?.textContent).toContain(
+      `F-021 · ${finding.id}`,
+    );
   });
 
   it("creates an escaped, printable HTML report with sample and conclusion", () => {

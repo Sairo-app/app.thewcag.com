@@ -2,10 +2,9 @@ import {
   useEffect,
   useId,
   useRef,
-  type ComponentType,
   type ReactNode,
 } from "react";
-import { CheckCircle, WarningCircle, X } from "@phosphor-icons/react";
+import { CheckCircle, WarningCircle, X, type IconComponent } from "./Icon";
 
 export function IconButton({
   label,
@@ -53,7 +52,7 @@ export function Button({
   id?: string;
   onClick?: () => void;
   variant?: "primary" | "secondary" | "quiet" | "danger";
-  icon?: ComponentType<{ size?: number; weight?: "bold" | "regular" }>;
+  icon?: IconComponent;
   type?: "button" | "submit";
   disabled?: boolean;
   className?: string;
@@ -66,7 +65,7 @@ export function Button({
       disabled={disabled}
       className={`button button-${variant} ${className}`}
     >
-      {Icon ? <Icon size={16} weight="bold" /> : null}
+      {Icon ? <Icon size={20} /> : null}
       {children}
     </button>
   );
@@ -98,7 +97,7 @@ export function EmptyState({
   body,
   action,
 }: {
-  icon: ComponentType<{ size?: number; weight?: "duotone" }>;
+  icon: IconComponent;
   title: string;
   body: string;
   action?: ReactNode;
@@ -106,7 +105,7 @@ export function EmptyState({
   return (
     <div className="empty-state">
       <div className="empty-icon">
-        <Icon size={28} weight="duotone" />
+        <Icon size={32} />
       </div>
       <h3>{title}</h3>
       <p>{body}</p>
@@ -126,40 +125,61 @@ export function Toast({
   actionLabel?: string;
   onAction?: () => void;
 }) {
-  if (!message) return null;
   return (
-    <div
-      className={`toast ${message.error ? "toast-error" : "toast-success"}`}
-      role={message.error ? "alert" : "status"}
-      aria-live={message.error ? "assertive" : "polite"}
-    >
-      <span className="toast-icon" aria-hidden="true">
-        {message.error ? (
-          <WarningCircle size={18} weight="fill" />
-        ) : (
-          <CheckCircle size={18} weight="fill" />
-        )}
-      </span>
-      <span className="toast-copy">
-        {message.title ? <strong>{message.title}</strong> : null}
-        <span>{message.text}</span>
-      </span>
-      {actionLabel && onAction ? (
-        <button type="button" className="toast-action" onClick={onAction}>
-          {actionLabel}
-        </button>
-      ) : null}
-      {onClose ? (
-        <button
-          type="button"
-          className="toast-close"
-          onClick={onClose}
-          aria-label="Dismiss message"
+    <>
+      <div
+        className="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {message && !message.error
+          ? `${message.title ? `${message.title}. ` : ""}${message.text}`
+          : ""}
+      </div>
+      <div
+        className="sr-only"
+        role="alert"
+        aria-live="assertive"
+        aria-atomic="true"
+      >
+        {message?.error
+          ? `${message.title ? `${message.title}. ` : ""}${message.text}`
+          : ""}
+      </div>
+      {message ? (
+        <div
+          className={`toast ${message.error ? "toast-error" : "toast-success"}`}
         >
-          <X size={14} />
-        </button>
+          <span className="toast-icon" aria-hidden="true">
+            {message.error ? (
+              <WarningCircle size={20} weight="fill" />
+            ) : (
+              <CheckCircle size={20} weight="fill" />
+            )}
+          </span>
+          <span className="toast-copy">
+            {message.title ? <strong>{message.title}</strong> : null}
+            <span>{message.text}</span>
+          </span>
+          {actionLabel && onAction ? (
+            <button type="button" className="toast-action" onClick={onAction}>
+              {actionLabel}
+            </button>
+          ) : null}
+          {onClose ? (
+            <button
+              type="button"
+              className="toast-close"
+              onClick={onClose}
+              aria-label="Dismiss message"
+            >
+              <X size={20} />
+            </button>
+          ) : null}
+        </div>
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -244,7 +264,7 @@ export function ConfirmDialog({
     >
       <div className="confirm-dialog-copy">
         <span className="confirm-dialog-icon" aria-hidden>
-          <WarningCircle size={22} weight="duotone" />
+          <WarningCircle size={20} />
         </span>
         <div>
           <h2 id={titleId}>{title}</h2>

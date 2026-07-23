@@ -57,7 +57,7 @@ export default function AccessibilityReportingSoftwarePage() {
           ],
         }}
       />
-      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-16">
+      <main id="main" className="editorial-page mx-auto max-w-3xl px-6 py-12">
         <h1>Accessible audit reports without automated conformance claims</h1>
         <p>
           TheWCAG turns a reviewed local audit into a branded report for the people who must act on it. Choose the audience and format, preserve finding-to-evidence traceability, and require a human response for every VPAT or Accessibility Conformance Report criterion.
@@ -84,7 +84,7 @@ export default function AccessibilityReportingSoftwarePage() {
         <section aria-labelledby="formats-heading">
           <h2 id="formats-heading">One audit record, four delivery paths</h2>
           <div className="mt-6 overflow-x-auto">
-            <table className="w-full text-left text-sm">
+            <table className="w-full text-left type-body">
               <thead><tr><th scope="col">Output</th><th scope="col">What it preserves</th></tr></thead>
               <tbody>
                 {OUTPUTS.map(([name, detail]) => <tr key={name}><th scope="row">{name}</th><td>{detail}</td></tr>)}

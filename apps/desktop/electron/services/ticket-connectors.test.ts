@@ -85,6 +85,7 @@ describe("ticket connector main-process service", () => {
     });
     expect(JSON.stringify(configuration)).not.toContain("jira-api-token-1234");
     expect((await readFile(join(userData, "ticket-connectors.bin"), "utf8"))).not.toContain("jira-api-token-1234");
+    await expect(service.externalOrigins()).resolves.toEqual(["https://example.atlassian.net"]);
     const link = await service.create({ connector: "jira", fields: fields() });
     expect(link).toMatchObject({ key: "A11Y-42", externalStatus: "To Do", syncState: "in-sync" });
     const createPayload = JSON.parse(String((fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1]?.body));
@@ -117,6 +118,7 @@ describe("ticket connector main-process service", () => {
       teamId: "team-id",
       mapping: DEFAULT_TICKET_FIELD_MAPPINGS.linear,
     });
+    await expect(linear.externalOrigins()).resolves.toEqual(["https://linear.app"]);
     await expect(linear.create({ connector: "linear", fields: fields() })).resolves.toMatchObject({ key: "A11Y-8" });
 
     const githubData = await directory();
@@ -142,6 +144,7 @@ describe("ticket connector main-process service", () => {
       repository: "example/product",
       mapping: DEFAULT_TICKET_FIELD_MAPPINGS.github,
     });
+    await expect(github.externalOrigins()).resolves.toEqual(["https://github.com"]);
     await expect(github.create({ connector: "github", fields: fields() })).resolves.toMatchObject({
       key: "example/product#17",
       externalStatus: "open",

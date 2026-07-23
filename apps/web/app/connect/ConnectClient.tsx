@@ -20,9 +20,9 @@ export function ConnectClient({ state, device, email }: { state: string; device:
   }
 
   return (
-    <main id="main" className="auth-page mx-auto max-w-md px-6 py-24 text-center">
-      <h1 className="text-2xl font-bold tracking-tight">Connect your desktop app</h1>
-      <p className="mt-3 text-sm text-muted">
+    <main id="main" className="auth-page mx-auto max-w-md px-6 py-marketing-section text-center">
+      <h1 className="type-title-2 font-bold ">Connect your desktop app</h1>
+      <p className="mt-3 type-body text-muted">
         Authorize <strong>{device}</strong> to use your TheWCAG account (
         <span className="font-medium">{email}</span>) to publish and manage shared screenshots.
       </p>
@@ -31,26 +31,26 @@ export function ConnectClient({ state, device, email }: { state: string; device:
         <button
           onClick={connect}
           disabled={status === "working"}
-          className="mt-6 inline-flex items-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60"
+          className="mt-6 inline-flex items-center rounded-lg bg-primary px-5 py-3 type-body font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60"
         >
           {status === "working" ? "Authorizing…" : "Authorize this device"}
         </button>
       )}
       {status === "done" && (
-        <div className="mt-6 text-sm text-muted" role="status" aria-live="polite">
-          <p>Returning you to the app…</p>
+        <div className="mt-6 type-body text-muted" role="status" aria-live="polite">
+          <p>Opening TheWCAG to finish connecting…</p>
           {link && (
             <p className="mt-2">
               Didn&apos;t switch automatically?{" "}
               <a href={link} className="font-medium text-primary hover:underline">
-                Open the app
+                Finish in the app
               </a>
             </p>
           )}
         </div>
       )}
       {status === "error" && (
-        <p className="mt-6 text-sm text-red-700" role="alert">
+        <p className="mt-6 type-body text-red-700" role="alert">
           Something went wrong. Try connecting again from the app.
         </p>
       )}

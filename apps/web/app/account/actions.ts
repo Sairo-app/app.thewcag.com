@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { auth, signOut } from "@/auth";
 import { db } from "@/lib/db";
@@ -18,6 +18,7 @@ export async function revokeDevice(deviceId: string): Promise<void> {
     .where(and(
       eq(desktopDevices.id, deviceId),
       eq(desktopDevices.userId, userId),
+      isNotNull(desktopDevices.claimedAt),
       isNull(desktopDevices.revokedAt),
     ));
   revalidatePath("/account");
@@ -30,7 +31,11 @@ export async function revokeAllDevices(): Promise<void> {
   await db
     .update(desktopDevices)
     .set({ revokedAt: new Date() })
-    .where(and(eq(desktopDevices.userId, userId), isNull(desktopDevices.revokedAt)));
+    .where(and(
+      eq(desktopDevices.userId, userId),
+      isNotNull(desktopDevices.claimedAt),
+      isNull(desktopDevices.revokedAt),
+    ));
   revalidatePath("/account");
 }
 

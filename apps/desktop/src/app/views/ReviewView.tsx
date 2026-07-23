@@ -5,7 +5,7 @@ import {
   DownloadSimple,
   Warning,
   WarningCircle,
-} from "@phosphor-icons/react";
+} from "../Icon";
 import type {
   AuditProject,
   AuditSampleItem,
@@ -13,7 +13,7 @@ import type {
   CaptureEntry,
   Finding,
 } from "../../shared/desktop";
-import { desktop, getStored, listCaptures, setStored } from "../api";
+import { desktop, getStored, listCaptures, saveStoredFindings, setStored } from "../api";
 import { normalizeFindingReferences } from "../../shared/finding-references";
 import {
   DEFAULT_REPORT_SECTIONS,
@@ -81,7 +81,12 @@ export function ReviewView({
         const normalized = normalizeFindingReferences(nextFindings);
         setFindings(normalized.findings);
         if (normalized.changed) {
-          void setStored(auditStoreKey(audit.id, "findings"), normalized.findings)
+          void saveStoredFindings(
+            auditStoreKey(audit.id, "findings"),
+            nextFindings,
+            normalized.findings,
+          )
+            .then((saved) => { if (!cancelled) setFindings(saved); })
             .catch((error) => show(messageFromError(error), true));
         }
         setChecklist(nextChecklist);
@@ -97,8 +102,16 @@ export function ReviewView({
       .catch((error) => {
         if (!cancelled) show(messageFromError(error), true);
       });
+    const findingsKey = auditStoreKey(audit.id, "findings");
+    const stopFindings = desktop.on<{ key: string | null }>("findings:changed", ({ key }) => {
+      if (key !== null && key !== findingsKey) return;
+      void getStored<Finding[]>(findingsKey, [])
+        .then((next) => { if (!cancelled) setFindings(next); })
+        .catch((error) => { if (!cancelled) show(messageFromError(error), true); });
+    });
     return () => {
       cancelled = true;
+      stopFindings();
     };
   }, [audit.id]);
 
@@ -280,7 +293,7 @@ export function ReviewView({
       <section className="review-summary" aria-label="Review summary">
         <div>
           <span className="review-icon review-icon-orange">
-            <WarningCircle size={20} weight="duotone" />
+            <WarningCircle size={20} />
           </span>
           <strong>{summary.failures}</strong>
           <small>unresolved findings</small>
@@ -294,14 +307,14 @@ export function ReviewView({
         </div>
         <div>
           <span className="review-icon review-icon-green">
-            <CheckCircle size={20} weight="duotone" />
+            <CheckCircle size={20} />
           </span>
           <strong>{summary.reviewed}</strong>
           <small>criteria reviewed</small>
         </div>
         <div>
           <span className="review-icon">
-            <ClipboardText size={20} weight="duotone" />
+            <ClipboardText size={20} />
           </span>
           <strong>{summary.notes}</strong>
           <small>test notes</small>
@@ -309,7 +322,7 @@ export function ReviewView({
       </section>
       {summary.unlinkedFailures ? (
         <section className="review-gap" role="status">
-          <Warning size={19} weight="fill" />
+          <Warning size={20} weight="fill" />
           <div>
             <strong>
               {summary.unlinkedFailures} failed {summary.unlinkedFailures === 1 ? "criterion has" : "criteria have"} no finding
@@ -323,7 +336,7 @@ export function ReviewView({
       ) : null}
       {summary.undocumentedNA ? (
         <section className="review-gap" role="status">
-          <Warning size={19} weight="fill" />
+          <Warning size={20} weight="fill" />
           <div>
             <strong>
               {summary.undocumentedNA} not-applicable {summary.undocumentedNA === 1 ? "decision needs" : "decisions need"} a reason

@@ -4,7 +4,7 @@ import {
   hexToRgb,
   rgbToHex,
 } from "@accessibility-build/a11y-core";
-import { ClipboardText, Palette, Plus, Trash, X } from "@phosphor-icons/react";
+import { ClipboardText, Palette, Plus, Trash, X } from "../Icon";
 import { desktop } from "../api";
 import { auditStoreKey } from "../audits";
 import { Button, EmptyState, Toast } from "../components";
@@ -95,7 +95,7 @@ export function PaletteView({ auditId }: { auditId: string }) {
                 }
                 aria-label={`Remove ${color}`}
               >
-                <X size={13} />
+                <X size={20} />
               </button>
             </span>
           ))}

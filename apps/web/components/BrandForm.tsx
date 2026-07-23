@@ -67,7 +67,7 @@ export function BrandForm({
       <div>
         <div className="mb-2 flex items-baseline justify-between">
           <p className="label">Live preview</p>
-          <p className="text-[11px] text-muted">How anyone opening your link sees it</p>
+          <p className="type-footnote text-muted">How anyone opening your link sees it</p>
         </div>
         <BrandPreview name={name} color={safeColor} logoUrl={showLogo ? logoPreview : null} />
       </div>
@@ -81,13 +81,13 @@ export function BrandForm({
             onChange={(e) => setName(e.target.value)}
             maxLength={60}
             placeholder="Acme Design"
-            className="mt-1.5 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="mt-2 w-full rounded-lg border border-border bg-card px-3 py-2 type-body outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
         </label>
 
         <label className="block">
           <span className="label">Accent color</span>
-          <div className="mt-1.5 flex items-center gap-2">
+          <div className="mt-2 flex items-center gap-2">
             <input
               type="color"
               value={safeColor}
@@ -102,11 +102,11 @@ export function BrandForm({
               aria-label="Accent color hex"
               aria-invalid={!colorValid}
               aria-describedby={!colorValid ? "brand-color-error" : undefined}
-              className="w-28 rounded-lg border border-border bg-card px-3 py-2 font-mono text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="w-28 rounded-lg border border-border bg-card px-3 py-2 font-mono type-body outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
           {!colorValid && (
-            <span id="brand-color-error" role="alert" className="mt-1.5 block text-xs text-red-700">
+            <span id="brand-color-error" role="alert" className="mt-2 block type-callout text-red-700">
               Enter a six-digit hex color such as #b83b12.
             </span>
           )}
@@ -117,7 +117,7 @@ export function BrandForm({
         <label htmlFor="brand-logo" className="label">
           Logo
         </label>
-        <p id="brand-logo-hint" className="mt-0.5 text-xs text-muted">
+        <p id="brand-logo-hint" className="mt-1 type-callout text-muted">
           PNG, JPG, or WEBP. Up to 1 MB. Transparent backgrounds work best.
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -129,14 +129,14 @@ export function BrandForm({
             accept="image/png,image/jpeg,image/webp"
             aria-describedby={`brand-logo-hint${fileError ? " brand-logo-error" : ""}`}
             onChange={onFile}
-            className="block text-sm file:mr-3 file:rounded-lg file:border file:border-border file:bg-card file:px-3 file:py-1.5 file:text-sm file:font-medium hover:file:bg-muted"
+            className="block type-body file:mr-3 file:rounded-lg file:border file:border-border file:bg-card file:px-3 file:py-2 file:type-body file:font-medium hover:file:bg-muted"
           />
-          {fileError && <span id="brand-logo-error" role="alert" className="text-xs text-red-700">{fileError}</span>}
+          {fileError && <span id="brand-logo-error" role="alert" className="type-callout text-red-700">{fileError}</span>}
           {showLogo && (
             <button
               type="button"
               onClick={clearLogo}
-              className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted hover:text-foreground"
+              className="rounded-lg border border-border px-3 py-2 type-callout font-medium text-muted hover:text-foreground"
             >
               Remove logo
             </button>
@@ -150,17 +150,17 @@ export function BrandForm({
         <button
           type="submit"
           disabled={pending || Boolean(fileError) || !colorValid}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-3 type-body font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60"
         >
           {pending ? "Saving…" : "Save branding"}
         </button>
         {state?.ok && (
-          <span role="status" className="inline-flex items-center gap-1.5 text-sm text-muted">
-            <CheckIcon size={15} /> Saved. It’s live on your shared reports.
+          <span role="status" className="inline-flex items-center gap-2 type-body text-muted">
+            <CheckIcon size={16} /> Saved. It’s live on your shared reports.
           </span>
         )}
         {state && !state.ok && (
-          <span role="alert" className="text-sm text-red-700">
+          <span role="alert" className="type-body text-red-700">
             {state.error}
           </span>
         )}

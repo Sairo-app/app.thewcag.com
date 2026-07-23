@@ -7,7 +7,7 @@ import {
   LockKey,
   Monitor,
   SlidersHorizontal,
-} from "@phosphor-icons/react";
+} from "../Icon";
 import { desktop } from "../api";
 import { Button, StatusBadge, Toast } from "../components";
 import { messageFromError, useTransientMessage } from "../hooks";
@@ -49,7 +49,7 @@ export function VisionView() {
         <div className="lens-schematic" aria-hidden="true">
           <div className="schematic-bar">
             <span>
-              <Aperture size={17} weight="duotone" /> Vision lens
+              <Aperture size={16} /> Vision lens
             </span>
             <span>100%</span>
           </div>
@@ -96,7 +96,7 @@ export function VisionView() {
         aria-label="Vision lens capabilities"
       >
         <div>
-          <Monitor size={21} weight="duotone" />
+          <Monitor size={20} />
           <span>
             <strong>Across applications</strong>
             <small>
@@ -106,7 +106,7 @@ export function VisionView() {
           <b>System wide</b>
         </div>
         <div>
-          <SlidersHorizontal size={21} weight="duotone" />
+          <SlidersHorizontal size={20} />
           <span>
             <strong>Adjustable simulation</strong>
             <small>
@@ -117,7 +117,7 @@ export function VisionView() {
           <b>Live controls</b>
         </div>
         <div>
-          <LockKey size={21} weight="duotone" />
+          <LockKey size={20} />
           <span>
             <strong>Protected evidence</strong>
             <small>

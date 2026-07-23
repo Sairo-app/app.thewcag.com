@@ -13,6 +13,7 @@ import type { AuditActivity, AuditProject, CaptureEntry, Finding } from "../../s
 import type { AiAuthoringService } from "./ai-authoring";
 import type { CaptureRepository } from "./captures";
 import type { JsonStore } from "./store";
+import { ManagedAiHttpError } from "./managed-ai-error";
 
 interface NativeProtocolServices {
   store: Pick<JsonStore, "get" | "set" | "addFindings" | "remove">;
@@ -120,7 +121,10 @@ async function saveFinding(
     services.store.get<AuditActivity[]>(activityKey, []),
     services.store.get<Finding[]>(`findings-${auditId}`, []),
   ]);
-  if (existing.some((item) => item.key === evidence.id)) return evidence.id;
+  const previouslySaved = existing.find(
+    (item) => item.id === evidence.findingId || item.key === evidence.id,
+  );
+  if (previouslySaved) return previouslySaved.key;
 
   const evidenceKey = `evidence-${evidence.id}`;
   await services.store.set(evidenceKey, scopedEvidence);
@@ -226,6 +230,21 @@ export async function handleNativeRequest(
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : "AI authoring failed";
+      if (error instanceof ManagedAiHttpError) {
+        if (error.status === 401) {
+          return errorResponse(request.requestId, "not-authenticated", message);
+        }
+        if (error.status === 402) {
+          return errorResponse(request.requestId, "quota-exceeded", message);
+        }
+        if (error.status === 429) {
+          return errorResponse(request.requestId, "quota-exceeded", message, true);
+        }
+        if (error.status === 503) {
+          return errorResponse(request.requestId, "generation-failed", message, true);
+        }
+        return errorResponse(request.requestId, "generation-failed", message, error.status >= 500);
+      }
       if (/sign in|session expired/i.test(message)) {
         return errorResponse(request.requestId, "not-authenticated", message);
       }

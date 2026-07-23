@@ -6,9 +6,8 @@ const boundary = vi.hoisted(() => ({
   hasActiveProSubscription: vi.fn(),
   isReportAvailable: vi.fn(),
   reportRows: [] as Array<{ userId: string; availabilityStatus: string; graceEndsAt: Date | null }>,
+  recordUniqueReportView: vi.fn(),
   selectWhere: vi.fn(),
-  updateSet: vi.fn(),
-  updateWhere: vi.fn(),
 }));
 
 vi.mock("@/auth", () => ({ auth: boundary.auth }));
@@ -17,6 +16,9 @@ vi.mock("@/lib/billing/entitlements", () => ({
 }));
 vi.mock("@/lib/billing/subscriptions", () => ({
   isReportAvailable: boundary.isReportAvailable,
+}));
+vi.mock("@/lib/report-views", () => ({
+  recordUniqueReportView: boundary.recordUniqueReportView,
 }));
 vi.mock("@/lib/db", () => ({
   db: {
@@ -27,16 +29,6 @@ vi.mock("@/lib/db", () => ({
           return { limit: async () => boundary.reportRows };
         },
       }),
-    })),
-    update: vi.fn(() => ({
-      set: (value: unknown) => {
-        boundary.updateSet(value);
-        return {
-          where: async (condition: unknown) => {
-            boundary.updateWhere(condition);
-          },
-        };
-      },
     })),
   },
 }));
@@ -65,6 +57,7 @@ describe("public report view counting", () => {
     boundary.auth.mockResolvedValue(null);
     boundary.hasActiveProSubscription.mockResolvedValue(true);
     boundary.isReportAvailable.mockReturnValue(true);
+    boundary.recordUniqueReportView.mockResolvedValue(true);
     boundary.reportRows = [{
       userId: "report-owner",
       availabilityStatus: "active",
@@ -77,8 +70,8 @@ describe("public report view counting", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ counted: true });
-    expect(boundary.updateSet).toHaveBeenCalledTimes(1);
-    expect(boundary.updateSet).toHaveBeenCalledWith({ viewCount: expect.anything() });
+    expect(boundary.recordUniqueReportView).toHaveBeenCalledTimes(1);
+    expect(boundary.recordUniqueReportView).toHaveBeenCalledWith(SLUG, expect.any(Headers));
     expect(boundary.hasActiveProSubscription).toHaveBeenCalledWith("report-owner");
     expect(response.headers.get("set-cookie")).toContain(`tw_report_${SLUG}=1`);
     expect(response.headers.get("set-cookie")).toContain("HttpOnly");
@@ -92,7 +85,17 @@ describe("public report view counting", () => {
 
     await expect(response.json()).resolves.toEqual({ counted: false });
     expect(boundary.selectWhere).not.toHaveBeenCalled();
-    expect(boundary.updateSet).not.toHaveBeenCalled();
+    expect(boundary.recordUniqueReportView).not.toHaveBeenCalled();
+  });
+
+  it("does not recount the same server-side viewer without relying on a cookie", async () => {
+    boundary.recordUniqueReportView
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+
+    await expect((await POST(request(), context())).json()).resolves.toEqual({ counted: true });
+    await expect((await POST(request(), context())).json()).resolves.toEqual({ counted: false });
+    expect(boundary.recordUniqueReportView).toHaveBeenCalledTimes(2);
   });
 
   it("does not count the report owner", async () => {
@@ -101,7 +104,7 @@ describe("public report view counting", () => {
     const response = await POST(request(), context());
 
     await expect(response.json()).resolves.toEqual({ counted: false });
-    expect(boundary.updateSet).not.toHaveBeenCalled();
+    expect(boundary.recordUniqueReportView).not.toHaveBeenCalled();
   });
 
   it("does not count bots or previews", async () => {
@@ -120,7 +123,7 @@ describe("public report view counting", () => {
     const response = await POST(request(), context());
 
     await expect(response.json()).resolves.toEqual({ counted: false, analytics: false });
-    expect(boundary.updateSet).not.toHaveBeenCalled();
+    expect(boundary.recordUniqueReportView).not.toHaveBeenCalled();
   });
 
   it("returns not found and gone states without updating the counter", async () => {
@@ -134,7 +137,7 @@ describe("public report view counting", () => {
     }];
     boundary.isReportAvailable.mockReturnValue(false);
     expect((await POST(request(), context())).status).toBe(410);
-    expect(boundary.updateSet).not.toHaveBeenCalled();
+    expect(boundary.recordUniqueReportView).not.toHaveBeenCalled();
   });
 
   it("rejects malformed slugs before any report lookup", async () => {

@@ -9,9 +9,10 @@ import {
   Eye,
   SlidersHorizontal,
   X,
-} from "@phosphor-icons/react";
+} from "./Icon";
 import type { LensFrame } from "../shared/desktop";
 import { desktop } from "./api";
+import { messageFromError } from "./hooks";
 
 const TYPES: { value: ColorblindType | "none"; label: string }[] = [
   { value: "none", label: "Original" },
@@ -31,6 +32,7 @@ export function LensView() {
   const [blur, setBlur] = useState(false);
   const [lowContrast, setLowContrast] = useState(false);
   const [lastFrame, setLastFrame] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -113,17 +115,22 @@ export function LensView() {
 
   async function exportFrame() {
     if (!canvasRef.current) return;
-    await desktop.invoke("dialog:save-image", {
-      name: `vision-${type}.png`,
-      pngDataUrl: canvasRef.current.toDataURL("image/png"),
-    });
+    try {
+      await desktop.invoke("dialog:save-image", {
+        name: `vision-${type}.png`,
+        pngDataUrl: canvasRef.current.toDataURL("image/png"),
+      });
+      setError("");
+    } catch (caught) {
+      setError(messageFromError(caught, "The vision frame could not be exported."));
+    }
   }
 
   return (
     <div className="lens-window">
       <header className="lens-titlebar">
         <div className="lens-drag">
-          <Eye size={16} weight="duotone" />
+          <Eye size={16} />
           <strong>Vision lens</strong>
           <span>{TYPES.find((item) => item.value === type)?.label}</span>
         </div>
@@ -132,17 +139,19 @@ export function LensView() {
           title="Export frame"
           onClick={() => void exportFrame()}
         >
-          <Camera size={15} />
+          <Camera size={20} />
         </button>
         <button
           aria-label="Close vision lens"
           title="Close"
-          onClick={() => void desktop.invoke("window:close")}
+          onClick={() => void desktop.invoke("window:close")
+            .catch((caught) => setError(messageFromError(caught, "The vision lens could not be closed.")))}
         >
-          <X size={16} />
+          <X size={20} />
         </button>
       </header>
       <div className="lens-canvas">
+        {error ? <div className="lens-loading" role="alert">{error}</div> : null}
         <canvas ref={canvasRef} aria-label="Live vision simulation" />
         {split ? <span className="split-label original">Original</span> : null}
         {split ? (
@@ -169,7 +178,7 @@ export function LensView() {
           ))}
         </select>
         <label className="lens-severity" title="Simulation severity">
-          <SlidersHorizontal size={15} aria-hidden />
+          <SlidersHorizontal size={16} aria-hidden />
           <input
             aria-label="Simulation severity"
             type="range"
@@ -204,7 +213,7 @@ export function LensView() {
           </button>
         </div>
         <label className="lens-zoom" title="Zoom">
-          <ArrowsOutSimple size={14} aria-hidden />
+          <ArrowsOutSimple size={16} aria-hidden />
           <input
             aria-label="Lens zoom"
             type="range"

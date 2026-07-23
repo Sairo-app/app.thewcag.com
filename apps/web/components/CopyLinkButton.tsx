@@ -20,10 +20,10 @@ export function CopyLinkButton({ url, className }: { url: string; className?: st
         aria-label={copied ? "Link copied" : "Copy link"}
         className={
           className ??
-          "inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-card"
+          "inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 type-body font-medium hover:bg-card"
         }
       >
-        {copied ? <CheckIcon size={14} /> : <LinkIcon size={14} />}
+        {copied ? <CheckIcon size={20} /> : <LinkIcon size={20} />}
         {copied ? "Copied" : "Copy link"}
       </button>
       <span className="sr-only" role="status" aria-live="polite">

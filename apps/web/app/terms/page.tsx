@@ -10,8 +10,8 @@ export default function TermsPage() {
     <>
       <Header />
       <main id="main" className="prose-page mx-auto max-w-3xl px-6 py-12">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Effective 22 July 2026</p>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight">Terms of use</h1>
+        <p className="type-callout font-semibold uppercase text-primary">Effective 22 July 2026</p>
+        <h1 className="mt-3 type-title-1 font-bold ">Terms of use</h1>
         <section><h2>Using TheWCAG</h2><p>You may use TheWCAG to plan and document accessibility evaluations, capture evidence you are authorized to inspect, prepare findings, and publish reports you are authorized to share. Do not use the service to access protected systems, capture information without permission, distribute unlawful material, or interfere with the service.</p></section>
         <section><h2>Professional judgment remains required</h2><p>Automated checks, templates, contrast calculations, simulations, and AI-assisted drafts are supporting tools. They do not by themselves establish legal compliance or conformance with WCAG or another standard. You are responsible for the scope, manual testing, conclusions, remediation advice, and final deliverables.</p></section>
         <section><h2>Your content and public links</h2><p>You retain responsibility for captures, findings, branding, and reports you create. You grant the service permission to store and serve content only as necessary to provide the features you request. Published report links are unlisted, not private; anyone with the link can view them. Remove sensitive information before publication.</p></section>

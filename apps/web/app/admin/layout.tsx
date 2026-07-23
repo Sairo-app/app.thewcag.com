@@ -23,13 +23,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <Header />
       <main id="main" className="admin-page mx-auto max-w-6xl px-6 py-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-bold tracking-tight">Admin</h1>
+          <h1 className="type-title-2 font-bold ">Admin</h1>
           <nav aria-label="Admin sections" className="flex gap-1 rounded-lg border border-border p-1">
             {SECTIONS.map((s) => (
               <Link
                 key={s.href}
                 href={s.href}
-                className="rounded-md px-3 py-1.5 text-sm text-muted hover:bg-card hover:text-foreground"
+                className="rounded-md px-3 py-2 type-body text-muted hover:bg-card hover:text-foreground"
               >
                 {s.label}
               </Link>

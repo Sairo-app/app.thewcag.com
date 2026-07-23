@@ -6,27 +6,57 @@ import {
   reportImageAlt,
   reportIssueEmptyState,
 } from "./report-view";
-import { buildSharedReportMetadata, decodePngBase64, sanitizeReportIssues } from "./reports";
+import {
+  buildSharedReportMetadata,
+  decodePngBase64,
+  generateSlug,
+  SITE_URL as REPORT_SITE_URL,
+  sanitizeReportIssues,
+  sanitizeReportIssuesForPublish,
+} from "./reports";
+import { SITE_URL as SEO_SITE_URL } from "./seo";
 import type { ReportIssue } from "./schema";
 
 const reportIssues: ReportIssue[] = [
-  { id: createFindingId(), n: 1, sc: "2.4.7", label: "Focus is hidden", severity: "major", note: "Keep focus visible.", status: "retest" },
-  { id: createFindingId(), n: 2, sc: "1.4.10", label: "Layout clips", severity: "minor", note: "Allow content to reflow.", status: "fixed" },
-  { id: createFindingId(), n: 3, sc: "1.4.3", label: "Text has low contrast", severity: "blocker", note: "Increase contrast.", status: "open" },
+  { id: createFindingId(), n: 1, sc: ["2.4.7"], label: "Focus is hidden", severity: "major", note: "Keep focus visible.", status: "retest" },
+  { id: createFindingId(), n: 2, sc: ["1.4.10"], label: "Layout clips", severity: "minor", note: "Allow content to reflow.", status: "fixed" },
+  { id: createFindingId(), n: 3, sc: ["1.4.3", "4.1.2"], label: "Text has low contrast", severity: "blocker", note: "Increase contrast.", status: "open" },
   { id: createFindingId(), n: 4, label: "Unmapped keyboard issue", severity: "major", note: "", status: "accepted" },
 ];
+
+describe("generateSlug", () => {
+  it("uses rejection sampling instead of biased modulo reduction", () => {
+    const source = [248, 255, 0, 61, 62];
+    let offset = 0;
+    const slug = generateSlug(3, (bytes) => {
+      bytes.fill(248);
+      for (let index = 0; index < bytes.length && offset < source.length; index += 1) {
+        bytes[index] = source[offset++];
+      }
+    });
+
+    expect(slug).toBe("0Z0");
+  });
+});
+
+describe("report URL configuration", () => {
+  it("re-exports the single normalized site origin", () => {
+    expect(REPORT_SITE_URL).toBe(SEO_SITE_URL);
+    expect(REPORT_SITE_URL).not.toMatch(/\/$/);
+  });
+});
 
 describe("sanitizeReportIssues", () => {
   it("normalizes untrusted issue fields and assigns stable sequential numbers", () => {
     const id = createFindingId(1_800_000_000_000, new Uint8Array(26));
-    const issues = sanitizeReportIssues([
+    const issues = sanitizeReportIssuesForPublish([
       { id, n: 99, sc: " 1.4.3 ", label: "  Contrast\u0000 issue  ", severity: "BLOCKER", note: " Fix it ", status: "RETEST" },
       { n: -2, sc: "javascript:alert(1)", label: "", severity: "unknown", note: 4 },
       null,
     ]);
 
     expect(issues).toEqual([
-      { id, n: 1, sc: "1.4.3", label: "Contrast  issue", severity: "blocker", note: "Fix it", status: "retest" },
+      { id, n: 1, sc: ["1.4.3"], label: "Contrast  issue", severity: "blocker", note: "Fix it", status: "retest" },
       { id: expect.any(String), n: 2, sc: undefined, label: "Accessibility issue", severity: "major", note: "", status: "open" },
     ]);
     expect(isFindingId(issues[1].id)).toBe(true);
@@ -35,7 +65,7 @@ describe("sanitizeReportIssues", () => {
 
   it("repairs duplicate IDs at the publishing boundary", () => {
     const id = createFindingId();
-    const issues = sanitizeReportIssues([
+    const issues = sanitizeReportIssuesForPublish([
       { id, label: "First" },
       { id, label: "Second" },
     ]);
@@ -44,14 +74,45 @@ describe("sanitizeReportIssues", () => {
     expect(isFindingId(issues[1].id)).toBe(true);
   });
 
+  it("keeps a backfilled legacy identity stable across render sanitization", () => {
+    const id = createFindingId(1_700_000_000_000, new Uint8Array(26).fill(3));
+    const legacyIssue = [{ id, label: "Legacy finding" }];
+
+    expect(sanitizeReportIssues(legacyIssue)[0].id).toBe(id);
+    expect(sanitizeReportIssues(legacyIssue)[0].id).toBe(id);
+  });
+
+  it("never generates identities on the render path", () => {
+    const issues = sanitizeReportIssues([
+      { label: "Missing ID" },
+      { id: "invalid-id", label: "Invalid ID" },
+    ]);
+
+    expect(issues.map((issue) => issue.id)).toEqual([undefined, undefined]);
+  });
+
+  it("preserves bounded criterion arrays and recovers the first valid legacy token", () => {
+    const issues = sanitizeReportIssues([
+      {
+        sc: ["1.4.3", "4.1.2", "1.4.3", "invalid", "2.4.7", "2.4.11", "1.1.1", "1.3.1", "3.3.1", "4.1.3", "2.5.8"],
+      },
+      { sc: "not-a-criterion, 1.4.10, 4.1.2" },
+      { sc: "1.4.3, 4.1.2" },
+    ]);
+
+    expect(issues[0].sc).toEqual(["1.4.3", "4.1.2", "2.4.7", "2.4.11", "1.1.1", "1.3.1", "3.3.1", "4.1.3"]);
+    expect(issues[1].sc).toEqual(["1.4.10"]);
+    expect(issues[2].sc).toEqual(["1.4.3"]);
+  });
+
   it("caps issue count and text lengths", () => {
     const issues = sanitizeReportIssues(
-      Array.from({ length: 5 }, () => ({ label: "x".repeat(200), note: "y".repeat(1200) })),
+      Array.from({ length: 5 }, () => ({ label: "x".repeat(200), note: "y".repeat(6_000) })),
       2,
     );
     expect(issues).toHaveLength(2);
-    expect(issues[0].label).toHaveLength(120);
-    expect(issues[0].note).toHaveLength(1000);
+    expect(issues[0].label).toHaveLength(160);
+    expect(issues[0].note).toHaveLength(5_000);
   });
 });
 
@@ -104,8 +165,8 @@ describe("public report finding explorer", () => {
   });
 
   it("gives the annotated image full finding text instead of a generic alt", () => {
-    const alt = reportImageAlt("Checkout", reportIssues.slice(0, 1));
-    expect(alt).toContain("Finding 1, major, WCAG 2.4.7, Focus is hidden: Keep focus visible.");
+    const alt = reportImageAlt("Checkout", reportIssues.slice(2, 3));
+    expect(alt).toContain("Finding 3, blocker, WCAG 1.4.3, 4.1.2, Text has low contrast: Increase contrast.");
   });
 });
 

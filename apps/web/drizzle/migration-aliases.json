@@ -1,0 +1,6 @@
+{
+  "0003_finding_identity.sql": ["0002_finding_identity.sql"],
+  "0004_brand_and_report_size.sql": ["0003_brand_and_report_size.sql"],
+  "0005_dodo_billing.sql": ["0004_dodo_billing.sql"],
+  "0006_funnel_telemetry.sql": ["0005_funnel_telemetry.sql"]
+}

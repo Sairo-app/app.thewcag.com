@@ -52,8 +52,13 @@ export function configuredPlanCatalog(): PlanCatalogEntry[] {
 }
 
 export function planForChoice(choice: unknown): PlanCatalogEntry | null {
-  if (choice !== "pro-monthly" && choice !== "pro-annual") return null;
-  return planCatalog().find((entry) => entry.choice === choice && entry.productId) ?? null;
+  const parsed = parsePlanChoice(choice);
+  if (!parsed) return null;
+  return planCatalog().find((entry) => entry.choice === parsed && entry.productId) ?? null;
+}
+
+export function parsePlanChoice(choice: unknown): PlanChoice | null {
+  return choice === "pro-monthly" || choice === "pro-annual" ? choice : null;
 }
 
 export function planForProduct(productId: unknown): PlanCatalogEntry | null {
