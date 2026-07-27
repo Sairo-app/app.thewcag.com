@@ -8,12 +8,15 @@ import {
   AppleIcon,
   ArrowRightIcon,
   BookIcon,
+  CalendarIcon,
   CheckIcon,
   ContrastIcon,
   CropIcon,
   EyeIcon,
+  FileCheckIcon,
+  FlagIcon,
   ImageIcon,
-  PaletteIcon,
+  LinkIcon,
   WindowsIcon,
 } from "@/components/icons";
 
@@ -72,25 +75,25 @@ const CAPABILITIES = [
     href: "/wcag-checklist",
   },
   {
-    icon: PaletteIcon,
+    icon: FileCheckIcon,
     title: "Accessible reports and VPAT authoring",
     body: "Create audience-specific HTML or PDF reports and author every VPAT response explicitly—never from an automated signal.",
     href: "/accessibility-reporting-software",
   },
   {
-    icon: CheckIcon,
+    icon: LinkIcon,
     title: "Tickets without retyping",
     body: "Map complete findings into Jira, Linear, or GitHub Issues and review external changes before they affect local audit decisions.",
     href: "/accessibility-issue-tracker-integrations",
   },
   {
-    icon: BookIcon,
+    icon: CalendarIcon,
     title: "Program trends without a score",
     body: "Review recurrence, retest time, component hotspots, and regressions from owned audit history while untested work stays visible.",
     href: "/accessibility-program-management",
   },
   {
-    icon: PaletteIcon,
+    icon: FlagIcon,
     title: "Audit planning and delivery",
     body: "Define scope, run guided tests, verify finding-to-evidence traceability, retest remediation, and produce a defensible audit record.",
     href: "/accessibility-audit-software",
@@ -163,9 +166,9 @@ export default function Home() {
                   </Link>
                 </div>
                 <div className="home-hero__assurances" aria-label="Download details">
-                  <span><CheckIcon size={16} /> No account to start</span>
+                  <span><CheckIcon size={16} /> Free, no account to start</span>
                   <span><CheckIcon size={16} /> macOS and Windows</span>
-                  <span><CheckIcon size={16} /> Local by default</span>
+                  <span><CheckIcon size={16} /> Evidence stays local</span>
                 </div>
               </div>
 
@@ -175,15 +178,6 @@ export default function Home() {
             </div>
           </div>
         </section>
-
-        <aside className="home-proof" aria-label="Product facts">
-          <div className="home-shell home-proof__inner">
-            <span><CheckIcon size={16} /> Free desktop app</span>
-            <span><CheckIcon size={16} /> Works without an account</span>
-            <span><CheckIcon size={16} /> Evidence stays on your device</span>
-            <span><CheckIcon size={16} /> WCAG 2.2 audit workflow</span>
-          </div>
-        </aside>
 
         <section className="home-paths" aria-labelledby="home-paths-heading">
           <div className="home-shell home-paths__inner">
@@ -252,22 +246,6 @@ export default function Home() {
                   </Link>
                 );
               })}
-            </div>
-          </div>
-        </section>
-
-        <section className="home-connected" aria-labelledby="connected-heading">
-          <div className="home-shell">
-            <div className="section-heading section-heading--compact">
-              <h2 id="connected-heading">Keep the context from capture to handoff.</h2>
-              <p>Move a real barrier through one continuous workflow instead of rebuilding the evidence in documents and ticket fields.</p>
-            </div>
-            <div className="home-connected__flow">
-              <Link href="/chrome-accessibility-extension"><strong>Capture the barrier</strong><span>Select a webpage control or region with its visual and semantic context intact.</span></Link>
-              <ArrowRightIcon size={16} />
-              <Link href="/accessibility-audit-software"><strong>Confirm the finding</strong><span>Review the evidence, WCAG decision, severity, ownership, and remediation locally.</span></Link>
-              <ArrowRightIcon size={16} />
-              <Link href="/download"><strong>Deliver with control</strong><span>Export a portable audit or publish only the approved report you choose.</span></Link>
             </div>
           </div>
         </section>
