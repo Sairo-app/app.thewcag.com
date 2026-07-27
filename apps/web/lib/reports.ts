@@ -17,15 +17,25 @@ export function buildSharedReportMetadata(input: {
   title: string;
   description?: string | null;
   issueCount: number;
+  /** Absolute or root-relative override for the preview image. */
+  imagePath?: string;
+  /**
+   * Published reports are unlisted and stay out of the index. The demonstration
+   * report is public marketing content and opts in explicitly.
+   */
+  indexable?: boolean;
 }): Metadata {
-  const image = `${SITE_URL}/api/s/${input.slug}/image`;
+  const image = input.imagePath
+    ? new URL(input.imagePath, SITE_URL).toString()
+    : `${SITE_URL}/api/s/${input.slug}/image`;
   const description =
     input.description ||
     `${input.issueCount} accessibility ${input.issueCount === 1 ? "issue" : "issues"} annotated in the TheWCAG desktop app.`;
   return {
     title: input.title,
     description,
-    robots: { index: false, follow: false },
+    robots: input.indexable ? { index: true, follow: true } : { index: false, follow: false },
+    alternates: input.indexable ? { canonical: `${SITE_URL}/s/${input.slug}` } : undefined,
     openGraph: { title: input.title, description, images: [{ url: image, width: 1400 }], type: "article" },
     twitter: { card: "summary_large_image", title: input.title, description, images: [image] },
   };

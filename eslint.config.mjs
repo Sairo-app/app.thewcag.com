@@ -11,6 +11,7 @@ export default tseslint.config(
       "**/.next/**",
       "**/coverage/**",
       "**/dist/**",
+      "**/dist-firefox/**",
       "**/node_modules/**",
       "**/out/**",
       "**/release/**",

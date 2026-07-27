@@ -49,6 +49,23 @@ Checklist decision keys are configured separately in Settings. Their defaults ar
 
 The Manifest V3 extension turns a browser observation into a reviewable desktop issue without claiming automated conformance. The toolbar opens a compact popup for quick capture. The optional side panel lets the auditor describe the issue, inspect and control the evidence payload, and send it to the selected desktop audit as **Needs review**. Full draft editing remains available as an optional extension-side path.
 
+#### Chrome and Firefox builds
+
+One `pnpm --filter @accessibility-build/extension build` produces both stores from the same bundle and the same `manifest.json`:
+
+| Output | Store | Manifest differences |
+| --- | --- | --- |
+| `apps/extension/dist` | Chrome, Edge | Source manifest, unchanged |
+| `apps/extension/dist-firefox` | Firefox | Event page instead of a background service worker, `sidebar_action` instead of `side_panel`, `browser_specific_settings.gecko`, and no Chrome-only keys |
+
+`manifest-targets.ts` derives the Firefox manifest so the two cannot drift, and `src/browser-panel.ts` routes the four panel calls to `sidePanel` or `sidebarAction` depending on what the browser exposes. Set `THEWCAG_GECKO_ID` at build time to override the add-on id; the desktop application reads the same variable when it writes the Firefox native messaging manifest to Mozilla's own host directory (macOS) or registry key (Windows).
+
+Validate the Firefox bundle against Mozilla's linter before submitting:
+
+```sh
+pnpm --filter @accessibility-build/extension exec web-ext lint --source-dir=dist-firefox
+```
+
 The capture flow is:
 
 1. Open the toolbar popup on the page being audited.

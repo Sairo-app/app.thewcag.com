@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/seo";
+import { SAMPLE_REPORT_SLUG } from "@/lib/sample-report";
 
 /** Static, indexable marketing + tool pages. Auth/API routes stay out. */
 export const PUBLIC_ROUTES: { path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"] }[] = [
@@ -13,6 +14,9 @@ export const PUBLIC_ROUTES: { path: string; priority: number; changeFrequency: M
   { path: "/download", priority: 0.9, changeFrequency: "weekly" },
   { path: "/pricing", priority: 0.9, changeFrequency: "monthly" },
   { path: "/screenshot-tool", priority: 0.8, changeFrequency: "monthly" },
+  // The one report page that is public marketing content rather than an
+  // unlisted customer report; see `sampleReport`.
+  { path: `/s/${SAMPLE_REPORT_SLUG}`, priority: 0.8, changeFrequency: "yearly" },
   { path: "/color-contrast-checker", priority: 0.8, changeFrequency: "monthly" },
   { path: "/wcag-contrast", priority: 0.8, changeFrequency: "monthly" },
   { path: "/wcag-checklist", priority: 0.8, changeFrequency: "monthly" },

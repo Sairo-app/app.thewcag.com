@@ -75,6 +75,7 @@ import {
   type LastWrittenStorage,
   type SavedFindingMarker,
 } from "./storage-state";
+import { openReviewPanel } from "../browser-panel";
 
 type StatusMessage = { text: string; tone: "neutral" | "success" | "danger" } | null;
 type DesktopState = "checking" | "connected" | "disconnected";
@@ -682,10 +683,12 @@ export function App({ surface }: { surface: ExtensionSurface }) {
       setStatus({ text: "The expanded workspace is not ready yet. Try again.", tone: "danger" });
       return;
     }
-    void chrome.sidePanel.open({ windowId: currentWindowId }).then(() => {
+    void openReviewPanel(currentWindowId).then((opened) => {
+      if (!opened) {
+        setStatus({ text: "The expanded workspace could not open. Reopen TheWCAG from the toolbar and try again.", tone: "danger" });
+        return;
+      }
       if (surface === "popup") window.close();
-    }).catch(() => {
-      setStatus({ text: "The expanded workspace could not open. Reopen TheWCAG from the toolbar and try again.", tone: "danger" });
     });
   }
 

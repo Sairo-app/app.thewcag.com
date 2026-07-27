@@ -8,6 +8,7 @@ import {
   type AxeSignalIdentity,
 } from "../../a11y/triage";
 import { A11Y_SCAN_REPORT_SLUG } from "../../lib/a11y-scan-fixture";
+import { SAMPLE_REPORT_SLUG } from "../../lib/sample-report";
 
 const require = createRequire(import.meta.url);
 const axePath = require.resolve("axe-core/axe.min.js");
@@ -28,6 +29,8 @@ const ROUTES = [
   "/wcag-contrast",
   "/wcag-checklist",
   `/s/${A11Y_SCAN_REPORT_SLUG}`,
+  // Public marketing content, unlike every other report page.
+  `/s/${SAMPLE_REPORT_SLUG}`,
 ] as const;
 
 const WCAG_A_AA_TAGS = [

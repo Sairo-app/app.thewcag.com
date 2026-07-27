@@ -817,7 +817,7 @@ kbd {
 
 .home-paths__inner {
   display: grid;
-  grid-template-columns: minmax(12rem, 0.85fr) repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(11rem, 0.7fr) repeat(4, minmax(0, 1fr));
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--radius-panel);
@@ -4374,14 +4374,16 @@ kbd {
     grid-column: 1 / -1;
   }
 
-  .home-paths__link:nth-child(2) {
+  /* Two columns: the intro spans the row, then the four links pair up. The
+     first link of each pair loses its divider; the second pair gains a rule. */
+  .home-paths__link:nth-child(2),
+  .home-paths__link:nth-child(4) {
     border-left: 0;
   }
 
-  .home-paths__link:last-child {
-    grid-column: 1 / -1;
+  .home-paths__link:nth-child(4),
+  .home-paths__link:nth-child(5) {
     border-top: 1px solid var(--line);
-    border-left: 0;
   }
 
   .site-nav__link {
@@ -4652,18 +4654,16 @@ kbd {
   }
 
   .home-paths__intro,
-  .home-paths__link,
-  .home-paths__link:last-child {
+  .home-paths__link {
     grid-column: 1;
   }
 
-  .home-paths__link,
-  .home-paths__link:nth-child(2),
-  .home-paths__link:last-child {
+  .home-paths__link {
     border-top: 1px solid var(--line);
     border-left: 0;
   }
 
+  /* Sits directly below the dark intro panel, which is its own divider. */
   .home-paths__link:nth-child(2) {
     border-top: 0;
   }

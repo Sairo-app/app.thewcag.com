@@ -5,6 +5,8 @@ import { reports } from "@/lib/schema";
 import { getImage } from "@/lib/r2";
 import { isReportAvailable } from "@/lib/billing/subscriptions";
 import { A11Y_SCAN_PNG_BASE64, a11yScanReportFixture } from "@/lib/a11y-scan-fixture";
+import { SAMPLE_REPORT_IMAGE_PATH, sampleReport } from "@/lib/sample-report";
+import { SITE_URL } from "@/lib/seo";
 
 export const runtime = "nodejs";
 
@@ -14,6 +16,11 @@ export const runtime = "nodejs";
  */
 export async function GET(_req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+  // The demonstration report's image is a committed static asset, not an R2
+  // object. Point callers that reach this route at the file they should use.
+  if (sampleReport(slug)) {
+    return NextResponse.redirect(new URL(SAMPLE_REPORT_IMAGE_PATH, SITE_URL), 308);
+  }
   if (a11yScanReportFixture(slug)) {
     return new NextResponse(Buffer.from(A11Y_SCAN_PNG_BASE64, "base64"), {
       headers: {

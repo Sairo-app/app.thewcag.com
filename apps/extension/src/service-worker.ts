@@ -16,8 +16,9 @@ import {
   QUEUED_FINDING_STORAGE_KEY,
   SAVED_FINDING_STORAGE_KEY,
 } from "./shared/storage";
+import { keepActionPopupOnClick } from "./browser-panel";
 
-void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => undefined);
+void keepActionPopupOnClick();
 
 const capturePromises = new Map<number, Promise<ExtensionResponse>>();
 const panelPortsByWindow = new Map<number, Set<chrome.runtime.Port>>();
@@ -55,11 +56,11 @@ chrome.runtime.onConnect.addListener((port) => {
 });
 
 chrome.runtime.onInstalled.addListener(() => {
-  void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => undefined);
+  void keepActionPopupOnClick();
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => undefined);
+  void keepActionPopupOnClick();
 });
 
 function showPageNotice(tone: "success" | "danger", message: string): void {

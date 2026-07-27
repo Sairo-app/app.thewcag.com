@@ -4,6 +4,7 @@ import { Footer, JsonLd } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { AuditPlayground } from "@/components/HomeExperience";
 import { createPageMetadata, SITE_URL } from "@/lib/seo";
+import { SAMPLE_REPORT_SLUG } from "@/lib/sample-report";
 import {
   AppleIcon,
   ArrowRightIcon,
@@ -193,6 +194,11 @@ export default function Home() {
             <Link href="/download" className="home-paths__link">
               <strong>Start working locally</strong>
               <span>Download the free desktop workstation for macOS or Windows.</span>
+              <ArrowRightIcon size={16} />
+            </Link>
+            <Link href={`/s/${SAMPLE_REPORT_SLUG}`} className="home-paths__link">
+              <strong>See a finished report</strong>
+              <span>Open the annotated report a reviewer receives, with findings and WCAG mapping.</span>
               <ArrowRightIcon size={16} />
             </Link>
             <Link href="/pricing" className="home-paths__link">

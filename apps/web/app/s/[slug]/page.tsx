@@ -14,6 +14,7 @@ import { hasActiveProSubscription } from "@/lib/billing/entitlements";
 import { isReportAvailable } from "@/lib/billing/subscriptions";
 import { ReportExplorer } from "./ReportExplorer";
 import { a11yScanReportFixture } from "@/lib/a11y-scan-fixture";
+import { SAMPLE_REPORT_IMAGE_PATH, sampleReport } from "@/lib/sample-report";
 import { brandLogoPath } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,8 @@ export const dynamic = "force-dynamic";
 const getScreenshot = cache(async (slug: string) => {
   const fixture = a11yScanReportFixture(slug);
   if (fixture) return fixture;
+  const sample = sampleReport(slug);
+  if (sample) return sample;
   const [row] = await db
     .select({
       title: reports.title,
@@ -58,11 +61,14 @@ export async function generateMetadata({
   const shot = await getScreenshot(slug);
   if (!shot) return { title: "Screenshot not found" };
 
+  const sample = sampleReport(slug);
   return buildSharedReportMetadata({
     slug,
     title: shot.title,
     description: shot.description,
     issueCount: shot.issues.length,
+    imagePath: sample ? SAMPLE_REPORT_IMAGE_PATH : undefined,
+    indexable: Boolean(sample),
   });
 }
 
@@ -72,7 +78,9 @@ export default async function ScreenshotPage({ params }: { params: Promise<{ slu
   if (!shot) notFound();
 
   const issues = sanitizeReportIssues(shot.issues);
-  const imageUrl = `/api/s/${slug}/image`;
+  // The sample ships as a committed asset, so it needs neither a database row
+  // nor object storage and can be cached like any other static file.
+  const imageUrl = sampleReport(slug) ? SAMPLE_REPORT_IMAGE_PATH : `/api/s/${slug}/image`;
 
   // White-label: if the report owner set a brand, the page leads with their
   // logo/name/accent instead of TheWCAG's site header.

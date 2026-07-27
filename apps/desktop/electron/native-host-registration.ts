@@ -19,6 +19,16 @@ export async function configuredExtensionId(resourcesPath: string): Promise<stri
   }
 }
 
+/** Firefox allowlists an add-on id, not a `chrome-extension://` origin. */
+const GECKO_ID = /^[^\s@]+@[^\s@]+$|^\{[0-9a-fA-F-]{36}\}$/;
+
+export const DEFAULT_GECKO_ID = "extension@thewcag.com";
+
+export function configuredGeckoId(): string {
+  const fromEnvironment = process.env.THEWCAG_GECKO_ID?.trim();
+  return fromEnvironment && GECKO_ID.test(fromEnvironment) ? fromEnvironment : DEFAULT_GECKO_ID;
+}
+
 export function nativeHostManifest(executablePath: string, extensionId: string): Record<string, unknown> {
   if (!EXTENSION_ID.test(extensionId)) throw new Error("Invalid Chrome extension ID");
   return {
@@ -27,6 +37,17 @@ export function nativeHostManifest(executablePath: string, extensionId: string):
     path: executablePath,
     type: "stdio",
     allowed_origins: [`chrome-extension://${extensionId}/`],
+  };
+}
+
+export function firefoxNativeHostManifest(executablePath: string, geckoId: string): Record<string, unknown> {
+  if (!GECKO_ID.test(geckoId)) throw new Error("Invalid Firefox add-on ID");
+  return {
+    name: HOST_NAME,
+    description: "TheWCAG local audit bridge",
+    path: executablePath,
+    type: "stdio",
+    allowed_extensions: [geckoId],
   };
 }
 
@@ -62,6 +83,31 @@ export function nativeHostManifestPath(options: {
   return null;
 }
 
+/**
+ * Firefox reads its own directory on macOS and its own registry key on Windows,
+ * so the manifest is written twice rather than shared with Chrome's location.
+ */
+export function firefoxNativeHostManifestPath(options: {
+  platform: NodeJS.Platform;
+  homePath: string;
+  userDataPath: string;
+}): string | null {
+  if (options.platform === "darwin") {
+    return posix.join(
+      options.homePath,
+      "Library",
+      "Application Support",
+      "Mozilla",
+      "NativeMessagingHosts",
+      `${HOST_NAME}.json`,
+    );
+  }
+  if (options.platform === "win32") {
+    return win32.join(options.userDataPath, "native-messaging", `${HOST_NAME}.firefox.json`);
+  }
+  return null;
+}
+
 async function writeAtomic(path: string, contents: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   const temporary = `${path}.${process.pid}.tmp`;
@@ -84,9 +130,18 @@ export async function registerNativeMessagingHost(options: {
     await access(hostExecutablePath);
   }
   const manifest = `${JSON.stringify(nativeHostManifest(hostExecutablePath, extensionId), null, 2)}\n`;
+  const firefoxPath = firefoxNativeHostManifestPath(options);
+  const firefoxManifest = `${JSON.stringify(
+    firefoxNativeHostManifest(hostExecutablePath, configuredGeckoId()),
+    null,
+    2,
+  )}\n`;
 
   if (options.platform === "darwin") {
     await writeAtomic(manifestPath, manifest);
+    // Firefox may not be installed; its directory is created regardless so the
+    // bridge works the moment the add-on is added.
+    if (firefoxPath) await writeAtomic(firefoxPath, firefoxManifest);
     return true;
   }
 
@@ -101,5 +156,18 @@ export async function registerNativeMessagingHost(options: {
     manifestPath,
     "/f",
   ], { windowsHide: true });
+  if (firefoxPath) {
+    await writeAtomic(firefoxPath, firefoxManifest);
+    await run("reg.exe", [
+      "ADD",
+      `HKCU\\Software\\Mozilla\\NativeMessagingHosts\\${HOST_NAME}`,
+      "/ve",
+      "/t",
+      "REG_SZ",
+      "/d",
+      firefoxPath,
+      "/f",
+    ], { windowsHide: true });
+  }
   return true;
 }

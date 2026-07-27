@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { headers } from "next/headers";
+import { SAMPLE_REPORT_SLUG } from "@/lib/sample-report";
 import {
   AccessibilityIcon,
   AppleIcon,
@@ -27,6 +28,7 @@ const COLUMNS: { heading: string; links: { href: string; label: string; icon: Re
     links: [
       { href: "/accessibility-audit-software", label: "Audit workstation", icon: <AccessibilityIcon size={20} /> },
       { href: "/accessibility-reporting-software", label: "Accessible reporting", icon: <FileCheckIcon size={20} /> },
+      { href: `/s/${SAMPLE_REPORT_SLUG}`, label: "See a sample report", icon: <ImageIcon size={20} /> },
       { href: "/accessibility-issue-tracker-integrations", label: "Issue tracker integrations", icon: <LinkIcon size={20} /> },
       { href: "/accessibility-program-management", label: "Program management", icon: <FlagIcon size={20} /> },
       { href: "/chrome-accessibility-extension", label: "Chrome extension", icon: <CropIcon size={20} /> },
