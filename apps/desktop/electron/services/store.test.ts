@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { access, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { assertStoreKey, isFindingsStoreKey, JsonStore, mergeFindings } from "./store";
@@ -356,6 +356,53 @@ describe("desktop storage validation", () => {
       await expect(
         access(join(store.directory, "evidence-orphan-packet.json")),
       ).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("sweeps an orphan whose modification time is ahead of the sweep clock", async () => {
+    // `Date.now()` truncates to whole milliseconds while `mtimeMs` keeps a
+    // fraction, so a packet written in the current millisecond can look newer
+    // than the sweep clock. A zero grace period must still collect it.
+    const directory = await mkdtemp(join(tmpdir(), "thewcag-evidence-skew-"));
+    try {
+      const store = new JsonStore(directory);
+      await store.initialize();
+      await store.set("evidence-future-packet", { id: "future-packet" });
+
+      const { mtimeMs } = await stat(
+        join(store.directory, "evidence-future-packet.json"),
+      );
+
+      await expect(
+        store.sweepOrphanedEvidence({ minimumAgeMs: 0, now: Math.floor(mtimeMs) - 5 }),
+      ).resolves.toEqual(["evidence-future-packet"]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps an orphan that has not outlived the grace period", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "thewcag-evidence-grace-"));
+    try {
+      const store = new JsonStore(directory);
+      await store.initialize();
+      await store.set("evidence-young-packet", { id: "young-packet" });
+
+      const { mtimeMs } = await stat(
+        join(store.directory, "evidence-young-packet.json"),
+      );
+
+      await expect(
+        store.sweepOrphanedEvidence({
+          minimumAgeMs: 60_000,
+          now: mtimeMs + 30_000,
+        }),
+      ).resolves.toEqual([]);
+      await expect(
+        access(join(store.directory, "evidence-young-packet.json")),
+      ).resolves.toBeUndefined();
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

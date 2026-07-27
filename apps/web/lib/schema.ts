@@ -184,6 +184,24 @@ export const funnelTransitions = pgTable("funnel_transition", {
   count: integer("count").notNull().default(1),
 });
 
+// Opt-in desktop crash diagnostics, aggregated by fingerprint. Every text
+// column is redacted client-side and again in `parseCrashReportPayload`, so no
+// row is tied to a person, machine, or audited page.
+export const crashReports = pgTable("crash_report", {
+  fingerprint: text("fingerprint").primaryKey(),
+  origin: text("origin").notNull(),
+  name: text("name").notNull(),
+  message: text("message").notNull(),
+  frames: jsonb("frames").$type<string[]>().notNull().default([]),
+  appVersion: text("app_version").notNull(),
+  platform: text("platform").notNull(),
+  osRelease: text("os_release").notNull(),
+  arch: text("arch").notNull(),
+  count: integer("count").notNull().default(1),
+  firstSeenAt: timestamp("first_seen_at").defaultNow().notNull(),
+  lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
+});
+
 // ---- Dodo Payments normalized billing state ----
 // Dodo remains the financial source of truth. These tables contain only the
 // minimum state required for fast service authorization and webhook recovery.

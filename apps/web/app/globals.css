@@ -1081,13 +1081,11 @@ kbd {
   color: var(--muted);
   transition:
     color var(--motion-duration-base) var(--motion-easing-standard),
-    opacity var(--motion-duration-base) var(--motion-easing-standard),
-    transform var(--motion-duration-base) var(--motion-easing-standard);
+    opacity var(--motion-duration-base) var(--motion-easing-standard);
 }
 
 .capability-map__item:hover .capability-map__arrow {
   color: var(--orange-text);
-  transform: translateX(3px);
 }
 
 .home-platforms .section-heading {

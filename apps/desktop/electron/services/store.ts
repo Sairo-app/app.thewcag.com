@@ -295,7 +295,15 @@ export class JsonStore {
         if (referenced.has(key)) continue;
         const path = join(this.directory, entry.name);
         const metadata = await stat(path).catch(() => null);
-        if (!metadata || now - metadata.mtimeMs < minimumAgeMs) continue;
+        if (!metadata) continue;
+        // `Date.now()` truncates to whole milliseconds while `mtimeMs` keeps a
+        // sub-millisecond fraction, so a packet written in the current
+        // millisecond can report a modification time later than `now`. Clamping
+        // keeps the age non-negative: without it a zero grace period skips the
+        // very files it is meant to sweep, and a future-dated packet is treated
+        // as brand new rather than immediately eligible.
+        const ageMs = Math.max(0, now - metadata.mtimeMs);
+        if (ageMs < minimumAgeMs) continue;
         await rm(path, { force: true });
         removed.push(key);
       }

@@ -11,6 +11,7 @@ function settings(enabled: boolean): AppSettings {
     reduceMotion: false,
     captureHighDpi: true,
     shareAnonymousFunnelTelemetry: enabled,
+    shareCrashReports: false,
   };
 }
 

@@ -55,6 +55,7 @@ const DEFAULTS: AppSettings = {
   reduceMotion: false,
   captureHighDpi: true,
   shareAnonymousFunnelTelemetry: false,
+  shareCrashReports: false,
 };
 
 const PROVIDER_MODELS: Record<AiProviderId, string> = {
@@ -378,6 +379,28 @@ export function SettingsView({
                 void saveSettings({
                   ...settings,
                   shareAnonymousFunnelTelemetry: event.target.checked,
+                })
+              }
+            />
+          </label>
+          <label className="toggle-row">
+            <span>
+              <strong>Send crash reports</strong>
+              <small>
+                After a crash, send the error type, a redacted message and stack, the application
+                version, and the operating system name, version, and architecture. File paths are
+                reduced to a file name, and addresses, links, and long tokens are removed before
+                sending. No audit content, evidence, screenshots, findings, tested URLs, or account
+                data is included.
+              </small>
+            </span>
+            <input
+              type="checkbox"
+              checked={settings.shareCrashReports}
+              onChange={(event) =>
+                void saveSettings({
+                  ...settings,
+                  shareCrashReports: event.target.checked,
                 })
               }
             />

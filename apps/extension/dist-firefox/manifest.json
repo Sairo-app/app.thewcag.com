@@ -1,0 +1,52 @@
+{
+  "manifest_version": 3,
+  "name": "TheWCAG Evidence Capture",
+  "short_name": "TheWCAG",
+  "description": "Mark accessibility barriers on a webpage and turn exact evidence into reviewable findings.",
+  "version": "0.4.0",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "unlimitedStorage"
+  ],
+  "optional_permissions": [
+    "nativeMessaging"
+  ],
+  "background": {
+    "scripts": [
+      "service-worker.js"
+    ],
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Mark an accessibility issue",
+    "default_popup": "popup.html"
+  },
+  "icons": {
+    "16": "icon-16.png",
+    "32": "icon-32.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+  },
+  "sidebar_action": {
+    "default_panel": "sidepanel.html",
+    "default_title": "TheWCAG",
+    "default_icon": {
+      "16": "icon-16.png",
+      "32": "icon-32.png",
+      "48": "icon-48.png",
+      "128": "icon-128.png"
+    },
+    "open_at_install": false
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "extension@thewcag.com",
+      "strict_min_version": "115.0"
+    }
+  }
+}

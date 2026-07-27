@@ -1,4 +1,5 @@
 import { appendFile, mkdir } from "node:fs/promises";
+import { arch, release } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
@@ -20,6 +21,8 @@ import { JsonStore } from "./services/store";
 import { UpdateService } from "./services/updater";
 import { TicketConnectorService } from "./services/ticket-connectors";
 import { FunnelTelemetryService } from "./services/funnel-telemetry";
+import { CrashReportService } from "./services/crash-reports";
+import type { CrashReportOrigin } from "../src/shared/desktop";
 import { WindowManager } from "./windows";
 import { createTray, installApplicationMenu } from "./menu";
 import { registerIpc } from "./ipc";
@@ -53,6 +56,9 @@ if (!lock) app.quit();
 let tray: Tray | null = null;
 let stopFindingsWatch: (() => void) | null = null;
 let stopStoreQuarantine: (() => void) | null = null;
+// Set once the store and settings exist. Crashes before that point are still
+// written to the local log; there is simply no consent to read yet.
+let crashReports: CrashReportService | null = null;
 let services: {
   auth: AuthService;
   windows: WindowManager;
@@ -152,6 +158,24 @@ async function start(): Promise<void> {
   },
   (value) => screenCapture.setHighDpi(value.captureHighDpi));
   const telemetry = new FunnelTelemetryService(settings, store);
+  crashReports = new CrashReportService(settings, store, {
+    appVersion: app.getVersion(),
+    platform: process.platform,
+    osRelease: release(),
+    arch: arch(),
+  });
+  app.on("render-process-gone", (_event, _contents, details) => {
+    void reportCrash(
+      "renderer-process-gone",
+      new Error(`Renderer process gone: ${details.reason} (exit code ${details.exitCode})`),
+    );
+  });
+  app.on("child-process-gone", (_event, details) => {
+    void reportCrash(
+      "child-process-gone",
+      new Error(`Child process gone: ${details.type} ${details.reason}`),
+    );
+  });
   const updates = new UpdateService((state) => windows.broadcast("update:state", state));
 
   services = { auth, windows, settings, captureCoordinator };
@@ -231,8 +255,21 @@ async function logFatal(error: unknown): Promise<void> {
   }
 }
 
-process.on("uncaughtException", (error) => { void logFatal(error); });
-process.on("unhandledRejection", (error) => { void logFatal(error); });
+/**
+ * Sending is best effort and must never mask the original failure: the local
+ * log is written first and a reporting error is swallowed.
+ */
+async function reportCrash(origin: CrashReportOrigin, error: unknown): Promise<void> {
+  await logFatal(error);
+  try {
+    await crashReports?.report(origin, error);
+  } catch {
+    // Diagnostics must not become a second failure.
+  }
+}
+
+process.on("uncaughtException", (error) => { void reportCrash("main-uncaught-exception", error); });
+process.on("unhandledRejection", (error) => { void reportCrash("main-unhandled-rejection", error); });
 
 void start().catch(async (error) => {
   await logFatal(error);

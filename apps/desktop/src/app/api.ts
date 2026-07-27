@@ -52,6 +52,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   reduceMotion: false,
   captureHighDpi: true,
   shareAnonymousFunnelTelemetry: false,
+  shareCrashReports: false,
 };
 
 const listeners = new Map<DesktopEvent, Set<(payload: unknown) => void>>();

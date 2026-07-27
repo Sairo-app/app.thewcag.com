@@ -421,6 +421,15 @@ export const FUNNEL_TELEMETRY_EVENTS = [
 
 export type FunnelTelemetryEvent = (typeof FUNNEL_TELEMETRY_EVENTS)[number];
 
+export const CRASH_REPORT_ORIGINS = [
+  "main-uncaught-exception",
+  "main-unhandled-rejection",
+  "renderer-process-gone",
+  "child-process-gone",
+] as const;
+
+export type CrashReportOrigin = (typeof CRASH_REPORT_ORIGINS)[number];
+
 export interface AppSettings {
   shortcuts: ShortcutSettings;
   checklistShortcuts: ChecklistShortcutSettings;
@@ -429,6 +438,7 @@ export interface AppSettings {
   reduceMotion: boolean;
   captureHighDpi: boolean;
   shareAnonymousFunnelTelemetry: boolean;
+  shareCrashReports: boolean;
 }
 
 export interface Account {

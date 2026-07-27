@@ -30,6 +30,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   reduceMotion: false,
   captureHighDpi: true,
   shareAnonymousFunnelTelemetry: false,
+  shareCrashReports: false,
 };
 
 function normalize(input: unknown): AppSettings {
@@ -63,6 +64,7 @@ function normalize(input: unknown): AppSettings {
     reduceMotion: Boolean(value.reduceMotion),
     captureHighDpi: value.captureHighDpi !== false,
     shareAnonymousFunnelTelemetry: value.shareAnonymousFunnelTelemetry === true,
+    shareCrashReports: value.shareCrashReports === true,
   };
 }
 
