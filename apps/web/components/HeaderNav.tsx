@@ -4,9 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV = [
-  { href: "/getting-started", label: "Getting started" },
-  { href: "/accessibility-audit-software", label: "Audit software" },
-  { href: "/screenshot-tool", label: "Screenshot tool" },
+  { href: "/accessibility-audit-software", label: "Product" },
+  { href: "/getting-started", label: "Workflow" },
+  { href: "/screenshot-tool", label: "Capture" },
   { href: "/accessibility-reporting-software", label: "Reporting" },
   { href: "/accessibility-issue-tracker-integrations", label: "Integrations" },
   { href: "/pricing", label: "Pricing" },

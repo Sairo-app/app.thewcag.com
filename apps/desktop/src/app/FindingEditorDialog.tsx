@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { ArrowClockwise, ArrowSquareOut, Camera, FloppyDisk, GearSix, LinkSimple, Plus, Ticket, Trash, X } from "./Icon";
+import { ArrowClockwise, ArrowSquareOut, Camera, Check, FloppyDisk, GearSix, LinkSimple, Plus, Sparkle, Ticket, Trash, X } from "./Icon";
 import type { AffectedUser } from "@accessibility-build/audit-contracts";
 import type {
   CaptureEntry,
@@ -7,12 +7,22 @@ import type {
   Finding,
   FindingOccurrence,
   FindingTicketLink,
+  AuditLoggingField,
+  AuditLoggingProfile,
+  AuditTemplatePrefillResult,
   TicketConnectorConfiguration,
   TicketConnectorId,
   TicketConnectorPublicConfig,
   TicketExternalSnapshot,
   TicketSourceField,
 } from "../shared/desktop";
+import {
+  agencyValueFromNative,
+  auditFieldIsRequired,
+  auditFieldValidationError,
+  auditLoggingLayouts,
+  nativeValueFromAgency,
+} from "../shared/audit-logging-profile";
 import {
   DEFAULT_TICKET_FIELD_MAPPINGS,
   TICKET_FIELD_LABELS,
@@ -74,6 +84,8 @@ export interface FindingEditorValue {
   reproductionSteps: string[];
   note: string;
   retestNote: string;
+  agencyFields: Record<string, string>;
+  agencyLayoutId: string;
 }
 
 const EMPTY: FindingEditorValue = {
@@ -103,13 +115,19 @@ const EMPTY: FindingEditorValue = {
   reproductionSteps: [],
   note: "",
   retestNote: "",
+  agencyFields: {},
+  agencyLayoutId: "",
 };
 
 function valueFromFinding(
   finding: Finding | null,
   initialValue?: Partial<FindingEditorValue>,
 ): FindingEditorValue {
-  if (!finding) return { ...EMPTY, ...initialValue };
+  if (!finding) return {
+    ...EMPTY,
+    ...initialValue,
+    agencyFields: { ...(initialValue?.agencyFields ?? {}) },
+  };
   return {
     title: finding.title,
     wcag: finding.wcag,
@@ -138,7 +156,83 @@ function valueFromFinding(
     reproductionSteps: finding.reproductionSteps ?? [],
     note: finding.note,
     retestNote: finding.retestNote ?? "",
+    agencyFields: { ...(finding.agencyFields ?? {}) },
+    agencyLayoutId: finding.agencyLayoutId ?? "",
   };
+}
+
+const PROFILE_SOURCE_LABELS: Record<Exclude<AuditLoggingField["sourceField"], "custom">, string> = {
+  title: "Issue title",
+  description: "Issue description",
+  actualResult: "Actual result",
+  expectedResult: "Expected result",
+  userImpact: "User impact",
+  affectedUsers: "Affected users",
+  wcag: "WCAG criterion",
+  severity: "Severity",
+  severityRationale: "Severity rationale",
+  recommendation: "Suggested resolution",
+  reproductionSteps: "Reproduction steps",
+  location: "Page, screen, or component",
+  owner: "Remediation owner",
+  dueDate: "Target remediation date",
+  status: "Remediation status",
+  evidenceLink: "Evidence link",
+  note: "Implementation note",
+  ticket: "Ticket or reference",
+  riskAcceptance: "Risk acceptance rationale",
+  retestNote: "Retest record",
+  comparisonNote: "Before/after comparison",
+};
+
+function profileFieldValue(field: AuditLoggingField, value: FindingEditorValue): string {
+  if (field.sourceField === "custom") return value.agencyFields[field.id]?.trim() ?? "";
+  const current = value[field.sourceField];
+  if (Array.isArray(current)) {
+    return current.map((item) => agencyValueFromNative(field, String(item))).join("\n").trim();
+  }
+  const nativeValue = String(current ?? "").trim();
+  return agencyValueFromNative(field, nativeValue);
+}
+
+function valueWithAgencyField(
+  value: FindingEditorValue,
+  field: AuditLoggingField,
+  agencyValue: string,
+): FindingEditorValue {
+  if (field.sourceField === "custom") {
+    return { ...value, agencyFields: { ...value.agencyFields, [field.id]: agencyValue } };
+  }
+  const nativeValue = nativeValueFromAgency(field, agencyValue);
+  if (field.sourceField === "reproductionSteps") {
+    return {
+      ...value,
+      reproductionSteps: nativeValue.split(/\r?\n/).map((step) => step.trim()).filter(Boolean),
+    };
+  }
+  if (field.sourceField === "affectedUsers") {
+    const allowed = new Set(Object.keys(AFFECTED_USER_LABELS) as AffectedUser[]);
+    const affectedUsers = agencyValue.split(/[\n,;]+/).map((item) => nativeValueFromAgency(field, item.trim()))
+      .filter((item): item is AffectedUser => allowed.has(item as AffectedUser));
+    return { ...value, affectedUsers: [...new Set(affectedUsers)] };
+  }
+  return { ...value, [field.sourceField]: nativeValue } as FindingEditorValue;
+}
+
+function valueWithProfileDefaults(
+  value: FindingEditorValue,
+  profile?: AuditLoggingProfile,
+): FindingEditorValue {
+  if (!profile) return value;
+  const layouts = auditLoggingLayouts(profile);
+  const layout = layouts.find((candidate) => candidate.id === value.agencyLayoutId) ?? layouts[0];
+  let next = { ...value, agencyLayoutId: layout.id };
+  for (const field of layout.fields) {
+    if (!profileFieldValue(field, next) && field.defaultValue) {
+      next = valueWithAgencyField(next, field, field.defaultValue);
+    }
+  }
+  return next;
 }
 
 function findingWithEditorValue(finding: Finding, value: FindingEditorValue): Finding {
@@ -182,6 +276,7 @@ export function FindingEditorDialog({
   auditId,
   sampleItemId,
   testRunId,
+  loggingProfile,
 }: {
   open: boolean;
   finding: Finding | null;
@@ -193,6 +288,7 @@ export function FindingEditorDialog({
   auditId?: string;
   sampleItemId?: string;
   testRunId?: string;
+  loggingProfile?: AuditLoggingProfile;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -204,6 +300,9 @@ export function FindingEditorDialog({
   const [ticketMessage, setTicketMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [captureBusy, setCaptureBusy] = useState(false);
   const [captureMessage, setCaptureMessage] = useState("");
+  const [prefillBusy, setPrefillBusy] = useState(false);
+  const [prefillMessage, setPrefillMessage] = useState("");
+  const [prefillResult, setPrefillResult] = useState<AuditTemplatePrefillResult | null>(null);
   const [pendingCapture, setPendingCapture] = useState<PendingFindingCapture | null>(null);
   const [recentCaptures, setRecentCaptures] = useState<CaptureEntry[]>([]);
   const credentialRef = useRef<HTMLInputElement>(null);
@@ -237,7 +336,7 @@ export function FindingEditorDialog({
 
   useEffect(() => {
     if (open) {
-      setValue(valueFromFinding(finding, initialValue));
+      setValue(valueWithProfileDefaults(valueFromFinding(finding, initialValue), loggingProfile));
       setRecentCaptures([]);
       captureIntentRoleRef.current = null;
       earlyCapturesRef.current.clear();
@@ -245,8 +344,11 @@ export function FindingEditorDialog({
       updatePendingCapture(null);
       setCaptureBusy(false);
       setCaptureMessage("");
+      setPrefillBusy(false);
+      setPrefillMessage("");
+      setPrefillResult(null);
     }
-  }, [finding, initialValue, open]);
+  }, [finding, initialValue, loggingProfile, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -307,6 +409,66 @@ export function FindingEditorDialog({
     next: FindingEditorValue[K],
   ) {
     setValue((current) => ({ ...current, [key]: next }));
+  }
+
+  function patchAgencyField(field: AuditLoggingField, agencyValue: string) {
+    setValue((current) => valueWithAgencyField(current, field, agencyValue));
+  }
+
+  async function prefillAgencyFields() {
+    if (!loggingProfile || !value.agencyLayoutId) return;
+    setPrefillBusy(true);
+    setPrefillMessage("");
+    try {
+      const result = await desktop.invoke<AuditTemplatePrefillResult>("ai:prefill-audit-template", {
+        profile: loggingProfile,
+        layoutId: value.agencyLayoutId,
+        finding: {
+          title: value.title,
+          wcag: value.wcag,
+          severity: value.severity,
+          status: value.status,
+          location: value.location,
+          owner: value.owner,
+          ticket: value.ticket,
+          dueDate: value.dueDate,
+          evidenceLink: value.evidenceLink,
+          riskAcceptance: value.riskAcceptance,
+          description: value.description,
+          actualResult: value.actualResult,
+          expectedResult: value.expectedResult,
+          userImpact: value.userImpact,
+          affectedUsers: value.affectedUsers,
+          severityRationale: value.severityRationale,
+          recommendation: value.recommendation,
+          reproductionSteps: value.reproductionSteps,
+          note: value.note,
+          retestNote: value.retestNote,
+          comparisonNote: value.comparisonNote,
+          occurrences: value.occurrences,
+          agencyFields: value.agencyFields,
+        },
+      });
+      const layout = auditLoggingLayouts(loggingProfile).find((candidate) => candidate.id === result.layoutId);
+      if (!layout) throw new Error("AI returned values for an unavailable agency layout");
+      setPrefillResult(result);
+      let applied = 0;
+      let next = value;
+      for (const suggestion of result.values) {
+        const field = layout.fields.find((candidate) => candidate.id === suggestion.fieldId);
+        if (!field || !suggestion.value || profileFieldValue(field, next)) continue;
+        next = valueWithAgencyField(next, field, suggestion.value);
+        applied += 1;
+      }
+      setValue(next);
+      setPrefillMessage(applied
+        ? `AI filled ${applied} empty ${applied === 1 ? "field" : "fields"}. Review every value before saving.`
+        : "No empty fields could be filled from the current finding details.");
+    } catch (error) {
+      setPrefillMessage(ticketErrorMessage(error));
+    } finally {
+      setPrefillBusy(false);
+    }
   }
 
   const availableCaptures = [
@@ -506,11 +668,29 @@ export function FindingEditorDialog({
       setTicketBusy(null);
     }
   }
+  const loggingLayouts = loggingProfile ? auditLoggingLayouts(loggingProfile) : [];
+  const activeLoggingLayout = loggingLayouts.find((layout) => layout.id === value.agencyLayoutId) ?? loggingLayouts[0];
+  const mappedProfileSources = new Set(
+    (activeLoggingLayout?.fields ?? [])
+      .filter((field) => field.sourceField !== "custom")
+      .map((field) => field.sourceField),
+  );
+  const agencyFieldValue = (fieldId: string) => {
+    const field = activeLoggingLayout?.fields.find((candidate) => candidate.id === fieldId);
+    return field ? profileFieldValue(field, value) : "";
+  };
+  const profileFieldErrors = (activeLoggingLayout?.fields ?? []).flatMap((field) => {
+    const current = profileFieldValue(field, value);
+    const required = auditFieldIsRequired(field, agencyFieldValue);
+    if (required && !current) return [{ field, message: `${field.label} is required.` }];
+    const validation = auditFieldValidationError(field, current);
+    return validation ? [{ field, message: validation }] : [];
+  });
   const missingRetest = value.status === "fixed" && !value.retestNote.trim();
   const missingRiskAcceptance =
     value.status === "accepted" && !value.riskAcceptance.trim();
   const saveDisabled =
-    !value.title.trim() || missingRetest || missingRiskAcceptance;
+    !value.title.trim() || missingRetest || missingRiskAcceptance || profileFieldErrors.length > 0;
 
   return (
     <dialog
@@ -543,7 +723,124 @@ export function FindingEditorDialog({
         </header>
 
         <div className="finding-editor-body">
-          <Field label="Issue title" className="finding-editor-wide">
+          {loggingProfile ? (
+            <section className="agency-logging-profile finding-editor-wide" aria-labelledby="agency-logging-profile-title">
+              <div className="agency-logging-profile-heading">
+                <span><Sparkle size={20} /></span>
+                <div>
+                  <strong id="agency-logging-profile-title">{loggingProfile.templateName} format</strong>
+                  <p>{loggingProfile.summary}</p>
+                </div>
+                <Button
+                  type="button"
+                  icon={Sparkle}
+                  disabled={prefillBusy}
+                  onClick={() => void prefillAgencyFields()}
+                >
+                  {prefillBusy ? "Filling" : "AI fill empty fields"}
+                </Button>
+              </div>
+              <p className="agency-prefill-privacy">AI fill is optional. It sends this finding draft and the accepted field layout to the selected AI provider; attached capture images are not included.</p>
+              {loggingProfile.instructions.length ? (
+                <details>
+                  <summary>Project logging instructions</summary>
+                  <ol>{loggingProfile.instructions.map((instruction) => <li key={instruction}>{instruction}</li>)}</ol>
+                </details>
+              ) : null}
+              {loggingLayouts.length > 1 ? (
+                <label className="agency-layout-selector">
+                  <span>Issue layout</span>
+                  <select
+                    value={activeLoggingLayout?.id ?? ""}
+                    onChange={(event) => {
+                      setPrefillResult(null);
+                      setPrefillMessage("");
+                      setValue((current) => valueWithProfileDefaults({
+                        ...current,
+                        agencyLayoutId: event.target.value,
+                      }, loggingProfile));
+                    }}
+                  >
+                    {loggingLayouts.map((layout) => (
+                      <option key={layout.id} value={layout.id}>{layout.label} · {layout.sheetName}</option>
+                    ))}
+                  </select>
+                  {activeLoggingLayout?.appliesTo ? <small>{activeLoggingLayout.appliesTo}</small> : null}
+                </label>
+              ) : activeLoggingLayout?.appliesTo ? (
+                <p className="agency-layout-applies">Use for: {activeLoggingLayout.appliesTo}</p>
+              ) : null}
+              <div className="agency-field-order">
+                {(activeLoggingLayout?.fields ?? []).map((field, index) => {
+                  const current = profileFieldValue(field, value);
+                  const mappedLabel = field.sourceField === "custom" ? "Agency-specific field" : PROFILE_SOURCE_LABELS[field.sourceField];
+                  const required = auditFieldIsRequired(field, agencyFieldValue);
+                  const validationError = auditFieldValidationError(field, current);
+                  const fieldError = validationError ?? (required && !current ? `${field.label} is required.` : null);
+                  const aiSuggestion = prefillResult?.layoutId === activeLoggingLayout?.id
+                    ? prefillResult.values.find((suggestion) => suggestion.fieldId === field.id)
+                    : undefined;
+                  const fieldId = `agency-field-${activeLoggingLayout?.id}-${field.id}`;
+                  return (
+                    <div className="agency-field-row" key={field.id} data-missing={(required && !current) || Boolean(validationError)}>
+                      <span className="agency-field-number">{index + 1}</span>
+                      <div className="agency-field-content">
+                        <label htmlFor={fieldId}>
+                          <strong>{field.label}{required ? <em>Required</em> : null}</strong>
+                          <small>{field.instructions || mappedLabel}</small>
+                        </label>
+                        {field.kind === "long-text" ? (
+                          <textarea
+                            id={fieldId}
+                            autoFocus={index === 0}
+                            rows={3}
+                            required={required}
+                            minLength={field.validation?.minLength}
+                            maxLength={field.validation?.maxLength ?? (field.sourceField === "title" ? 240 : undefined)}
+                            value={current}
+                            placeholder={field.example ?? field.defaultValue}
+                            onChange={(event) => patchAgencyField(field, event.target.value)}
+                          />
+                        ) : field.kind === "select" ? (
+                          <select
+                            id={fieldId}
+                            autoFocus={index === 0}
+                            required={required}
+                            multiple={field.sourceField === "affectedUsers"}
+                            value={field.sourceField === "affectedUsers" ? current.split("\n").filter(Boolean) : current}
+                            onChange={(event) => patchAgencyField(field, field.sourceField === "affectedUsers"
+                              ? [...event.target.selectedOptions].map((option) => option.value).join("\n")
+                              : event.target.value)}
+                          >
+                            {field.sourceField !== "affectedUsers" ? <option value="">Choose {field.label.toLowerCase()}</option> : null}
+                            {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
+                          </select>
+                        ) : (
+                          <input
+                            id={fieldId}
+                            autoFocus={index === 0}
+                            type={field.kind === "date" ? "date" : field.kind === "url" ? "url" : field.kind === "number" ? "number" : "text"}
+                            required={required}
+                            minLength={field.validation?.minLength}
+                            maxLength={field.validation?.maxLength ?? (field.sourceField === "title" ? 240 : undefined)}
+                            value={current}
+                            placeholder={field.example ?? field.defaultValue}
+                            onChange={(event) => patchAgencyField(field, event.target.value)}
+                          />
+                        )}
+                        {field.sourceField !== "custom" ? <span className="agency-field-mapped is-complete"><Check size={16} /> Synced with {mappedLabel}</span> : null}
+                        {aiSuggestion?.value ? <span className="agency-field-ai-note"><Sparkle size={16} /> AI suggestion ({aiSuggestion.confidence}): “{aiSuggestion.value.slice(0, 140)}{aiSuggestion.value.length > 140 ? "…" : ""}”. {aiSuggestion.reason}</span> : null}
+                        {fieldError ? <span className="agency-field-error" role="alert">{fieldError}</span> : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {prefillMessage ? <p className="agency-prefill-message" role="status">{prefillMessage}</p> : null}
+              {profileFieldErrors.length ? <p className="agency-profile-errors" role="alert">Complete {profileFieldErrors.length} required or invalid {profileFieldErrors.length === 1 ? "field" : "fields"} before saving.</p> : null}
+            </section>
+          ) : null}
+          {!mappedProfileSources.has("title") ? <Field label="Issue title" className="finding-editor-wide">
             <input
               autoFocus
               required
@@ -552,8 +849,8 @@ export function FindingEditorDialog({
               onChange={(event) => patch("title", event.target.value)}
               placeholder="Describe the barrier in one specific sentence"
             />
-          </Field>
-          <Field label="WCAG criterion" hint="Use a criterion such as 2.4.7, or leave blank until manual mapping is complete.">
+          </Field> : null}
+          {!mappedProfileSources.has("wcag") ? <Field label="WCAG criterion" hint="Use a criterion such as 2.4.7, or leave blank until manual mapping is complete.">
             <select
               value={value.wcag}
               onChange={(event) => patch("wcag", event.target.value)}
@@ -568,14 +865,14 @@ export function FindingEditorDialog({
                 </option>
               ))}
             </select>
-          </Field>
-          <Field label="Page, screen, or component">
+          </Field> : null}
+          {!mappedProfileSources.has("location") ? <Field label="Page, screen, or component">
             <input
               value={value.location}
               onChange={(event) => patch("location", event.target.value)}
               placeholder="Checkout / Payment method dialog"
             />
-          </Field>
+          </Field> : null}
           <section className="finding-evidence-editor finding-editor-wide" aria-labelledby="finding-evidence-title">
             <div className="finding-evidence-heading">
               <div>
@@ -640,7 +937,7 @@ export function FindingEditorDialog({
             </label>
             <button className="field-inline-action" type="button" disabled={captureBusy} onClick={() => void captureForFinding("after")}>Capture after</button>
           </div>
-          <Field
+          {!mappedProfileSources.has("comparisonNote") ? <Field
             label="Evidence comparison note"
             hint="Explain what changed and which environment was used for the retest."
             className="finding-editor-wide"
@@ -651,8 +948,8 @@ export function FindingEditorDialog({
               onChange={(event) => patch("comparisonNote", event.target.value)}
               placeholder="Before: focus was not visible. After: a 3 px indicator is visible in Windows High Contrast and at 200% zoom."
             />
-          </Field>
-          <Field label="Severity">
+          </Field> : null}
+          {!mappedProfileSources.has("severity") ? <Field label="Severity">
             <select
               value={value.severity}
               onChange={(event) => patch("severity", event.target.value as Finding["severity"])}
@@ -661,8 +958,8 @@ export function FindingEditorDialog({
               <option value="major">Major</option>
               <option value="minor">Minor</option>
             </select>
-          </Field>
-          <Field label="Remediation status">
+          </Field> : null}
+          {!mappedProfileSources.has("status") ? <Field label="Remediation status">
             <select
               value={value.status}
               onChange={(event) => patch("status", event.target.value as Finding["status"])}
@@ -672,37 +969,37 @@ export function FindingEditorDialog({
               <option value="fixed">Verified fixed</option>
               <option value="accepted">Risk accepted</option>
             </select>
-          </Field>
-          <Field label="Remediation owner">
+          </Field> : null}
+          {!mappedProfileSources.has("owner") ? <Field label="Remediation owner">
             <input
               value={value.owner}
               onChange={(event) => patch("owner", event.target.value)}
               placeholder="Team or person responsible"
             />
-          </Field>
-          <Field label="Ticket or reference">
+          </Field> : null}
+          {!mappedProfileSources.has("ticket") ? <Field label="Ticket or reference">
             <input
               value={value.ticket}
               onChange={(event) => patch("ticket", event.target.value)}
               placeholder="A11Y-142 or issue URL"
               readOnly={Boolean(value.ticketLink)}
             />
-          </Field>
-          <Field label="Target remediation date">
+          </Field> : null}
+          {!mappedProfileSources.has("dueDate") ? <Field label="Target remediation date">
             <input
               type="date"
               value={value.dueDate}
               onChange={(event) => patch("dueDate", event.target.value)}
             />
-          </Field>
-          <Field label="Evidence link" hint="Use a shareable report, capture, or test-evidence URL for the external ticket.">
+          </Field> : null}
+          {!mappedProfileSources.has("evidenceLink") ? <Field label="Evidence link" hint="Use a shareable report, capture, or test-evidence URL for the external ticket.">
             <input
               type="url"
               value={value.evidenceLink}
               onChange={(event) => patch("evidenceLink", event.target.value)}
               placeholder="https://app.thewcag.com/s/..."
             />
-          </Field>
+          </Field> : null}
           {finding ? (
             <section className="finding-ticket-panel finding-editor-wide" aria-labelledby="finding-ticket-heading">
               <div className="finding-ticket-heading">
@@ -878,39 +1175,39 @@ export function FindingEditorDialog({
               </details>
             </section>
           ) : null}
-          <Field label="Issue description" className="finding-editor-wide">
+          {!mappedProfileSources.has("description") ? <Field label="Issue description" className="finding-editor-wide">
             <textarea
               rows={3}
               value={value.description}
               onChange={(event) => patch("description", event.target.value)}
               placeholder="Summarize the accessibility barrier and where it occurs."
             />
-          </Field>
-          <Field label="Actual result">
+          </Field> : null}
+          {!mappedProfileSources.has("actualResult") ? <Field label="Actual result">
             <textarea
               rows={4}
               value={value.actualResult}
               onChange={(event) => patch("actualResult", event.target.value)}
               placeholder="Describe what happens now, using observable behavior."
             />
-          </Field>
-          <Field label="Expected result">
+          </Field> : null}
+          {!mappedProfileSources.has("expectedResult") ? <Field label="Expected result">
             <textarea
               rows={4}
               value={value.expectedResult}
               onChange={(event) => patch("expectedResult", event.target.value)}
               placeholder="Describe the accessible behavior required."
             />
-          </Field>
-          <Field label="User impact">
+          </Field> : null}
+          {!mappedProfileSources.has("userImpact") ? <Field label="User impact">
             <textarea
               rows={4}
               value={value.userImpact}
               onChange={(event) => patch("userImpact", event.target.value)}
               placeholder="Who is affected, what task is disrupted, and whether a workaround exists?"
             />
-          </Field>
-          <fieldset className="affected-users finding-editor-wide">
+          </Field> : null}
+          {!mappedProfileSources.has("affectedUsers") ? <fieldset className="affected-users finding-editor-wide">
             <legend>Affected users</legend>
             <p>Select every group directly affected by this barrier.</p>
             <div>
@@ -932,24 +1229,24 @@ export function FindingEditorDialog({
                 </label>
               ))}
             </div>
-          </fieldset>
-          <Field label="Severity rationale">
+          </fieldset> : null}
+          {!mappedProfileSources.has("severityRationale") ? <Field label="Severity rationale">
             <textarea
               rows={4}
               value={value.severityRationale}
               onChange={(event) => patch("severityRationale", event.target.value)}
               placeholder="Explain task criticality, reach, frequency, and available workarounds."
             />
-          </Field>
-          <Field label="Suggested resolution">
+          </Field> : null}
+          {!mappedProfileSources.has("recommendation") ? <Field label="Suggested resolution">
             <textarea
               rows={4}
               value={value.recommendation}
               onChange={(event) => patch("recommendation", event.target.value)}
               placeholder="Give implementation direction without prescribing an unverified fix."
             />
-          </Field>
-          <Field label="Reproduction steps" className="finding-editor-wide" hint="Enter one step per line.">
+          </Field> : null}
+          {!mappedProfileSources.has("reproductionSteps") ? <Field label="Reproduction steps" className="finding-editor-wide" hint="Enter one step per line.">
             <textarea
               rows={4}
               value={value.reproductionSteps.join("\n")}
@@ -959,7 +1256,7 @@ export function FindingEditorDialog({
               )}
               placeholder={"1. Open the checkout page\n2. Move focus to Payment method\n3. Observe the focus indicator"}
             />
-          </Field>
+          </Field> : null}
           <fieldset className="occurrence-editor finding-editor-wide">
             <legend>Repeated occurrences</legend>
             <p>
@@ -1057,23 +1354,23 @@ export function FindingEditorDialog({
               Add occurrence
             </Button>
           </fieldset>
-          <Field label="Implementation note">
+          {!mappedProfileSources.has("note") ? <Field label="Implementation note">
             <textarea
               rows={3}
               value={value.note}
               onChange={(event) => patch("note", event.target.value)}
               placeholder="Optional internal note, ticket reference, or owner."
             />
-          </Field>
-          <Field label="Retest record" hint="Record the build, date, environment, and outcome when remediation is checked.">
+          </Field> : null}
+          {!mappedProfileSources.has("retestNote") ? <Field label="Retest record" hint="Record the build, date, environment, and outcome when remediation is checked.">
             <textarea
               rows={3}
               value={value.retestNote}
               onChange={(event) => patch("retestNote", event.target.value)}
               placeholder="Retested in build 3.0.4 with NVDA and Chrome."
             />
-          </Field>
-          <Field
+          </Field> : null}
+          {!mappedProfileSources.has("riskAcceptance") ? <Field
             label="Risk acceptance rationale"
             hint="Required when status is Risk accepted. Record the decision owner, reason, and review date."
             className="finding-editor-wide"
@@ -1084,7 +1381,7 @@ export function FindingEditorDialog({
               onChange={(event) => patch("riskAcceptance", event.target.value)}
               placeholder="Accepted by the product owner until 2026-10-01 because…"
             />
-          </Field>
+          </Field> : null}
         </div>
 
         <footer className="finding-editor-actions">
@@ -1092,6 +1389,8 @@ export function FindingEditorDialog({
             <p role="alert">Add a retest record before marking this verified fixed.</p>
           ) : missingRiskAcceptance ? (
             <p role="alert">Add a rationale before recording accepted risk.</p>
+          ) : profileFieldErrors.length ? (
+            <p role="alert">{profileFieldErrors.map((error) => error.message).join(" ")}</p>
           ) : null}
           <Button onClick={onClose}>Cancel</Button>
           <Button type="submit" variant="primary" icon={FloppyDisk} disabled={saveDisabled}>

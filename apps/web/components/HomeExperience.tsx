@@ -6,130 +6,109 @@ import {
   CheckIcon,
   CropIcon,
   FileCheckIcon,
-  ImageIcon,
   SparklesIcon,
 } from "@/components/icons";
 import { FrameCorners } from "@/components/Icon";
 
 const MODES = [
+  { id: "Format", label: "Set format", icon: SparklesIcon },
   { id: "Capture", label: "Capture", icon: CropIcon },
-  { id: "Draft", label: "AI draft", icon: SparklesIcon },
   { id: "Review", label: "Review", icon: BookIcon },
   { id: "Deliver", label: "Deliver", icon: FileCheckIcon },
 ] as const;
 
 type Mode = (typeof MODES)[number]["id"];
 
+function FormatPanel() {
+  return (
+    <div className="ledger-panel ledger-panel--format">
+      <div className="ledger-panel__heading">
+        <span className="ledger-kicker"><SparklesIcon size={16} /> Optional project setup</span>
+        <strong>Agency-audit-template.xlsx</strong>
+        <p>AI has learned how this client expects every issue to be logged.</p>
+      </div>
+      <div className="ledger-mapping" aria-label="Template fields mapped by AI">
+        <div><span>Issue title</span><strong>Summary</strong><CheckIcon size={16} /></div>
+        <div><span>WCAG criterion</span><strong>Success Criteria</strong><CheckIcon size={16} /></div>
+        <div><span>User impact</span><strong>Impact Description</strong><CheckIcon size={16} /></div>
+        <div><span>Remediation</span><strong>Recommendation</strong><CheckIcon size={16} /></div>
+      </div>
+      <div className="ledger-panel__status"><span>7 / 7 fields mapped</span><strong>Ready to log</strong></div>
+    </div>
+  );
+}
+
 function CapturePanel() {
   return (
-    <div className="hero-workspace__capture">
-      <div className="hero-workspace__browser" aria-hidden="true">
-        <div className="hero-workspace__address">
-          <span>checkout.example</span>
-          <strong>/ payment</strong>
-        </div>
-        <div className="hero-workspace__page">
-          <span className="hero-workspace__page-label">Payment details</span>
+    <div className="ledger-panel ledger-panel--capture">
+      <div className="ledger-browser" aria-hidden="true">
+        <div className="ledger-browser__bar"><span /><span /><span /><strong>checkout.example / payment</strong></div>
+        <div className="ledger-browser__page">
+          <span className="ledger-browser__label">Payment details</span>
           <strong>Complete your order</strong>
-          <span className="hero-workspace__field-label">Cardholder name</span>
-          <span className="hero-workspace__field">Alex Morgan</span>
-          <span className="hero-workspace__target-label">button</span>
-          <span className="hero-workspace__target">Continue to payment</span>
+          <span className="ledger-browser__field">Cardholder name</span>
+          <span className="ledger-browser__value">Alex Morgan</span>
+          <span className="ledger-browser__target">Continue to payment</span>
+          <span className="ledger-browser__focus" />
         </div>
       </div>
-
-      <div className="hero-workspace__inspector">
-        <span className="hero-workspace__section-label"><ImageIcon size={16} /> Browser evidence</span>
+      <div className="ledger-inspector">
+        <span className="ledger-kicker"><CropIcon size={16} /> Evidence 01</span>
         <strong>Continue to payment</strong>
         <dl>
           <div><dt>Role</dt><dd>button</dd></div>
           <div><dt>Name</dt><dd>Continue to payment</dd></div>
           <div><dt>State</dt><dd>Focused</dd></div>
         </dl>
-        <span className="hero-workspace__confirmed"><CheckIcon size={16} /> Visual and semantic context attached</span>
+        <span className="ledger-confirmed"><CheckIcon size={16} /> Visual + semantic context attached</span>
       </div>
-    </div>
-  );
-}
-
-function DraftPanel() {
-  return (
-    <div className="hero-workspace__document">
-      <div className="hero-workspace__document-head">
-        <div>
-          <span className="hero-workspace__section-label"><SparklesIcon size={16} /> Finding draft</span>
-          <strong>Visible focus is obscured by the sticky footer</strong>
-        </div>
-        <span className="hero-workspace__provider">Your AI provider</span>
-      </div>
-      <div className="hero-workspace__document-grid">
-        <div>
-          <span>Actual result</span>
-          <p>The payment button receives focus, but its indicator is partially hidden by the persistent footer.</p>
-        </div>
-        <div>
-          <span>Expected result</span>
-          <p>The complete focus indicator remains visible while the control has keyboard focus.</p>
-        </div>
-        <div>
-          <span>Suggested resolution</span>
-          <p>Reserve space for the focused control or move the sticky footer so it cannot overlap the indicator.</p>
-        </div>
-        <div>
-          <span>WCAG mapping</span>
-          <p><strong>2.4.11</strong> Focus Not Obscured (Minimum)</p>
-        </div>
-      </div>
-      <p className="hero-workspace__note">Every field stays editable before it becomes part of the audit.</p>
     </div>
   );
 }
 
 function ReviewPanel() {
   return (
-    <div className="hero-workspace__review">
-      <div className="hero-workspace__review-main">
-        <span className="hero-workspace__section-label"><BookIcon size={16} /> Auditor review</span>
-        <strong>Confirm the decision, not just the wording.</strong>
-        <ul>
-          <li><CheckIcon size={16} /><span><b>Evidence</b> Screenshot and browser semantics are attached.</span></li>
-          <li><CheckIcon size={16} /><span><b>Traceability</b> WCAG 2.4.11 is mapped to the finding.</span></li>
-          <li><CheckIcon size={16} /><span><b>Affected users</b> Keyboard and switch control users.</span></li>
-          <li><CheckIcon size={16} /><span><b>Retest path</b> Reproduction steps are ready.</span></li>
-        </ul>
+    <div className="ledger-panel ledger-panel--review">
+      <div className="ledger-finding">
+        <span className="ledger-kicker"><BookIcon size={16} /> Finding A-014</span>
+        <strong>Sticky footer obscures the visible focus indicator</strong>
+        <p>The payment button receives keyboard focus, but the persistent footer covers part of its indicator.</p>
+        <div className="ledger-finding__checks">
+          <span><CheckIcon size={16} /> Evidence attached</span>
+          <span><CheckIcon size={16} /> Reproduction steps ready</span>
+          <span><CheckIcon size={16} /> User impact confirmed</span>
+        </div>
       </div>
-      <div className="hero-workspace__decision">
-        <span>Severity</span>
-        <strong>Major</strong>
-        <span>Status</span>
-        <strong>Ready for review</strong>
-        <span>Owner</span>
-        <strong>Checkout team</strong>
-      </div>
+      <dl className="ledger-decision">
+        <div><dt>Criterion</dt><dd>2.4.11</dd></div>
+        <div><dt>Severity</dt><dd>Major</dd></div>
+        <div><dt>Status</dt><dd>Ready for review</dd></div>
+        <div><dt>Owner</dt><dd>Checkout team</dd></div>
+      </dl>
     </div>
   );
 }
 
 function DeliverPanel() {
   return (
-    <div className="hero-workspace__deliver">
-      <div className="hero-workspace__report-mark"><FileCheckIcon size={32} /></div>
-      <div className="hero-workspace__report-copy">
-        <span className="hero-workspace__section-label">Audit delivery</span>
-        <strong>Checkout accessibility audit</strong>
-        <p>A clear handoff with approved findings, evidence, WCAG mapping, remediation guidance, and retest history.</p>
+    <div className="ledger-panel ledger-panel--deliver">
+      <div className="ledger-delivery__mark"><FileCheckIcon size={32} /></div>
+      <div className="ledger-delivery__copy">
+        <span className="ledger-kicker">Delivery check</span>
+        <strong>Client audit is ready</strong>
+        <p>Approved findings, evidence, WCAG mapping, remediation guidance, and retest history are complete.</p>
       </div>
-      <div className="hero-workspace__delivery-options">
-        <span><CheckIcon size={16} /> Export a portable audit</span>
-        <span><CheckIcon size={16} /> Publish only when approved</span>
-        <span><CheckIcon size={16} /> Keep local work private</span>
+      <div className="ledger-delivery__formats">
+        <span><CheckIcon size={16} /> Original agency workbook</span>
+        <span><CheckIcon size={16} /> Accessible HTML or PDF</span>
+        <span><CheckIcon size={16} /> Jira, Linear, or GitHub</span>
       </div>
     </div>
   );
 }
 
 export function AuditPlayground() {
-  const [mode, setMode] = useState<Mode>("Capture");
+  const [mode, setMode] = useState<Mode>("Format");
   const id = useId();
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
@@ -141,79 +120,63 @@ export function AuditPlayground() {
       : event.key === "End"
         ? MODES.length - 1
         : (current + (["ArrowRight", "ArrowDown"].includes(event.key) ? 1 : -1) + MODES.length) % MODES.length;
-    const nextMode = MODES[next];
-    setMode(nextMode.id);
-    const tabs = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("[role='tab']");
-    tabs?.[next]?.focus();
+    setMode(MODES[next].id);
+    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("[role='tab']")[next]?.focus();
   }
 
   return (
-    <div className="hero-showcase">
-      <div className="hero-showcase__art" aria-hidden="true">
-        <FrameCorners size={32} weight="duotone" />
+    <div className="ledger-demo">
+      <span className="ledger-demo__frame" aria-hidden="true"><FrameCorners size={32} weight="duotone" /></span>
+      <div className="ledger-demo__topbar">
+        <div className="ledger-demo__identity">
+          <span aria-hidden="true">W</span>
+          <div><strong>Checkout audit</strong><small>Local project · 24 findings</small></div>
+        </div>
+        <span className="ledger-demo__local"><i /> Local-first</span>
       </div>
 
-      <div className="hero-showcase__signal hero-showcase__signal--evidence" aria-hidden="true">
-        <span><CheckIcon size={16} /></span>
-        <div><strong>Evidence linked</strong><small>Visual + semantic context</small></div>
-      </div>
-
-      <div className="hero-workspace" aria-label="Explore the connected TheWCAG audit workflow">
-        <div className="hero-workspace__chrome">
-          <div className="hero-workspace__brand">
-            <span aria-hidden="true">W</span>
-            <div><strong>TheWCAG</strong><small>Checkout accessibility audit</small></div>
-          </div>
-          <span className="hero-workspace__local"><CheckIcon size={16} /> Local audit</span>
+      <div className="ledger-demo__body">
+        <div className="ledger-demo__tabs" role="tablist" aria-label="Explore the audit evidence workflow">
+          {MODES.map((item, index) => {
+            const Icon = item.icon;
+            const selected = mode === item.id;
+            return (
+              <button
+                key={item.id}
+                id={`${id}-${item.id}-tab`}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                aria-controls={`${id}-${item.id}-panel`}
+                tabIndex={selected ? 0 : -1}
+                onClick={() => setMode(item.id)}
+                onKeyDown={handleKeyDown}
+              >
+                <span className="ledger-demo__step">{String(index + 1).padStart(2, "0")}</span>
+                <Icon size={20} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
         </div>
 
-        <div className="hero-workspace__body">
-          <div className="hero-workspace__tabs" role="tablist" aria-label="Audit workflow stages">
-            {MODES.map((item, index) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.id}
-                  id={`${id}-${item.id}-tab`}
-                  type="button"
-                  role="tab"
-                  aria-selected={mode === item.id}
-                  aria-controls={`${id}-${item.id}-panel`}
-                  tabIndex={mode === item.id ? 0 : -1}
-                  onClick={() => setMode(item.id)}
-                  onKeyDown={handleKeyDown}
-                >
-                  <span className="hero-workspace__step">{String(index + 1).padStart(2, "0")}</span>
-                  <Icon size={20} />
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div
-            id={`${id}-${mode}-panel`}
-            className="hero-workspace__panel"
-            role="tabpanel"
-            aria-labelledby={`${id}-${mode}-tab`}
-          >
-            {mode === "Capture" && <CapturePanel />}
-            {mode === "Draft" && <DraftPanel />}
-            {mode === "Review" && <ReviewPanel />}
-            {mode === "Deliver" && <DeliverPanel />}
-          </div>
-        </div>
-
-        <div className="hero-workspace__footer">
-          <span>Browser context intact</span>
-          <span>Provider controlled by you</span>
-          <span>Publish only when ready</span>
+        <div
+          id={`${id}-${mode}-panel`}
+          className="ledger-demo__panel"
+          role="tabpanel"
+          aria-labelledby={`${id}-${mode}-tab`}
+        >
+          {mode === "Format" && <FormatPanel />}
+          {mode === "Capture" && <CapturePanel />}
+          {mode === "Review" && <ReviewPanel />}
+          {mode === "Deliver" && <DeliverPanel />}
         </div>
       </div>
 
-      <div className="hero-showcase__signal hero-showcase__signal--standard" aria-hidden="true">
-        <span>2.4.11</span>
-        <div><strong>WCAG 2.2</strong><small>Decision ready to review</small></div>
+      <div className="ledger-demo__footer">
+        <span><i /> Template optional</span>
+        <span><i /> Human reviewed</span>
+        <span><i /> Export controlled by you</span>
       </div>
     </div>
   );

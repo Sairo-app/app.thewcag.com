@@ -19,7 +19,7 @@ import {
   Plus,
   Warning,
 } from "../Icon";
-import type { OverlayResult, WorkspaceStage } from "../../shared/desktop";
+import type { AuditLoggingProfile, OverlayResult, WorkspaceStage } from "../../shared/desktop";
 import { desktop } from "../api";
 import type { AuditSessionSelection } from "../audit-coverage";
 import { auditStoreKey, type RecordAuditActivity } from "../audits";
@@ -54,11 +54,13 @@ export function InspectView({
   initialSession,
   onNavigate,
   recordActivity,
+  loggingProfile,
 }: {
   auditId: string;
   initialSession: AuditSessionSelection | null;
   onNavigate: (stage: WorkspaceStage) => void;
   recordActivity: RecordAuditActivity;
+  loggingProfile?: AuditLoggingProfile;
 }) {
   const [fg, setFg] = useState("#1F2933");
   const [bg, setBg] = useState("#FFF9ED");
@@ -175,6 +177,7 @@ export function InspectView({
         initialSession={initialSession}
         onNavigate={onNavigate}
         recordActivity={recordActivity}
+        loggingProfile={loggingProfile}
       />
       <section
         className="contrast-stage"

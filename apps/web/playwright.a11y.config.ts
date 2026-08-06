@@ -26,15 +26,13 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       ACCESSIBILITY_SCAN_FIXTURE: "1",
+      // Public-route scans use an in-process report fixture and never connect
+      // to Postgres, but production startup still requires an explicit URL.
+      DATABASE_URL: "postgres://a11y:a11y@127.0.0.1:1/a11y",
       NEXT_PUBLIC_APP_URL: "https://app.thewcag.com",
       AUTH_SECRET: "accessibility-scan-fixture-secret",
       AUTH_TRUST_HOST: "true",
       RUN_STARTUP_MIGRATIONS: "false",
-      // `instrumentation.ts` refuses to boot a production server without this.
-      // The scan never opens a connection: every scanned route is either static
-      // marketing content or the `/s/<slug>` report served from
-      // `a11yScanReportFixture`, so this only has to satisfy the startup guard.
-      DATABASE_URL: "postgres://accessibility-scan:accessibility-scan@127.0.0.1:5432/accessibility-scan-fixture",
       R2_PUBLIC_URL: "",
       DODO_PAYMENTS_API_KEY: "",
       DODO_PAYMENTS_WEBHOOK_KEY: "",

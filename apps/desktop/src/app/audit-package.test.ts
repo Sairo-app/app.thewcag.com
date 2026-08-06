@@ -33,6 +33,19 @@ describe("audit packages", () => {
     await expect(parseAuditPackage(serialized)).resolves.toEqual(source);
   });
 
+  it("keeps the local source-workbook marker out of portable packages", async () => {
+    const source = payload();
+    source.audit.loggingTemplateAsset = {
+      available: true,
+      originalFileName: "private-client-name.xlsx",
+      extension: "xlsx",
+      savedAt: 1_800_000_000_000,
+    };
+    const parsed = await parseAuditPackage(await serializeAuditPackage(source));
+    expect(parsed.audit.loggingTemplateAsset).toBeUndefined();
+    expect(JSON.stringify(parsed)).not.toContain("private-client-name.xlsx");
+  });
+
   it("rejects a payload changed after export", async () => {
     const serialized = await serializeAuditPackage(payload());
     const changed = serialized.replace("Portable audit", "Changed audit");
@@ -71,6 +84,43 @@ describe("audit packages", () => {
 
     source.audit.scopeProfile.targetType = "unknown" as never;
     await expect(serializeAuditPackage(source)).rejects.toThrow("invalid scope profile");
+  });
+
+  it("round trips an agency logging profile and its custom finding values", async () => {
+    const source = payload();
+    source.audit.loggingProfile = {
+      version: 1,
+      templateName: "agency.xlsx",
+      sheetName: "Issue Log",
+      summary: "One issue per row.",
+      instructions: ["Use agency field order."],
+      fields: [{
+        id: "client-priority",
+        label: "Client priority",
+        sourceField: "custom",
+        kind: "select",
+        required: true,
+        instructions: "Choose the agreed priority.",
+        options: ["P1", "P2"],
+      }],
+      analyzedAt: 1_800_000_000_000,
+      provenance: { provider: "openai", model: "gpt-5.6", promptVersion: "audit-template-profile-v1" },
+    };
+    source.sections.findings = [{
+      id: createFindingId(),
+      key: "profiled-finding",
+      title: "Dialog has no accessible name",
+      wcag: "4.1.2",
+      severity: "major",
+      status: "open",
+      note: "",
+      agencyFields: { "client-priority": "P1" },
+      createdAt: 1,
+    }];
+    await expect(parseAuditPackage(await serializeAuditPackage(source))).resolves.toEqual(source);
+
+    source.audit.loggingProfile.fields[0].id = "Invalid ID";
+    await expect(serializeAuditPackage(source)).rejects.toThrow("invalid agency logging profile");
   });
 
   it("bounds scope-profile metadata before importing it", async () => {

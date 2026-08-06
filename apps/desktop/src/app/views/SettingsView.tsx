@@ -250,7 +250,7 @@ export function SettingsView({
     try {
       const configuration = await desktop.invoke<AiConfiguration>("ai:set-active", { provider });
       acceptAiConfiguration(configuration);
-      show(`${PROVIDERS.find((item) => item.id === provider)?.name} will author new findings`);
+      show(`${PROVIDERS.find((item) => item.id === provider)?.name} will handle AI authoring and template analysis`);
     } catch (error) {
       show(messageFromError(error), true);
     } finally {
@@ -312,6 +312,7 @@ export function SettingsView({
             </span>
             <input
               type="checkbox"
+              role="switch"
               checked={settings.captureHighDpi}
               onChange={(event) =>
                 void saveSettings({
@@ -328,6 +329,7 @@ export function SettingsView({
             </span>
             <input
               type="checkbox"
+              role="switch"
               checked={settings.launchAtLogin}
               onChange={(event) =>
                 void saveSettings({
@@ -346,6 +348,7 @@ export function SettingsView({
             </span>
             <input
               type="checkbox"
+              role="switch"
               checked={settings.reduceMotion}
               onChange={(event) =>
                 void saveSettings({
@@ -374,6 +377,7 @@ export function SettingsView({
             </span>
             <input
               type="checkbox"
+              role="switch"
               checked={settings.shareAnonymousFunnelTelemetry}
               onChange={(event) =>
                 void saveSettings({
@@ -411,7 +415,7 @@ export function SettingsView({
       <section className="settings-section ai-settings-section">
         <div className="settings-intro">
           <h2>AI authoring</h2>
-          <p>Choose who processes evidence when the extension drafts a finding.</p>
+          <p>Choose who processes approved evidence, reviewed audit-template extracts, and optional agency-field prefills.</p>
         </div>
         <div className="ai-settings">
           <div className="ai-provider-picker" aria-label="AI providers">
@@ -544,7 +548,7 @@ export function SettingsView({
                     disabled={busyProvider !== null || !selectedStatus.configured || selectedStatus.active}
                     onClick={() => void selectAiProvider(selectedKeyProvider)}
                   >
-                    {selectedStatus.active ? "In use" : "Use for authoring"}
+                    {selectedStatus.active ? "In use" : "Use for AI features"}
                   </Button>
                   <Button
                     variant="quiet"
@@ -568,7 +572,7 @@ export function SettingsView({
                 <div className="ai-data-note">
                   <ShieldCheck size={20} />
                   <p>
-                    Encrypted with {secureStorageName}. Approved evidence goes directly from this computer to {selectedProvider.name}; your key never passes through TheWCAG servers.
+                    Encrypted with {secureStorageName}. Approved evidence, reviewed template extracts, and requested field-prefill text go directly from this computer to {selectedProvider.name}; your key never passes through TheWCAG servers.
                   </p>
                 </div>
               </div>

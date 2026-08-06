@@ -11,6 +11,7 @@ import {
   normalizeFindingEvidence,
   referencedEvidenceCaptureIds,
 } from "../shared/finding-evidence";
+import { normalizeAuditLoggingProfile } from "../shared/audit-logging-profile";
 
 export const AUDIT_PACKAGE_VERSION = 1;
 
@@ -171,7 +172,19 @@ function validateStructuredSections(sections: Record<string, unknown>): void {
             ))) ||
         (finding.affectedUsers !== undefined &&
           (!Array.isArray(finding.affectedUsers) ||
-            finding.affectedUsers.some((user) => typeof user !== "string"))),
+            finding.affectedUsers.some((user) => typeof user !== "string"))) ||
+        (finding.agencyFields !== undefined &&
+          (!object(finding.agencyFields) ||
+            Object.keys(finding.agencyFields).length > 480 ||
+            Object.entries(finding.agencyFields).some(
+              ([key, value]) => !/^[a-z][a-z0-9-]{0,63}$/.test(key) || typeof value !== "string" || value.length > 10_000,
+            ))) ||
+        (finding.agencyLayoutId !== undefined &&
+          (typeof finding.agencyLayoutId !== "string" || !/^[a-z][a-z0-9-]{0,63}$/.test(finding.agencyLayoutId))) ||
+        (finding.agencyProfileId !== undefined &&
+          (typeof finding.agencyProfileId !== "string" || finding.agencyProfileId.length > 80)) ||
+        (finding.agencyProfileRevision !== undefined &&
+          (!Number.isInteger(finding.agencyProfileRevision) || Number(finding.agencyProfileRevision) < 1 || Number(finding.agencyProfileRevision) > 10_000)),
     )
   ) {
     throw new Error("The audit package has invalid finding records.");
@@ -310,6 +323,23 @@ function validatePayload(payload: unknown): asserts payload is AuditPackagePaylo
       throw new Error("The audit package has an invalid scope profile.");
     }
   }
+  if (payload.audit.loggingProfile !== undefined) {
+    try {
+      normalizeAuditLoggingProfile(payload.audit.loggingProfile);
+    } catch {
+      throw new Error("The audit package has an invalid agency logging profile.");
+    }
+  }
+  if (payload.audit.loggingProfileHistory !== undefined) {
+    if (!Array.isArray(payload.audit.loggingProfileHistory) || payload.audit.loggingProfileHistory.length > 10) {
+      throw new Error("The audit package has invalid agency logging profile history.");
+    }
+    try {
+      payload.audit.loggingProfileHistory.forEach(normalizeAuditLoggingProfile);
+    } catch {
+      throw new Error("The audit package has invalid agency logging profile history.");
+    }
+  }
   const sections = payload.sections;
   const limits: Array<[string, number]> = [
     ["sampleItems", 2_000],
@@ -399,7 +429,10 @@ export async function serializeAuditPackage(
   payload: AuditPackagePayload,
 ): Promise<string> {
   validatePayload(payload);
-  const prepared = migrateAuditPackageEvidence(payload);
+  const prepared = migrateAuditPackageEvidence({
+    ...payload,
+    audit: { ...payload.audit, loggingTemplateAsset: undefined },
+  });
   validatePayload(prepared);
   const encoded = JSON.stringify(prepared);
   if (encoded.length > MAX_PACKAGE_CHARACTERS) {

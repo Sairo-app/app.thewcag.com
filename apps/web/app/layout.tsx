@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { JetBrains_Mono, Manrope, Source_Sans_3 } from "next/font/google";
 import { PRODUCT_DESCRIPTION, SITE_URL, SOCIAL_IMAGE } from "@/lib/seo";
 import "./globals.css";
+import "./site-redesign.css";
 
 const sourceSans = Source_Sans_3({
   subsets: ["latin"],
@@ -74,7 +75,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // middleware nonce to its framework scripts.
   await headers();
   return (
-    <html lang="en">
+    <html lang="en" data-scroll-behavior="smooth">
       <body className={`${sourceSans.variable} ${manrope.variable} ${jetbrainsMono.variable}`}>
         <a
           href="#main"

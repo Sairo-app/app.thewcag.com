@@ -257,7 +257,8 @@ async function previewInvoke<T>(channel: InvokeChannel, payload?: unknown): Prom
     case "capture:delete":
       savePreviewCaptures(previewCaptures().filter((capture) => capture.id !== value.id));
       return undefined as T;
-    case "dialog:open-text": return null as T;
+    case "dialog:open-text":
+    case "dialog:open-audit-template": return null as T;
     case "dialog:save-pdf": return null as T;
     case "screen:permission":
     case "screen:request-permission": return "granted" as T;
@@ -298,6 +299,13 @@ async function previewInvoke<T>(channel: InvokeChannel, payload?: unknown): Prom
       setLocal("ai-provider-settings", JSON.stringify(state));
       return previewAiConfiguration(state) as T;
     }
+    case "ai:analyze-audit-template":
+    case "ai:prefill-audit-template":
+      throw new Error("AI template analysis is available in the installed desktop app.");
+    case "audit-template:attach":
+      return { available: true, originalFileName: "preview.xlsx", extension: "xlsx", savedAt: Date.now() } as T;
+    case "audit-template:remove": return undefined as T;
+    case "audit-template:export": return null as T;
     case "ticket:configuration": return {
       secureStorageAvailable: false,
       connectors: (["jira", "linear", "github"] as const).map((id) => ({

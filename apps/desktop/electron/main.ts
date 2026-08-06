@@ -23,6 +23,7 @@ import { TicketConnectorService } from "./services/ticket-connectors";
 import { FunnelTelemetryService } from "./services/funnel-telemetry";
 import { CrashReportService } from "./services/crash-reports";
 import type { CrashReportOrigin } from "../src/shared/desktop";
+import { AuditTemplateService } from "./services/audit-template";
 import { WindowManager } from "./windows";
 import { createTray, installApplicationMenu } from "./menu";
 import { registerIpc } from "./ipc";
@@ -146,6 +147,7 @@ async function start(): Promise<void> {
   const captureCoordinator = new CaptureCoordinator(screenCapture, captures, windows);
   const auth = new AuthService(userData, store);
   const ai = new AiAuthoringService(userData, auth);
+  const auditTemplates = new AuditTemplateService(userData);
   const tickets = new TicketConnectorService(userData);
   const notifyError = (error: unknown) => windows.broadcast("notification", { text: error instanceof Error ? error.message : String(error), error: true });
   const settings = new SettingsService(store, {
@@ -179,7 +181,7 @@ async function start(): Promise<void> {
   const updates = new UpdateService((state) => windows.broadcast("update:state", state));
 
   services = { auth, windows, settings, captureCoordinator };
-  registerIpc({ ai, auth, captureCoordinator, captures, capture: screenCapture, settings, store, telemetry, tickets, updates, windows });
+  registerIpc({ ai, auditTemplates, auth, captureCoordinator, captures, capture: screenCapture, settings, store, telemetry, tickets, updates, windows });
 
   protocol.handle("thewcag-asset", async (request) => {
     if (request.method !== "GET") {

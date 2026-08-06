@@ -10,13 +10,13 @@ import {
   ContrastIcon,
   CropIcon,
   DownloadIcon,
+  EyeIcon,
   FileCheckIcon,
   FlagIcon,
   GitHubIcon,
   ImageIcon,
   LinkIcon,
   LogInIcon,
-  PaletteIcon,
   WindowsIcon,
 } from "./icons";
 
@@ -31,28 +31,27 @@ const COLUMNS: { heading: string; links: { href: string; label: string; icon: Re
       { href: `/s/${SAMPLE_REPORT_SLUG}`, label: "See a sample report", icon: <ImageIcon size={20} /> },
       { href: "/accessibility-issue-tracker-integrations", label: "Issue tracker integrations", icon: <LinkIcon size={20} /> },
       { href: "/accessibility-program-management", label: "Program management", icon: <FlagIcon size={20} /> },
-      { href: "/chrome-accessibility-extension", label: "Chrome extension", icon: <CropIcon size={20} /> },
-      { href: "/screenshot-tool", label: "Screenshot tool", icon: <CropIcon size={20} /> },
-      { href: "/color-contrast-checker", label: "Contrast checker", icon: <ContrastIcon size={20} /> },
+      { href: "/chrome-accessibility-extension", label: "Chrome evidence capture", icon: <CropIcon size={20} /> },
       { href: "/download", label: "Download the app", icon: <DownloadIcon size={20} /> },
       { href: "/pricing", label: "Pricing", icon: <BookIcon size={20} /> },
     ],
   },
   {
-    heading: "Workspace",
+    heading: "Tools",
     links: [
+      { href: "/screenshot-tool", label: "Screenshot tool", icon: <CropIcon size={20} /> },
+      { href: "/color-contrast-checker", label: "Contrast checker", icon: <ContrastIcon size={20} /> },
+      { href: "/color-blindness-simulator", label: "Vision simulator", icon: <EyeIcon size={20} /> },
+      { href: "/wcag-checklist", label: "WCAG 2.2 checklist", icon: <BookIcon size={20} /> },
+      { href: "/screenshots", label: "My published reports", icon: <ImageIcon size={20} /> },
       { href: "/signin", label: "Sign in", icon: <LogInIcon size={20} /> },
-      { href: "/screenshots", label: "My reports", icon: <ImageIcon size={20} /> },
-      { href: "/brand", label: "Report branding", icon: <PaletteIcon size={20} /> },
-      { href: "/account", label: "Account and devices", icon: <LogInIcon size={20} /> },
     ],
   },
   {
-    heading: "Guides",
+    heading: "Resources",
     links: [
       { href: "/getting-started", label: "Getting started", icon: <BookIcon size={20} /> },
       { href: "/wcag-contrast", label: "WCAG contrast", icon: <BookIcon size={20} /> },
-      { href: "/wcag-checklist", label: "WCAG 2.2 checklist", icon: <BookIcon size={20} /> },
       { href: "/apca-contrast", label: "APCA vs WCAG", icon: <ContrastIcon size={20} /> },
       { href: "/alt-text-guide", label: "Alt text guide", icon: <ImageIcon size={20} /> },
       { href: "/accessibility-statement", label: "Accessibility statement", icon: <AccessibilityIcon size={20} /> },
@@ -68,12 +67,11 @@ export function Footer() {
       <div className="site-footer__inner">
         <div className="site-footer__cta-panel">
           <div>
-            <h2>Audit what people see. Keep the proof.</h2>
+            <p className="site-footer__eyebrow">The evidence trail starts here</p>
+            <h2>Every finding should keep its proof.</h2>
             <p>Start free on macOS or Windows. No account is required for local audits.</p>
           </div>
-          <Link href="/download" className="site-footer__cta">
-            Download free <ArrowRightIcon size={20} />
-          </Link>
+          <Link href="/download" className="site-footer__cta">Get the desktop app <ArrowRightIcon size={20} /></Link>
         </div>
 
         <div className="site-footer__grid">
@@ -83,9 +81,7 @@ export function Footer() {
               <img src="/logo.png" alt="" width={28} height={28} />
               <span>TheWCAG</span>
             </Link>
-            <p className="site-footer__description">
-              Plan the audit, inspect rendered interfaces, keep evidence with findings, coordinate remediation, retest fixes, and deliver only what you choose.
-            </p>
+            <p className="site-footer__description">A local-first workstation for planning audits, capturing evidence, reviewing WCAG decisions, coordinating remediation, and delivering a defensible record.</p>
             <div className="site-footer__platforms">
               <Link href="/download" className="site-footer__platform" aria-label="Download for macOS"><AppleIcon className="h-4 w-4" />macOS</Link>
               <Link href="/download" className="site-footer__platform" aria-label="Download for Windows"><WindowsIcon className="h-4 w-4" />Windows</Link>
@@ -97,11 +93,7 @@ export function Footer() {
             <nav key={column.heading} aria-label={column.heading} className="site-footer__nav">
               <h2>{column.heading}</h2>
               <ul>
-                {column.links.map((link) => (
-                  <li key={link.href}>
-                    <Link href={link.href} className="site-footer__link"><span>{link.icon}</span>{link.label}</Link>
-                  </li>
-                ))}
+                {column.links.map((link) => <li key={link.href}><Link href={link.href} className="site-footer__link"><span>{link.icon}</span>{link.label}</Link></li>)}
               </ul>
             </nav>
           ))}
@@ -111,7 +103,7 @@ export function Footer() {
           <span>© {new Date().getFullYear()} TheWCAG</span>
           <span>Local-first</span>
           <span>WCAG 2.2</span>
-          <span>macOS and Windows</span>
+          <span>macOS + Windows</span>
         </div>
       </div>
     </footer>
@@ -124,6 +116,7 @@ export async function JsonLd({ data }: { data: Record<string, unknown> }) {
   return (
     <script
       nonce={nonce}
+      suppressHydrationWarning
       type="application/ld+json"
       // eslint-disable-next-line react/no-danger
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}

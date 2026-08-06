@@ -203,8 +203,126 @@ export interface AuditProject extends AuditBrief {
   id: string;
   createdAt: number;
   archivedAt?: number;
+  /** Optional AI-derived instructions for matching an agency's audit template. */
+  loggingProfile?: AuditLoggingProfile;
+  /** Previous accepted profiles retained so older findings remain traceable. */
+  loggingProfileHistory?: AuditLoggingProfile[];
+  loggingTemplateAsset?: {
+    available: boolean;
+    originalFileName: string;
+    extension: string;
+    savedAt: number;
+  };
   /** Bundled training data. Never inferred for a user's real audit. */
   demo?: boolean;
+}
+
+export type AuditLoggingSourceField =
+  | "title"
+  | "description"
+  | "actualResult"
+  | "expectedResult"
+  | "userImpact"
+  | "affectedUsers"
+  | "wcag"
+  | "severity"
+  | "severityRationale"
+  | "recommendation"
+  | "reproductionSteps"
+  | "location"
+  | "owner"
+  | "dueDate"
+  | "status"
+  | "evidenceLink"
+  | "note"
+  | "ticket"
+  | "riskAcceptance"
+  | "retestNote"
+  | "comparisonNote"
+  | "custom";
+
+export interface AuditLoggingField {
+  id: string;
+  label: string;
+  sourceField: AuditLoggingSourceField;
+  kind: "text" | "long-text" | "select" | "date" | "url" | "number";
+  required: boolean;
+  instructions: string;
+  options: string[];
+  example?: string;
+  /** One-based destination column in the agency worksheet. */
+  columnIndex?: number;
+  defaultValue?: string;
+  valueMappings?: Array<{ agencyValue: string; nativeValue: string }>;
+  validation?: {
+    pattern?: string;
+    minLength?: number;
+    maxLength?: number;
+  };
+  requiredWhen?: Array<{
+    fieldId: string;
+    operator: "equals" | "not-equals" | "empty" | "not-empty";
+    value: string;
+  }>;
+}
+
+export interface AuditLoggingLayout {
+  id: string;
+  label: string;
+  sheetName: string;
+  description: string;
+  appliesTo: string;
+  headerRow: number;
+  dataStartRow: number;
+  fields: AuditLoggingField[];
+}
+
+export interface AuditLoggingProfile {
+  version: 1;
+  profileId?: string;
+  revision?: number;
+  templateName: string;
+  sheetName?: string;
+  summary: string;
+  instructions: string[];
+  fields: AuditLoggingField[];
+  layouts?: AuditLoggingLayout[];
+  analyzedAt: number;
+  provenance: {
+    provider: AiProviderId;
+    model: string;
+    promptVersion: string;
+  };
+}
+
+export interface AuditTemplateUpload {
+  name: string;
+  extension: string;
+  size: number;
+  sheetNames: string[];
+  content: string;
+  uploadToken?: string;
+  sheets?: Array<{
+    name: string;
+    rows: Array<{ rowNumber: number; values: string[] }>;
+    metadata?: string[];
+  }>;
+}
+
+export interface AuditTemplatePrefillResult {
+  layoutId: string;
+  values: Array<{
+    fieldId: string;
+    value: string;
+    confidence: "high" | "medium" | "low";
+    reason: string;
+  }>;
+  provenance: {
+    provider: AiProviderId;
+    model: string;
+    promptVersion: string;
+    generatedAt: number;
+  };
 }
 
 export interface AuditActivity {
@@ -350,6 +468,11 @@ export interface Finding {
     generatedAt: number;
   };
   modifiedAt?: number;
+  /** Values for agency-template columns that do not map to a native finding field. */
+  agencyFields?: Record<string, string>;
+  agencyLayoutId?: string;
+  agencyProfileId?: string;
+  agencyProfileRevision?: number;
 }
 
 export type CaptureSavedEvent = CaptureEntry & {
@@ -560,6 +683,11 @@ export type InvokeChannel =
   | "ai:test-provider"
   | "ai:remove-provider"
   | "ai:set-active"
+  | "ai:analyze-audit-template"
+  | "ai:prefill-audit-template"
+  | "audit-template:attach"
+  | "audit-template:remove"
+  | "audit-template:export"
   | "ticket:configuration"
   | "ticket:save-connector"
   | "ticket:remove-connector"
@@ -570,6 +698,7 @@ export type InvokeChannel =
   | "dialog:save-pdf"
   | "dialog:save-text"
   | "dialog:open-text"
+  | "dialog:open-audit-template"
   | "clipboard:write-text"
   | "clipboard:write-image"
   | "shell:show-item"

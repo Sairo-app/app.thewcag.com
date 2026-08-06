@@ -17,7 +17,9 @@ vi.mock("electron", () => ({
 
 import {
   AiAuthoringService,
+  analyzeAuditTemplateWithProvider,
   generateWithProvider,
+  prefillAuditTemplateWithProvider,
   verifyProvider,
 } from "./ai-authoring";
 
@@ -108,6 +110,52 @@ const providerFinding = {
   manualChecks: ["Confirm the computed accessible name."],
 };
 
+const providerAuditProfile = {
+  summary: "One row per confirmed accessibility issue.",
+  instructions: ["Keep the worksheet field order."],
+  layouts: [{
+    id: "web-issues",
+    label: "Web issues",
+    sheetName: "Issue Log",
+    description: "One row per web issue.",
+    appliesTo: "Web findings",
+    headerRow: 1,
+    dataStartRow: 2,
+    fields: [
+      {
+        id: "issue-title",
+        label: "Issue title",
+        sourceField: "title",
+        kind: "text",
+        required: true,
+        instructions: "Describe one barrier.",
+        options: [],
+        example: "Checkout button has no accessible name",
+        columnIndex: 1,
+        defaultValue: "",
+        valueMappings: [],
+        validation: { pattern: "", minLength: 1, maxLength: 240 },
+        requiredWhen: [],
+      },
+      {
+        id: "client-priority",
+        label: "Client priority",
+        sourceField: "custom",
+        kind: "select",
+        required: true,
+        instructions: "Use the agency priority scale.",
+        options: ["P1", "P2", "P3"],
+        example: "P1",
+        columnIndex: 2,
+        defaultValue: "P2",
+        valueMappings: [],
+        validation: { pattern: "", minLength: 1, maxLength: 2 },
+        requiredWhen: [],
+      },
+    ],
+  }],
+};
+
 function requestBody(fetchMock: ReturnType<typeof vi.fn>, index = 0): Record<string, unknown> {
   const init = fetchMock.mock.calls[index][1] as RequestInit;
   return JSON.parse(String(init.body)) as Record<string, unknown>;
@@ -168,6 +216,55 @@ describe("desktop AI provider adapters", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: "openai/gpt-5.6" }] }), { status: 200 }));
     await expect(verifyProvider("openrouter", "sk-or-v1-test", "openai/gpt-5.6", fetchMock as typeof fetch)).resolves.toBeUndefined();
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("derives an ordered logging profile from an uploaded agency sheet", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      output: [{ content: [{ type: "output_text", text: JSON.stringify(providerAuditProfile) }] }],
+    }), { status: 200, headers: { "Content-Type": "application/json" } })) as unknown as typeof fetch;
+    const profile = await analyzeAuditTemplateWithProvider({
+      name: "agency-audit.xlsx",
+      extension: "xlsx",
+      size: 2_048,
+      sheetNames: ["Issue Log"],
+      content: "[Sheet: Issue Log]\nIssue title\tClient priority",
+    }, "openai", "sk-openai-test", "gpt-5.6", fetchMock);
+    const body = requestBody(fetchMock as unknown as ReturnType<typeof vi.fn>);
+
+    expect(JSON.stringify(body)).toContain("audit_logging_profile");
+    expect(JSON.stringify(body)).toContain("untrusted_audit_template");
+    expect(JSON.stringify(body)).not.toContain("agency-audit.xlsx");
+    expect(profile.templateName).toBe("agency-audit.xlsx");
+    expect(profile.fields.map((field) => field.id)).toEqual(["issue-title", "client-priority"]);
+    expect(profile.layouts?.[0]).toEqual(expect.objectContaining({ id: "web-issues", dataStartRow: 2 }));
+    expect(profile.provenance).toEqual(expect.objectContaining({ provider: "openai", model: "gpt-5.6" }));
+  });
+
+  it("fills only known fields for an accepted logging layout", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      output: [{ content: [{ type: "output_text", text: JSON.stringify({
+        layoutId: "web-issues",
+        values: [
+          { fieldId: "issue-title", value: "Checkout button has no name", confidence: "high", reason: "Present in finding title." },
+          { fieldId: "client-priority", value: "P2", confidence: "low", reason: "Approved default." },
+        ],
+      }) }] }],
+    }), { status: 200, headers: { "Content-Type": "application/json" } })) as unknown as typeof fetch;
+    const result = await prefillAuditTemplateWithProvider({
+      profile: {
+        ...providerAuditProfile,
+        version: 1,
+        templateName: "agency-audit.xlsx",
+        analyzedAt: 1_800_000_000_000,
+        provenance: { provider: "openai", model: "gpt-5.6", promptVersion: "audit-template-profile-v2" },
+      },
+      layoutId: "web-issues",
+      finding: { title: "Checkout button has no name", severity: "major" },
+    }, "openai", "sk-openai-test", "gpt-5.6", fetchMock);
+
+    expect(result.values).toHaveLength(2);
+    expect(result.provenance).toEqual(expect.objectContaining({ provider: "openai", promptVersion: "audit-template-prefill-v1" }));
+    expect(JSON.stringify(requestBody(fetchMock as unknown as ReturnType<typeof vi.fn>))).toContain("untrusted_prefill_json");
   });
 });
 

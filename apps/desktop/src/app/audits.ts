@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   AuditActivity,
   AuditBrief,
+  AuditLoggingProfile,
   Finding,
   AuditProject,
   AuditScopeFeature,
   AuditScopeProfile,
   AuditTargetType,
 } from "../shared/desktop";
+import { auditLoggingProfileFromStored } from "../shared/audit-logging-profile";
 import { desktop, getStored, listCaptures, saveStoredFindings, setStored } from "./api";
 import { findingEvidenceStoreKeys } from "../shared/finding-evidence";
 
@@ -92,6 +94,7 @@ export interface AuditDeletionServices {
   getFindings: (key: string) => Promise<Finding[]>;
   deleteCapture: (id: string) => Promise<unknown>;
   removeStoreKey: (key: string) => Promise<unknown>;
+  removeAuditTemplate?: (auditId: string) => Promise<unknown>;
 }
 
 export function auditStoreKey(auditId: string, section: AuditSection): string {
@@ -112,6 +115,7 @@ export async function deleteAuditData(
     getFindings: (key) => getStored<Finding[]>(key, []),
     deleteCapture: (id) => desktop.invoke("capture:delete", { id }),
     removeStoreKey: (key) => desktop.invoke("store:remove", { key }),
+    removeAuditTemplate: (id) => desktop.invoke("audit-template:remove", { auditId: id }),
   },
 ): Promise<void> {
   const findingsKey = auditStoreKey(auditId, "findings");
@@ -125,6 +129,7 @@ export async function deleteAuditData(
       services.removeStoreKey(key),
     ),
     ...auditDeletionKeys(auditId).map((key) => services.removeStoreKey(key)),
+    ...(services.removeAuditTemplate ? [services.removeAuditTemplate(auditId)] : []),
   ]);
 }
 
@@ -135,7 +140,10 @@ export function localDateInputValue(date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
-export function createAuditProject(name = "Untitled audit"): AuditProject {
+export function createAuditProject(
+  name = "Untitled audit",
+  loggingProfile?: AuditLoggingProfile,
+): AuditProject {
   const now = Date.now();
   return {
     id: `aud-${crypto.randomUUID().slice(0, 12)}`,
@@ -158,6 +166,7 @@ export function createAuditProject(name = "Untitled audit"): AuditProject {
     startedAt: localDateInputValue(new Date(now)),
     updatedAt: now,
     createdAt: now,
+    loggingProfile,
   };
 }
 
@@ -216,6 +225,19 @@ export function normalizeAuditProject(audit: AuditProject): AuditProject {
     conclusion: audit.conclusion ?? "in-progress",
     completedAt: audit.completedAt ?? "",
     scopeProfile: normalizeScopeProfile(audit.scopeProfile),
+    loggingProfile: auditLoggingProfileFromStored(audit.loggingProfile),
+    loggingProfileHistory: Array.isArray(audit.loggingProfileHistory)
+      ? audit.loggingProfileHistory
+          .map(auditLoggingProfileFromStored)
+          .filter((profile): profile is AuditLoggingProfile => Boolean(profile))
+          .slice(-10)
+      : undefined,
+    loggingTemplateAsset: audit.loggingTemplateAsset?.available &&
+      typeof audit.loggingTemplateAsset.originalFileName === "string" &&
+      typeof audit.loggingTemplateAsset.extension === "string" &&
+      typeof audit.loggingTemplateAsset.savedAt === "number"
+      ? audit.loggingTemplateAsset
+      : undefined,
     demo: audit.demo === true || undefined,
   };
 }
@@ -354,8 +376,8 @@ export function useAuditWorkspace() {
     [audits, reportError],
   );
 
-  const createAudit = useCallback((name?: string) => {
-    const audit = createAuditProject(name);
+  const createAudit = useCallback((name?: string, loggingProfile?: AuditLoggingProfile) => {
+    const audit = createAuditProject(name, loggingProfile);
     setAudits((current) => {
       const next = [audit, ...current];
       auditsRef.current = next;
@@ -401,6 +423,9 @@ export function useAuditWorkspace() {
       auditor: source.auditor,
       startedAt: source.startedAt,
       scopeProfile: source.scopeProfile,
+      loggingProfile: source.loggingProfile,
+      loggingProfileHistory: source.loggingProfileHistory,
+      loggingTemplateAsset: undefined,
       demo: source.demo === true || undefined,
     });
     setAudits((current) => {
@@ -431,6 +456,20 @@ export function useAuditWorkspace() {
       });
     },
     [activeAudit, persistAudits],
+  );
+
+  const updateAuditById = useCallback(
+    (id: string, patch: Partial<AuditProject>) => {
+      setAudits((current) => {
+        const next = current.map((audit) => audit.id === id
+          ? { ...audit, ...patch, id: audit.id, updatedAt: Date.now() }
+          : audit);
+        auditsRef.current = next;
+        void persistAudits(next);
+        return next;
+      });
+    },
+    [persistAudits],
   );
 
   const archiveAudit = useCallback(
@@ -544,5 +583,6 @@ export function useAuditWorkspace() {
     retryLoad: () => setLoadVersion((value) => value + 1),
     selectAudit,
     updateAudit,
+    updateAuditById,
   };
 }

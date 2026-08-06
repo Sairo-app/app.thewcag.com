@@ -15,6 +15,7 @@ import type {
 } from "../../shared/desktop";
 import { desktop, getStored, listCaptures, saveStoredFindings, setStored } from "../api";
 import { normalizeFindingReferences } from "../../shared/finding-references";
+import { auditFindingLoggingErrors } from "../../shared/audit-logging-profile";
 import {
   DEFAULT_REPORT_SECTIONS,
   REPORT_AUDIENCE_PRESETS,
@@ -58,6 +59,7 @@ export function ReviewView({
   const [reportAudience, setReportAudience] = useState<ReportAudience | "custom">("complete");
   const [reportSections, setReportSections] = useState<ReportSectionOptions>({ ...DEFAULT_REPORT_SECTIONS });
   const [vpatResponses, setVpatResponses] = useState<VpatResponseMap>({});
+  const [agencyExportBusy, setAgencyExportBusy] = useState(false);
   const [message, show] = useTransientMessage();
 
   useEffect(() => {
@@ -156,6 +158,36 @@ export function ReviewView({
     }
   }
 
+  async function exportAgencyWorkbook() {
+    if (!audit.loggingProfile) return;
+    setAgencyExportBusy(true);
+    try {
+      const path = await desktop.invoke<string | null>("audit-template:export", {
+        auditId: audit.id,
+        profile: audit.loggingProfile,
+        findings,
+      });
+      if (!path) return;
+      let activityWarning = "";
+      try {
+        await recordActivity({
+          kind: "exported",
+          title: "Agency workbook exported",
+          detail: `${audit.loggingProfile.templateName}, ${findings.length} findings`,
+        });
+      } catch (error) {
+        activityWarning = ` The file was saved, but its activity entry could not be saved: ${messageFromError(error)}`;
+      }
+      show((audit.loggingTemplateAsset?.available && ["xlsx", "csv", "tsv"].includes(audit.loggingTemplateAsset.extension)
+        ? "Findings written into the retained agency workbook."
+        : "Agency-formatted workbook generated from the accepted mapping.") + activityWarning, Boolean(activityWarning));
+    } catch (error) {
+      show(messageFromError(error), true);
+    } finally {
+      setAgencyExportBusy(false);
+    }
+  }
+
   function chooseReportAudience(audience: ReportAudience) {
     setReportAudience(audience);
     setReportSections({ ...REPORT_AUDIENCE_PRESETS[audience] });
@@ -227,6 +259,9 @@ export function ReviewView({
       }).length,
     };
   }, [audit.standard, checklist, findings, vpatResponses]);
+  const agencyExportIssueCount = useMemo(() => audit.loggingProfile
+    ? findings.filter((finding) => auditFindingLoggingErrors(audit.loggingProfile!, finding).length > 0).length
+    : 0, [audit.loggingProfile, findings]);
 
   return (
     <div className="review-view">
@@ -270,7 +305,19 @@ export function ReviewView({
             <Button icon={DownloadSimple} onClick={() => void exportAudit()}>
               Export report
             </Button>
+            {audit.loggingProfile ? (
+              <Button icon={DownloadSimple} disabled={agencyExportBusy || agencyExportIssueCount > 0} onClick={() => void exportAgencyWorkbook()}>
+                {agencyExportBusy ? "Exporting" : "Export agency workbook"}
+              </Button>
+            ) : null}
           </div>
+          {audit.loggingProfile && agencyExportIssueCount ? (
+            <p className="agency-export-readiness" role="status">
+              <WarningCircle size={20} />
+              <span>{agencyExportIssueCount} {agencyExportIssueCount === 1 ? "finding needs" : "findings need"} required agency fields or format corrections before workbook export.</span>
+              <button type="button" onClick={onOpenFindings}>Review findings</button>
+            </p>
+          ) : null}
           <fieldset className="report-section-toggles">
             <legend>Audience sections</legend>
             {([

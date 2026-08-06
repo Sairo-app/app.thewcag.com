@@ -23,6 +23,7 @@ import {
   type EvidencePacketV1,
 } from "@accessibility-build/audit-contracts";
 import type {
+  AuditLoggingProfile,
   CaptureEntry,
   Finding,
   FindingSavedView,
@@ -85,11 +86,13 @@ function dateLabel(timestamp: number) {
 
 export function EvidenceView({
   auditId,
+  loggingProfile,
   initialTab = "captures",
   onNavigate,
   recordActivity,
 }: {
   auditId?: string;
+  loggingProfile?: AuditLoggingProfile;
   initialTab?: Tab;
   onNavigate?: (stage: WorkspaceStage) => void;
   recordActivity?: RecordAuditActivity;
@@ -306,6 +309,10 @@ export function EvidenceView({
       recommendation: value.recommendation.trim(),
       note: value.note.trim(),
       retestNote: value.retestNote.trim(),
+      agencyFields: { ...value.agencyFields },
+      agencyLayoutId: value.agencyLayoutId || undefined,
+      agencyProfileId: loggingProfile?.profileId,
+      agencyProfileRevision: loggingProfile?.revision,
       statusHistory: findingStatusHistoryAfterChange(existing ?? undefined, value.status, now),
       modifiedAt: now,
       retestedAt:
@@ -1427,6 +1434,7 @@ export function EvidenceView({
         finding={editingFinding ?? null}
         captures={captures}
         auditId={auditId}
+        loggingProfile={loggingProfile}
         onClose={() => setEditingFinding(undefined)}
         onSave={(value) => void saveFinding(value)}
         onTicketUpdate={saveTicketFinding}

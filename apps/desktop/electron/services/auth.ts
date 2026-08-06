@@ -11,7 +11,8 @@ import {
   REPORT_PUBLISH_LIMITS,
   type AiFindingDraftV1,
 } from "@accessibility-build/audit-contracts";
-import type { Account } from "../../src/shared/desktop";
+import type { Account, AuditLoggingProfile, AuditTemplatePrefillResult, AuditTemplateUpload } from "../../src/shared/desktop";
+import { normalizeAuditLoggingProfile } from "../../src/shared/audit-logging-profile";
 import type { JsonStore } from "./store";
 import { ManagedAiHttpError } from "./managed-ai-error";
 
@@ -372,6 +373,70 @@ export class AuthService {
       );
     }
     return parseAiFindingDraft(body.draft);
+  }
+
+  async analyzeAuditTemplate(template: AuditTemplateUpload): Promise<AuditLoggingProfile> {
+    const token = await this.readToken();
+    if (!token) throw new Error("Sign in to TheWCAG before using AI template analysis");
+    const response = await this.fetcher(new URL("/api/device/ai/audit-templates", this.site), {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ template }),
+      signal: AbortSignal.timeout(55_000),
+    });
+    const body = await response.json().catch(() => ({})) as {
+      profile?: unknown;
+      message?: string;
+      error?: string;
+      retryAfterSeconds?: number;
+    };
+    if (!response.ok) {
+      if (response.status === 401) await this.signOut();
+      const fallback = response.status === 401
+        ? "Your session expired. Sign in again to analyze this template"
+        : response.status === 402
+          ? "Managed AI template analysis requires Pro or your own configured AI key"
+          : response.status === 429
+            ? "AI authoring limit reached. Try again later"
+            : response.status === 503
+              ? "AI template analysis is not configured yet"
+              : `AI template analysis failed with status ${response.status}`;
+      throw new ManagedAiHttpError(
+        response.status,
+        body.message || body.error || fallback,
+        nonNegativeNumber(body.retryAfterSeconds) ?? undefined,
+      );
+    }
+    return normalizeAuditLoggingProfile(body.profile);
+  }
+
+  async prefillAuditTemplate(input: unknown): Promise<AuditTemplatePrefillResult> {
+    const token = await this.readToken();
+    if (!token) throw new Error("Sign in to TheWCAG before using AI template prefill");
+    const response = await this.fetcher(new URL("/api/device/ai/audit-template-prefill", this.site), {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+      signal: AbortSignal.timeout(55_000),
+    });
+    const body = await response.json().catch(() => ({})) as {
+      result?: AuditTemplatePrefillResult;
+      message?: string;
+      error?: string;
+      retryAfterSeconds?: number;
+    };
+    if (!response.ok) {
+      if (response.status === 401) await this.signOut();
+      throw new ManagedAiHttpError(
+        response.status,
+        body.message || body.error || "AI could not fill the agency template fields",
+        nonNegativeNumber(body.retryAfterSeconds) ?? undefined,
+      );
+    }
+    if (!body.result || !Array.isArray(body.result.values) || typeof body.result.layoutId !== "string") {
+      throw new Error("Managed AI returned invalid agency field values");
+    }
+    return body.result;
   }
 
   private async saveToken(token: string): Promise<void> {

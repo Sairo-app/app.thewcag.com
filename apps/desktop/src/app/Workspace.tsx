@@ -28,17 +28,22 @@ import {
   Palette,
   Plus,
   SidebarSimple,
+  Sparkle,
   SquaresFour,
   Target,
   Trash,
   UserCircle,
+  UploadSimple,
+  WarningCircle,
   X,
 } from "./Icon";
 import type { IconComponent } from "./Icon";
 import type {
   AppSettings,
   AuditActivity,
+  AuditLoggingProfile,
   AuditSampleItem,
+  AuditTemplateUpload,
   AuditTestRun,
   CaptureEntry,
   Finding,
@@ -79,6 +84,8 @@ import { SettingsView } from "./views/SettingsView";
 import { PlanView } from "./views/PlanView";
 import { ScreenshotView } from "./views/ScreenshotView";
 import { ProgramDashboard } from "./views/ProgramDashboard";
+import { AuditLoggingProfileEditor } from "./AuditLoggingProfileEditor";
+import { normalizeAuditLoggingProfile } from "../shared/audit-logging-profile";
 import { WCAG_CRITERIA } from "./data/wcag";
 import {
   createGuidedSampleAuditPackage,
@@ -215,6 +222,143 @@ function Modal({
   );
 }
 
+function NewAuditSetup({
+  busy,
+  message,
+  name,
+  profile,
+  previewContent,
+  includedSheets,
+  template,
+  onAnalyze,
+  onChooseTemplate,
+  onCreate,
+  onNameChange,
+  onPreviewContentChange,
+  onProfileChange,
+  onRemoveTemplate,
+  onToggleSheet,
+}: {
+  busy: boolean;
+  message: { text: string; error: boolean } | null;
+  name: string;
+  profile: AuditLoggingProfile | null;
+  previewContent: string;
+  includedSheets: string[];
+  template: AuditTemplateUpload | null;
+  onAnalyze: () => void;
+  onChooseTemplate: () => void;
+  onCreate: () => void;
+  onNameChange: (value: string) => void;
+  onPreviewContentChange: (value: string) => void;
+  onProfileChange: (profile: AuditLoggingProfile) => void;
+  onRemoveTemplate: () => void;
+  onToggleSheet: (sheetName: string) => void;
+}) {
+  const templatePending = Boolean(template && !profile);
+  let profileError = "";
+  if (profile) {
+    try { normalizeAuditLoggingProfile(profile); } catch (error) {
+      profileError = messageFromError(error, "Review the detected field mapping before creating the project.");
+    }
+  }
+  return (
+    <form
+      className="new-audit-setup"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!busy && !templatePending && !profileError) onCreate();
+      }}
+    >
+      <label className="new-audit-name">
+        <span>Project or release name</span>
+        <input
+          autoFocus
+          value={name}
+          onChange={(event) => onNameChange(event.target.value)}
+          placeholder="Checkout accessibility audit"
+          maxLength={120}
+        />
+      </label>
+      <section className="audit-template-setup" aria-labelledby="audit-template-setup-title">
+        <div className="audit-template-setup-heading">
+          <span className="audit-template-icon"><FileText size={20} /></span>
+          <div>
+            <strong id="audit-template-setup-title">Agency audit template <small>Optional</small></strong>
+            <p>Upload an existing issue sheet and AI will adapt finding authoring to its field order and rules.</p>
+          </div>
+        </div>
+        {!template ? (
+          <button className="audit-template-upload" type="button" disabled={busy} onClick={onChooseTemplate}>
+            <UploadSimple size={20} />
+            <span><strong>Choose audit template</strong><small>XLSX, CSV, TSV, JSON, Markdown, or text</small></span>
+          </button>
+        ) : (
+          <div className="audit-template-file">
+            <div>
+              {profile ? <Check size={20} /> : busy ? <Sparkle size={20} /> : <WarningCircle size={20} />}
+              <span>
+                <strong>{template.name}</strong>
+                <small>
+                  {busy
+                    ? "AI is identifying fields and instructions..."
+                    : profile
+                      ? `${profile.layouts?.length ?? 1} layout${(profile.layouts?.length ?? 1) === 1 ? "" : "s"} · ${(profile.layouts ?? [{ fields: profile.fields }]).reduce((total, layout) => total + layout.fields.length, 0)} mapped fields`
+                      : "Review the extracted data, then analyze the structure"}
+                </small>
+              </span>
+            </div>
+            <div>
+              <button type="button" onClick={onRemoveTemplate}>Remove</button>
+            </div>
+          </div>
+        )}
+        {template && !profile ? (
+          <div className="audit-template-privacy-review">
+            {template.sheetNames.length > 1 ? (
+              <fieldset>
+                <legend>Worksheets included in analysis</legend>
+                <div>{template.sheetNames.map((sheetName) => (
+                  <label key={sheetName}><input type="checkbox" checked={includedSheets.includes(sheetName)} onChange={() => onToggleSheet(sheetName)} /><span>{sheetName}</span></label>
+                ))}</div>
+              </fieldset>
+            ) : null}
+            <label>
+              <span>Extracted data sent to AI <small>Review, redact, or remove example rows before analysis.</small></span>
+              <textarea rows={8} value={previewContent} onChange={(event) => onPreviewContentChange(event.target.value)} />
+            </label>
+            <button className="button button-secondary" type="button" disabled={busy || !previewContent.trim() || !includedSheets.length} onClick={onAnalyze}>
+              <Sparkle size={20} /> {busy ? "Analyzing template" : "Analyze selected structure"}
+            </button>
+          </div>
+        ) : null}
+        {profile ? (
+          <div className="audit-template-profile-review">
+            <div className="audit-template-profile" role="status">
+              <strong>Review AI mapping before using it</strong>
+              <p>Correct labels, worksheet positions, required fields, terminology mappings, and conditional rules. This accepted profile controls authoring and export.</p>
+            </div>
+            <AuditLoggingProfileEditor profile={profile} onChange={onProfileChange} />
+            {profileError ? <p className="audit-template-message is-error" role="alert">{profileError}</p> : null}
+          </div>
+        ) : null}
+        {message ? (
+          <p className={message.error ? "audit-template-message is-error" : "audit-template-message"} role={message.error ? "alert" : "status"}>
+            {message.text}
+          </p>
+        ) : null}
+        <p className="audit-template-privacy">The file type, selected worksheet names, and extracted data you approve above are sent to the AI provider selected in Settings. The file name and original file stay local; after approval, the original is retained for agency-format export.</p>
+      </section>
+      <div className="new-audit-setup-actions">
+        <span>{template ? "This project will use the analyzed agency format." : "No template selected · standard finding format"}</span>
+        <button className="button button-primary" type="submit" disabled={busy || templatePending || Boolean(profileError)}>
+          <Plus size={20} /> Create project
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function formatShortcut(value: string, platform: PlatformInfo["platform"]): string {
   return value
     .replace("CommandOrControl", platform === "macos" ? "⌘" : "Ctrl")
@@ -267,7 +411,7 @@ function FirstRunExperience({
               <ArrowRight size={20} />
             </button>
             <button type="button" className="button button-secondary" disabled={busy} onClick={onCreateBlank}>
-              <Plus size={20} /> Create blank audit
+              <Plus size={20} /> Create project
             </button>
             <button type="button" className="text-action" disabled={busy} onClick={onImport}>
               Import an audit package
@@ -361,6 +505,12 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
   const [query, setQuery] = useState("");
   const [commandIndex, setCommandIndex] = useState(0);
   const [newAuditName, setNewAuditName] = useState("");
+  const [newAuditTemplate, setNewAuditTemplate] = useState<AuditTemplateUpload | null>(null);
+  const [newAuditProfile, setNewAuditProfile] = useState<AuditLoggingProfile | null>(null);
+  const [newAuditPreviewContent, setNewAuditPreviewContent] = useState("");
+  const [newAuditIncludedSheets, setNewAuditIncludedSheets] = useState<string[]>([]);
+  const [newAuditTemplateBusy, setNewAuditTemplateBusy] = useState(false);
+  const [newAuditTemplateMessage, setNewAuditTemplateMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [archiveConfirm, setArchiveConfirm] = useState(false);
   const [screenshotShareId, setScreenshotShareId] = useState("");
   const [demoDeleteConfirm, setDemoDeleteConfirm] = useState(false);
@@ -416,6 +566,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     retryLoad,
     selectAudit,
     updateAudit,
+    updateAuditById,
   } = auditWorkspace;
   useEffect(() => {
     let active = true;
@@ -647,12 +798,100 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     setQuery("");
   }
 
-  function createNamedAudit() {
-    const audit = createAudit(newAuditName);
+  function resetNewAuditSetup() {
     setNewAuditName("");
+    setNewAuditTemplate(null);
+    setNewAuditProfile(null);
+    setNewAuditPreviewContent("");
+    setNewAuditIncludedSheets([]);
+    setNewAuditTemplateMessage(null);
+  }
+
+  async function analyzeNewAuditTemplate(template = newAuditTemplate) {
+    if (!template || newAuditTemplateBusy) return;
+    setNewAuditTemplateBusy(true);
+    setNewAuditProfile(null);
+    setNewAuditTemplateMessage({ text: "AI is analyzing the issue sheet structure.", error: false });
+    try {
+      const profile = await desktop.invoke<AuditLoggingProfile>("ai:analyze-audit-template", {
+        ...template,
+        content: newAuditPreviewContent || template.content,
+        sheetNames: newAuditIncludedSheets.length ? newAuditIncludedSheets : template.sheetNames,
+      });
+      setNewAuditProfile(profile);
+      setNewAuditTemplateMessage({
+        text: `Format ready: ${(profile.layouts ?? [{ fields: profile.fields }]).reduce((total, layout) => total + layout.fields.length, 0)} ordered fields across ${profile.layouts?.length ?? 1} layout${(profile.layouts?.length ?? 1) === 1 ? "" : "s"} will guide finding authoring.`,
+        error: false,
+      });
+    } catch (error) {
+      setNewAuditTemplateMessage({
+        text: `${messageFromError(error, "AI could not analyze this audit template.")} Remove the optional template to use the standard format, or configure AI in Settings and try again.`,
+        error: true,
+      });
+    } finally {
+      setNewAuditTemplateBusy(false);
+    }
+  }
+
+  async function chooseNewAuditTemplate() {
+    if (newAuditTemplateBusy) return;
+    try {
+      const template = await desktop.invoke<AuditTemplateUpload | null>("dialog:open-audit-template");
+      if (!template) return;
+      setNewAuditTemplate(template);
+      setNewAuditProfile(null);
+      setNewAuditPreviewContent(template.content);
+      setNewAuditIncludedSheets(template.sheetNames);
+      setNewAuditTemplateMessage(null);
+    } catch (error) {
+      setNewAuditTemplateMessage({ text: messageFromError(error, "The audit template could not be opened."), error: true });
+    }
+  }
+
+  function removeNewAuditTemplate() {
+    setNewAuditTemplate(null);
+    setNewAuditProfile(null);
+    setNewAuditPreviewContent("");
+    setNewAuditIncludedSheets([]);
+    setNewAuditTemplateMessage(null);
+  }
+
+  function toggleNewAuditSheet(sheetName: string) {
+    if (!newAuditTemplate?.sheets) return;
+    const next = newAuditIncludedSheets.includes(sheetName)
+      ? newAuditIncludedSheets.filter((name) => name !== sheetName)
+      : [...newAuditIncludedSheets, sheetName];
+    setNewAuditIncludedSheets(next);
+    const content = newAuditTemplate.sheets
+      .filter((sheet) => next.includes(sheet.name))
+      .map((sheet) => `[Sheet: ${sheet.name}]\n${sheet.rows.map((row) => row.values.join("\t")).join("\n")}${sheet.metadata?.length ? `\n[Worksheet rules]\n${sheet.metadata.join("\n")}` : ""}`)
+      .join("\n\n");
+    setNewAuditPreviewContent(content);
+  }
+
+  async function createNamedAudit() {
+    if (newAuditTemplate && !newAuditProfile) return;
+    const hasLoggingProfile = Boolean(newAuditProfile);
+    const acceptedProfile = newAuditProfile ? normalizeAuditLoggingProfile(newAuditProfile) : undefined;
+    const audit = createAudit(newAuditName, acceptedProfile);
+    let attachmentWarning = "";
+    if (acceptedProfile && newAuditTemplate?.uploadToken) {
+      try {
+        const asset = await desktop.invoke<{ originalFileName: string; extension: string; savedAt: number }>("audit-template:attach", {
+          auditId: audit.id,
+          uploadToken: newAuditTemplate.uploadToken,
+        });
+        updateAuditById(audit.id, { loggingTemplateAsset: { ...asset, available: true } });
+      } catch (error) {
+        attachmentWarning = ` ${messageFromError(error, "The original workbook could not be retained, but mapped XLSX export remains available.")}`;
+      }
+    }
+    resetNewAuditSetup();
     setSwitcherOpen(false);
     setActive("plan");
-    showNotice(`${audit.project} created`);
+    showNotice((hasLoggingProfile
+      ? `${audit.project} created with its agency logging format`
+      : `${audit.project} created`) + attachmentWarning, Boolean(attachmentWarning));
   }
 
   async function exportAuditPackage() {
@@ -888,10 +1127,9 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
   }
 
   function createBlankAudit() {
-    const audit = createAudit("Untitled audit");
-    setActive("plan");
+    setNewAuditName("");
     setFirstRunMessage("");
-    showNotice(`${audit.project} created`);
+    setSwitcherOpen(true);
   }
 
   async function deleteDemoAudit() {
@@ -971,21 +1209,51 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
 
   if (!activeAudit)
     return (
-      <FirstRunExperience
-        busy={seedingSample}
-        message={firstRunMessage}
-        onCreateBlank={createBlankAudit}
-        onImport={() => {
-          void importAuditPackage().catch((error) =>
-            setFirstRunMessage(messageFromError(error, "The audit package could not be imported.")),
-          );
-        }}
-        onOpenCaptureLibrary={() => setStandaloneCaptureLibrary(true)}
-        onOpenExtensionGuide={() => void desktop.invoke("shell:open-external", {
-          url: "https://app.thewcag.com/getting-started#browser-extension",
-        }).catch((error) => setFirstRunMessage(messageFromError(error, "The browser guide could not be opened.")))}
-        onStartSample={() => void startGuidedSample()}
-      />
+      <>
+        <FirstRunExperience
+          busy={seedingSample}
+          message={firstRunMessage}
+          onCreateBlank={createBlankAudit}
+          onImport={() => {
+            void importAuditPackage().catch((error) =>
+              setFirstRunMessage(messageFromError(error, "The audit package could not be imported.")),
+            );
+          }}
+          onOpenCaptureLibrary={() => setStandaloneCaptureLibrary(true)}
+          onOpenExtensionGuide={() => void desktop.invoke("shell:open-external", {
+            url: "https://app.thewcag.com/getting-started#browser-extension",
+          }).catch((error) => setFirstRunMessage(messageFromError(error, "The browser guide could not be opened.")))}
+          onStartSample={() => void startGuidedSample()}
+        />
+        <Modal
+          open={switcherOpen}
+          onClose={() => setSwitcherOpen(false)}
+          label="Create project"
+          className="new-audit-dialog"
+        >
+          <div className="dialog-heading">
+            <div><span>New project</span><h2>Start an accessibility audit</h2></div>
+            <button aria-label="Close project setup" onClick={() => setSwitcherOpen(false)}><X size={20} /></button>
+          </div>
+          <NewAuditSetup
+            busy={newAuditTemplateBusy}
+            message={newAuditTemplateMessage}
+            name={newAuditName}
+            profile={newAuditProfile}
+            previewContent={newAuditPreviewContent}
+            includedSheets={newAuditIncludedSheets}
+            template={newAuditTemplate}
+            onAnalyze={() => void analyzeNewAuditTemplate()}
+            onChooseTemplate={() => void chooseNewAuditTemplate()}
+            onCreate={() => void createNamedAudit()}
+            onNameChange={setNewAuditName}
+            onPreviewContentChange={setNewAuditPreviewContent}
+            onProfileChange={setNewAuditProfile}
+            onRemoveTemplate={removeNewAuditTemplate}
+            onToggleSheet={toggleNewAuditSheet}
+          />
+        </Modal>
+      </>
     );
 
   const plan = auditPlanProgress(activeAudit);
@@ -1011,6 +1279,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
       <InspectView
         key={`${activeAudit.id}-${auditDataVersion}`}
         auditId={activeAudit.id}
+        loggingProfile={activeAudit.loggingProfile}
         initialSession={guidedSession?.auditId === activeAudit.id ? guidedSession : null}
         onNavigate={navigate}
         recordActivity={recordActivity}
@@ -1019,6 +1288,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
       <EvidenceView
         key={`${activeAudit.id}-${auditDataVersion}`}
         auditId={activeAudit.id}
+        loggingProfile={activeAudit.loggingProfile}
         initialTab={evidenceTab}
         onNavigate={navigate}
         recordActivity={recordActivity}
@@ -1381,6 +1651,13 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
                   <span>{activeAudit.standard}</span>
                 </div>
               </div>
+              {activeAudit.loggingProfile ? (
+                <div className="inspector-section">
+                  <span className="inspector-label">Finding format</span>
+                  <div className="context-value"><Sparkle size={20} /><span>{activeAudit.loggingProfile.templateName}</span></div>
+                  <p className="inspector-copy">{(activeAudit.loggingProfile.layouts ?? [{ fields: activeAudit.loggingProfile.fields }]).reduce((total, layout) => total + layout.fields.length, 0)} mapped fields across {activeAudit.loggingProfile.layouts?.length ?? 1} issue layout{(activeAudit.loggingProfile.layouts?.length ?? 1) === 1 ? "" : "s"}.</p>
+                </div>
+              ) : null}
               <div className="inspector-section">
                 <span className="inspector-label">Scope</span>
                 <p className="inspector-copy">
@@ -1601,26 +1878,23 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
               </button>
             ))}
         </div>
-        <form
-          className="new-audit-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            createNamedAudit();
-          }}
-        >
-          <label>
-            <span>New audit</span>
-            <input
-              value={newAuditName}
-              onChange={(event) => setNewAuditName(event.target.value)}
-              placeholder="Project or release name"
-            />
-          </label>
-          <button className="button button-primary" type="submit">
-            <Plus size={20} />
-            Create
-          </button>
-        </form>
+        <NewAuditSetup
+          busy={newAuditTemplateBusy}
+          message={newAuditTemplateMessage}
+          name={newAuditName}
+          profile={newAuditProfile}
+          previewContent={newAuditPreviewContent}
+          includedSheets={newAuditIncludedSheets}
+          template={newAuditTemplate}
+          onAnalyze={() => void analyzeNewAuditTemplate()}
+          onChooseTemplate={() => void chooseNewAuditTemplate()}
+          onCreate={() => void createNamedAudit()}
+          onNameChange={setNewAuditName}
+          onPreviewContentChange={setNewAuditPreviewContent}
+          onProfileChange={setNewAuditProfile}
+          onRemoveTemplate={removeNewAuditTemplate}
+          onToggleSheet={toggleNewAuditSheet}
+        />
         <div className="dialog-footer">
           <span>
             {audits.filter((audit) => !audit.archivedAt).length} active audits

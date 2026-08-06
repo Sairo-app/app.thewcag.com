@@ -25,9 +25,11 @@ import { parseDesktopTelemetryRequest } from "./services/funnel-telemetry";
 import type { WindowManager } from "./windows";
 import { discoverWebsite } from "./services/scope-discovery";
 import { assertRendererStoreAccess } from "./services/store-access";
+import type { AuditTemplateService } from "./services/audit-template";
 
 interface Services {
   ai: AiAuthoringService;
+  auditTemplates: AuditTemplateService;
   auth: AuthService;
   captureCoordinator: CaptureCoordinator;
   captures: CaptureRepository;
@@ -330,6 +332,24 @@ export function registerIpc(services: Services): void {
   register("ai:test-provider", (_event, payload) => services.ai.testProvider(payload));
   register("ai:remove-provider", (_event, payload) => services.ai.removeProvider(payload));
   register("ai:set-active", (_event, payload) => services.ai.setActive(payload));
+  register("ai:analyze-audit-template", (_event, payload) => services.ai.analyzeAuditTemplate(payload));
+  register("ai:prefill-audit-template", (_event, payload) => services.ai.prefillAuditTemplate(payload));
+  register("audit-template:attach", (_event, payload) => {
+    const value = asObject(payload);
+    return services.auditTemplates.attach(value.auditId, value.uploadToken);
+  });
+  register("audit-template:remove", (_event, payload) => services.auditTemplates.remove(asObject(payload).auditId));
+  register("audit-template:export", async (event, payload) => {
+    const value = asObject(payload);
+    const info = await services.auditTemplates.exportInfo(value.auditId, value.profile);
+    const response = await dialog.showSaveDialog(currentWindow(event), {
+      defaultPath: info.name,
+      filters: [{ name: "Completed agency audit", extensions: [info.extension] }],
+    });
+    if (response.canceled || !response.filePath) return null;
+    await services.auditTemplates.export(value.auditId, value.profile, value.findings, response.filePath);
+    return response.filePath;
+  });
   register("ticket:configuration", () => services.tickets.configuration());
   register("ticket:save-connector", (_event, payload) => services.tickets.saveConnector(payload));
   register("ticket:remove-connector", (_event, payload) => services.tickets.removeConnector(payload));
@@ -416,6 +436,17 @@ export function registerIpc(services: Services): void {
     const size = await stat(file);
     if (size.size > 300 * 1024 * 1024) throw new Error("The audit package is too large");
     return readFile(file, "utf8");
+  });
+  register("dialog:open-audit-template", async (event) => {
+    const response = await dialog.showOpenDialog(currentWindow(event), {
+      properties: ["openFile"],
+      filters: [{
+        name: "Audit templates",
+        extensions: ["xlsx", "csv", "tsv", "json", "md", "txt"],
+      }],
+    });
+    if (response.canceled || !response.filePaths[0]) return null;
+    return services.auditTemplates.open(response.filePaths[0]);
   });
   register("clipboard:write-text", (_event, payload) => clipboard.writeText(stringField(asObject(payload), "text", 2 * 1024 * 1024)));
   register("clipboard:write-image", (_event, payload) => clipboard.writeImage(nativeImage.createFromDataURL(stringField(asObject(payload), "pngDataUrl", 50 * 1024 * 1024))));

@@ -9,6 +9,7 @@ import {
   WarningCircle,
 } from "./Icon";
 import type {
+  AuditLoggingProfile,
   AuditSampleItem,
   AuditTestRun,
   CaptureEntry,
@@ -54,11 +55,13 @@ export function GuidedAuditSession({
   initialSession,
   onNavigate,
   recordActivity,
+  loggingProfile,
 }: {
   auditId: string;
   initialSession: AuditSessionSelection | null;
   onNavigate: (stage: WorkspaceStage) => void;
   recordActivity: RecordAuditActivity;
+  loggingProfile?: AuditLoggingProfile;
 }) {
   const [sampleItems, setSampleItems] = useState<AuditSampleItem[]>([]);
   const [testRuns, setTestRuns] = useState<AuditTestRun[]>([]);
@@ -353,6 +356,10 @@ export function GuidedAuditSession({
       recommendation: value.recommendation.trim(),
       reproductionSteps: value.reproductionSteps,
       retestNote: value.retestNote.trim(),
+      agencyFields: { ...value.agencyFields },
+      agencyLayoutId: value.agencyLayoutId || undefined,
+      agencyProfileId: loggingProfile?.profileId,
+      agencyProfileRevision: loggingProfile?.revision,
       statusHistory: findingStatusHistoryAfterChange(undefined, value.status, now),
       createdAt: now,
       modifiedAt: now,
@@ -603,6 +610,7 @@ export function GuidedAuditSession({
         auditId={auditId}
         sampleItemId={sample?.id}
         testRunId={run?.id}
+        loggingProfile={loggingProfile}
         initialValue={editorSeed}
         onClose={() => setEditorOpen(false)}
         onSave={(value) => void saveFinding(value)}

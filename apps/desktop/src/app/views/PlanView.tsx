@@ -36,6 +36,7 @@ import {
   type AuditSessionSelection,
 } from "../audit-coverage";
 import { AuditCoverageMap } from "../AuditCoverageMap";
+import { AuditTemplateProjectSettings } from "../AuditTemplateProjectSettings";
 import { auditStoreKey, type RecordAuditActivity } from "../audits";
 import { Button, ConfirmDialog, Field, Toast } from "../components";
 import { messageFromError, useTransientMessage } from "../hooks";
@@ -823,6 +824,11 @@ export function PlanView({
           </Button>
         </form>
       </section>
+      <AuditTemplateProjectSettings
+        audit={audit}
+        onAuditChange={onAuditChange}
+        recordActivity={recordActivity}
+      />
       <section className="plan-status" aria-labelledby="plan-status-title">
         <div className="plan-status-icon">
           {readiness.ready ? (
