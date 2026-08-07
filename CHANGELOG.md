@@ -1,5 +1,29 @@
 # Changelog
 
+## v3.0.9 - 2026-08-08
+
+**Adaptive audit templates**
+
+- Added optional per-project audit templates on desktop: import a client's audit workbook, let the configured AI provider learn its sheets, fields, allowed values, and examples, and prefill findings in the client's own format without making any template mandatory.
+- Added audit logging profiles with a dedicated editor so projects control how findings are written, plus template-aware prefill in the finding editor and guided sessions.
+- Added authenticated web AI endpoints for audit-template learning and finding prefill, with request validation and tests.
+
+**Crash telemetry and platform reliability**
+
+- Added opt-in desktop crash reports with client- and server-side redaction, fingerprint deduplication, per-session rate limits, payload validation, and Postgres storage; the privacy policy discloses the new telemetry.
+- Restored the accessibility gate's production boot requirements and fixed the evidence sweep's age-comparison race with timing-independent regression tests.
+
+**Firefox Evidence Capture extension**
+
+- Ported the Evidence Capture extension to Firefox with a manifest derived from the Chrome build to prevent drift, a sidebar shim, and native-messaging support; the build passes AMO lint cleanly.
+
+**Website: sample report and interface polish**
+
+- Published a sample checkout audit report with findings, WCAG mapping, and annotated evidence at `/s/sample-checkout-audit`, linked from the home page and footer and indexed in the sitemap.
+- Simplified the home hero to a single product workspace card with the real logo, compacted the sticky header, and gave every navigation item a distinct semantic Phosphor icon.
+- Fixed responsive clipping of the hero capture panel between 960 and 1090 pixels, unified card seam spacing, and replaced the remaining hardcoded interface colors with canonical theme tokens.
+- Updated the desktop release to `3.0.9`; the exact `v3.0.9` tag runs the complete quality gate and produces the macOS and Windows release artifacts.
+
 ## v3.0.8 - 2026-07-23
 
 **Cross-process data integrity and desktop reliability**
