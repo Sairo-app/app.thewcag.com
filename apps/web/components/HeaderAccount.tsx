@@ -115,6 +115,6 @@ export function HeaderAccount({ mobile = false }: { mobile?: boolean }) {
       </div>
     </AccountMenu>
   ) : (
-    <Link href="/signin" className="site-signin"><LogInIcon size={20} />Sign in</Link>
+    <Link href="/signin" className="site-signin"><LogInIcon size={16} />Sign in</Link>
   );
 }

@@ -416,9 +416,9 @@ describe("canonical design tokens", () => {
     for (const match of source.matchAll(/<([A-Z][\w.]*)\b[^>]*\bweight="fill"/g)) {
       expect(["CheckCircle", "Warning", "WarningCircle"], match[0]).toContain(match[1]);
     }
-    const duotone = [...source.matchAll(/<([A-Z][\w.]*)\b([^>]*)\bweight="duotone"/g)];
-    expect(duotone).toHaveLength(1);
-    expect(duotone[0][0]).toContain("size={32}");
+    for (const match of source.matchAll(/<([A-Z][\w.]*)\b([^>]*)\bweight="duotone"/g)) {
+      expect(match[0], "duotone is reserved for size-32 empty states").toContain("size={32}");
+    }
   });
 
   it("keeps icon-only controls named and icons visible in forced colors", () => {

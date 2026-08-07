@@ -9,7 +9,6 @@ import {
   ImageIcon,
   SparklesIcon,
 } from "@/components/icons";
-import { FrameCorners } from "@/components/Icon";
 
 const MODES = [
   { id: "Capture", label: "Capture", icon: CropIcon },
@@ -148,72 +147,57 @@ export function AuditPlayground() {
   }
 
   return (
-    <div className="hero-showcase">
-      <div className="hero-showcase__art" aria-hidden="true">
-        <FrameCorners size={32} weight="duotone" />
+    <div className="hero-workspace" aria-label="Explore the connected TheWCAG audit workflow">
+      <div className="hero-workspace__chrome">
+        <div className="hero-workspace__brand">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="" width={26} height={26} />
+          <div><strong>TheWCAG</strong><small>Checkout accessibility audit</small></div>
+        </div>
+        <span className="hero-workspace__local"><CheckIcon size={16} /> Local audit</span>
       </div>
 
-      <div className="hero-showcase__signal hero-showcase__signal--evidence" aria-hidden="true">
-        <span><CheckIcon size={16} /></span>
-        <div><strong>Evidence linked</strong><small>Visual + semantic context</small></div>
-      </div>
-
-      <div className="hero-workspace" aria-label="Explore the connected TheWCAG audit workflow">
-        <div className="hero-workspace__chrome">
-          <div className="hero-workspace__brand">
-            <span aria-hidden="true">W</span>
-            <div><strong>TheWCAG</strong><small>Checkout accessibility audit</small></div>
-          </div>
-          <span className="hero-workspace__local"><CheckIcon size={16} /> Local audit</span>
+      <div className="hero-workspace__body">
+        <div className="hero-workspace__tabs" role="tablist" aria-label="Audit workflow stages">
+          {MODES.map((item, index) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                id={`${id}-${item.id}-tab`}
+                type="button"
+                role="tab"
+                aria-selected={mode === item.id}
+                aria-controls={`${id}-${item.id}-panel`}
+                tabIndex={mode === item.id ? 0 : -1}
+                onClick={() => setMode(item.id)}
+                onKeyDown={handleKeyDown}
+              >
+                <span className="hero-workspace__step">{String(index + 1).padStart(2, "0")}</span>
+                <Icon size={20} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
         </div>
 
-        <div className="hero-workspace__body">
-          <div className="hero-workspace__tabs" role="tablist" aria-label="Audit workflow stages">
-            {MODES.map((item, index) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.id}
-                  id={`${id}-${item.id}-tab`}
-                  type="button"
-                  role="tab"
-                  aria-selected={mode === item.id}
-                  aria-controls={`${id}-${item.id}-panel`}
-                  tabIndex={mode === item.id ? 0 : -1}
-                  onClick={() => setMode(item.id)}
-                  onKeyDown={handleKeyDown}
-                >
-                  <span className="hero-workspace__step">{String(index + 1).padStart(2, "0")}</span>
-                  <Icon size={20} />
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div
-            id={`${id}-${mode}-panel`}
-            className="hero-workspace__panel"
-            role="tabpanel"
-            aria-labelledby={`${id}-${mode}-tab`}
-          >
-            {mode === "Capture" && <CapturePanel />}
-            {mode === "Draft" && <DraftPanel />}
-            {mode === "Review" && <ReviewPanel />}
-            {mode === "Deliver" && <DeliverPanel />}
-          </div>
-        </div>
-
-        <div className="hero-workspace__footer">
-          <span>Browser context intact</span>
-          <span>Provider controlled by you</span>
-          <span>Publish only when ready</span>
+        <div
+          id={`${id}-${mode}-panel`}
+          className="hero-workspace__panel"
+          role="tabpanel"
+          aria-labelledby={`${id}-${mode}-tab`}
+        >
+          {mode === "Capture" && <CapturePanel />}
+          {mode === "Draft" && <DraftPanel />}
+          {mode === "Review" && <ReviewPanel />}
+          {mode === "Deliver" && <DeliverPanel />}
         </div>
       </div>
 
-      <div className="hero-showcase__signal hero-showcase__signal--standard" aria-hidden="true">
-        <span>2.4.11</span>
-        <div><strong>WCAG 2.2</strong><small>Decision ready to review</small></div>
+      <div className="hero-workspace__footer">
+        <span>Browser context intact</span>
+        <span>Provider controlled by you</span>
+        <span>Publish only when ready</span>
       </div>
     </div>
   );

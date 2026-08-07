@@ -341,7 +341,7 @@ article :where(p, li, dd),
 }
 
 [id] {
-  scroll-margin-top: 5.5rem;
+  scroll-margin-top: 5rem;
 }
 
 kbd {
@@ -464,7 +464,7 @@ kbd {
 
 .site-header__inner {
   display: grid;
-  min-height: 4.25rem;
+  min-height: 3.75rem;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: clamp(var(--space-4), 2.5vw, var(--space-10));
@@ -666,7 +666,7 @@ kbd {
 
 .site-menu__panel {
   position: fixed;
-  top: 4.75rem;
+  top: 4.25rem;
   right: var(--gutter);
   width: min(19rem, calc(100% - (var(--gutter) * 2)));
 }
@@ -836,11 +836,11 @@ kbd {
   flex-direction: column;
   justify-content: center;
   background: var(--ink);
-  color: white;
+  color: var(--canvas);
 }
 
 .home-paths__intro > span {
-  color: #f2c5ac;
+  color: color-mix(in oklch, var(--orange) 32%, var(--canvas));
   font-size: var(--type-footnote-size);
   line-height: var(--type-footnote-line);
   letter-spacing: var(--type-footnote-tracking);
@@ -1182,8 +1182,8 @@ kbd {
 .feature-matrix {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-3);
-  margin-top: var(--space-3);
+  gap: var(--space-4);
+  margin-top: var(--space-4);
 }
 
 .feature-matrix li {
@@ -1244,7 +1244,7 @@ kbd {
 
 .section-heading--sticky {
   position: sticky;
-  top: 7.5rem;
+  top: 7rem;
 }
 
 .workflow-list {
@@ -1353,99 +1353,6 @@ kbd {
 
 /* Interactive product workflow */
 
-.hero-showcase {
-  position: relative;
-  z-index: 0;
-  min-width: 0;
-  isolation: isolate;
-  padding: var(--space-8) var(--space-4) calc(var(--space-12) + var(--space-3)) var(--space-3);
-}
-
-.hero-showcase__art {
-  position: absolute;
-  z-index: -1;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  inset: -3.4rem -4.35rem -3.6rem -3.8rem;
-  width: calc(100% + 8.15rem);
-  height: calc(100% + 7rem);
-  max-width: none;
-  padding: var(--space-12);
-  color: var(--action);
-  opacity: 0.18;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.hero-showcase__signal {
-  position: absolute;
-  z-index: 4;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  border: 0;
-  border-radius: var(--radius-panel);
-  background: var(--surface);
-  padding: var(--space-2) var(--space-3);
-  box-shadow: var(--elevation-1);
-  backdrop-filter: blur(12px);
-}
-
-.hero-showcase__signal > span {
-  display: grid;
-  width: 2rem;
-  height: 2rem;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: var(--radius-control);
-  background: var(--orange);
-  color: var(--on-orange);
-  font-family: var(--font-mono-face), monospace;
-  font-size: var(--type-caption-size);
-  line-height: var(--type-caption-line);
-  letter-spacing: var(--type-caption-tracking);
-
-
-  font-weight: 750;
-}
-
-.hero-showcase__signal > div {
-  display: grid;
-  line-height: var(--type-body-line);
-}
-
-.hero-showcase__signal strong {
-  color: var(--ink);
-  font-family: var(--font-display), sans-serif;
-  font-size: var(--type-footnote-size);
-  line-height: var(--type-footnote-line);
-  letter-spacing: var(--type-footnote-tracking);
-
-
-}
-
-.hero-showcase__signal small {
-  margin-top: var(--space-1);
-  color: var(--muted);
-  font-size: var(--type-caption-size);
-  line-height: var(--type-caption-line);
-  letter-spacing: var(--type-caption-tracking);
-
-
-  white-space: nowrap;
-}
-
-.hero-showcase__signal--evidence {
-  top: 0.15rem;
-  right: 0.4rem;
-}
-
-.hero-showcase__signal--standard {
-  bottom: 0.15rem;
-  left: 0;
-}
-
 .hero-workspace {
   position: relative;
   z-index: 2;
@@ -1479,23 +1386,11 @@ kbd {
   gap: var(--space-3);
 }
 
-.hero-workspace__brand > span {
-  display: inline-flex;
-  width: 2.1rem;
-  height: 2.1rem;
+.hero-workspace__brand img {
+  width: 1.625rem;
+  height: 1.625rem;
   flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-control);
-  background: var(--orange);
-  color: var(--on-orange);
-  font-family: var(--font-display), sans-serif;
-  font-size: var(--type-body-size);
-  line-height: var(--type-body-line);
-  letter-spacing: var(--type-body-tracking);
-
-
-  font-weight: 800;
+  border-radius: 7px;
 }
 
 .hero-workspace__brand > div {
@@ -1612,7 +1507,7 @@ kbd {
 .hero-workspace__capture {
   display: grid;
   min-height: 23.5rem;
-  grid-template-columns: minmax(15rem, 1.35fr) minmax(11rem, 0.65fr);
+  grid-template-columns: minmax(13rem, 1.35fr) minmax(10rem, 0.65fr);
 }
 
 .hero-workspace__browser {
@@ -4366,6 +4261,20 @@ kbd {
 /* Responsive */
 
 @media (max-width: 68rem) {
+  /* The hero's two columns need ~68rem of shell before both minimums fit;
+     below that the stage clips its capture panel, so stack early. */
+  .home-hero__intro {
+    grid-template-columns: 1fr;
+  }
+
+  .home-hero__copy {
+    max-width: 42rem;
+  }
+
+  .home-hero__stage {
+    margin-top: var(--space-10);
+  }
+
   .home-paths__inner {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -4421,26 +4330,9 @@ kbd {
     grid-column: 2;
   }
 
-  .home-hero {
-    min-height: auto;
-  }
-
-  .home-hero__intro,
   .home-workflow__grid,
   .home-trust__inner {
     grid-template-columns: 1fr;
-  }
-
-  .home-hero__copy {
-    max-width: 42rem;
-  }
-
-  .home-hero__copy h1 {
-    max-width: 10ch;
-  }
-
-  .home-hero__stage {
-    margin-top: var(--space-10);
   }
 
   .section-heading--sticky {
@@ -4588,16 +4480,6 @@ kbd {
     grid-template-columns: 1fr;
   }
 
-  .hero-showcase {
-    padding: var(--space-8) var(--space-4) calc(var(--space-12) + var(--space-3));
-  }
-
-  .hero-showcase__art {
-    inset: -2.8rem -3rem -3.2rem;
-    width: calc(100% + 6rem);
-    height: calc(100% + 6rem);
-  }
-
   .hero-workspace__tabs {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -4704,29 +4586,6 @@ kbd {
 
   .download-platform .button {
     width: 100%;
-  }
-
-  .hero-showcase {
-    padding: var(--space-10) 0 calc(var(--space-12) + var(--space-2));
-  }
-
-  .hero-showcase__art {
-    inset: -2.1rem -2.6rem -2.8rem;
-    width: calc(100% + 5.2rem);
-    height: calc(100% + 4.9rem);
-    opacity: 0.78;
-  }
-
-  .hero-showcase__signal--evidence {
-    right: -0.15rem;
-  }
-
-  .hero-showcase__signal--standard {
-    left: -0.15rem;
-  }
-
-  .hero-showcase__signal small {
-    display: none;
   }
 
   .home-purpose__principles article {
@@ -4944,7 +4803,6 @@ kbd {
 
   .account-menu__panel,
   .site-menu__panel,
-  .hero-showcase__signal,
   .hero-workspace,
   .report-lightbox {
     border: 1px solid CanvasText;
