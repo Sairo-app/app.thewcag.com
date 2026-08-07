@@ -32,10 +32,7 @@ export function Header() {
         <Link href="/" aria-label="TheWCAG home" className="site-brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="" width={26} height={26} />
-          <span className="site-brand__copy">
-            <span className="site-brand__name">TheWCAG</span>
-            <small>Audit workspace</small>
-          </span>
+          <span className="site-brand__name">TheWCAG</span>
         </Link>
 
         <div className="site-header__center">
@@ -59,9 +56,9 @@ export function Header() {
             </div>
           </SiteMenu>
 
-          <Link href="/download" aria-label="Get TheWCAG desktop app" className="site-header__download">
+          <Link href="/download" aria-label="Download TheWCAG" className="site-header__download">
             <DownloadIcon size={20} />
-            <strong>Get the app</strong>
+            <strong>Download free</strong>
           </Link>
         </div>
       </div>
