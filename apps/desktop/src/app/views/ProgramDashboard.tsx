@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { ChartBarHorizontal, ClipboardText, Info, WarningCircle } from "../Icon";
+import { ChartBarHorizontal, ClipboardText, Info } from "../Icon";
 import type {
   AuditProject,
   AuditSampleItem,

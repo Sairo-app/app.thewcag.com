@@ -10,7 +10,6 @@ import {
   Plus,
   Trash,
   UploadSimple,
-  WarningCircle,
 } from "../Icon";
 import type {
   AuditProject,

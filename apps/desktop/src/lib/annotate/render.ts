@@ -106,7 +106,7 @@ function drawShape(
       break;
     }
     case "text": {
-      ctx.font = '600 26px \"Source Sans 3\", system-ui, sans-serif';
+      ctx.font = '600 26px "Source Sans 3", system-ui, sans-serif';
       ctx.lineWidth = 5;
       ctx.strokeStyle = isLight(s.color) ? "rgba(0,0,0,0.7)" : "rgba(255,255,255,0.85)";
       ctx.strokeText(s.text ?? "", s.x1, s.y1);
@@ -216,7 +216,7 @@ function drawFocusPath(ctx: CanvasRenderingContext2D, shapes: Shape[]) {
     ctx.strokeStyle = "#FFFFFF";
     ctx.stroke();
     ctx.fillStyle = "#FFFFFF";
-    ctx.font = '700 16px \"Source Sans 3\", system-ui, sans-serif';
+    ctx.font = '700 16px "Source Sans 3", system-ui, sans-serif';
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(String(i + 1), p.x1, p.y1 + 1);
@@ -247,7 +247,7 @@ function drawBadge(ctx: CanvasRenderingContext2D, x: number, y: number, num: num
     ctx.lineWidth = 3;
   }
   ctx.fillStyle = onDark ? "#FFFFFF" : "#0F172A";
-  ctx.font = '700 22px \"Source Sans 3\", system-ui, sans-serif';
+  ctx.font = '700 22px "Source Sans 3", system-ui, sans-serif';
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(String(num), x, y + 1);
@@ -256,7 +256,7 @@ function drawBadge(ctx: CanvasRenderingContext2D, x: number, y: number, num: num
 }
 
 function pill(ctx: CanvasRenderingContext2D, x: number, y: number, label: string, bg: string) {
-  ctx.font = '600 15px \"Source Sans 3\", system-ui, sans-serif';
+  ctx.font = '600 15px "Source Sans 3", system-ui, sans-serif';
   const w = ctx.measureText(label).width + 12;
   ctx.fillStyle = bg;
   ctx.beginPath();
