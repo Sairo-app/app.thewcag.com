@@ -1,4 +1,5 @@
 import { forwardRef, type ForwardRefExoticComponent, type RefAttributes } from "react";
+import { AppWindow as PhosphorAppWindow } from "@phosphor-icons/react/dist/ssr/AppWindow";
 import { ArrowRight as PhosphorArrowRight } from "@phosphor-icons/react/dist/ssr/ArrowRight";
 import { BookOpen as PhosphorBookOpen } from "@phosphor-icons/react/dist/ssr/BookOpen";
 import { CalendarBlank as PhosphorCalendarBlank } from "@phosphor-icons/react/dist/ssr/CalendarBlank";
@@ -15,6 +16,7 @@ import { Image as PhosphorImage } from "@phosphor-icons/react/dist/ssr/Image";
 import { LinkSimple as PhosphorLinkSimple } from "@phosphor-icons/react/dist/ssr/LinkSimple";
 import { List as PhosphorList } from "@phosphor-icons/react/dist/ssr/List";
 import { ListChecks as PhosphorListChecks } from "@phosphor-icons/react/dist/ssr/ListChecks";
+import { LockSimple as PhosphorLockSimple } from "@phosphor-icons/react/dist/ssr/LockSimple";
 import { Palette as PhosphorPalette } from "@phosphor-icons/react/dist/ssr/Palette";
 import { PersonArmsSpread as PhosphorPersonArmsSpread } from "@phosphor-icons/react/dist/ssr/PersonArmsSpread";
 import { PuzzlePiece as PhosphorPuzzlePiece } from "@phosphor-icons/react/dist/ssr/PuzzlePiece";
@@ -23,6 +25,7 @@ import { SignOut as PhosphorSignOut } from "@phosphor-icons/react/dist/ssr/SignO
 import { Sparkle as PhosphorSparkle } from "@phosphor-icons/react/dist/ssr/Sparkle";
 import { Tag as PhosphorTag } from "@phosphor-icons/react/dist/ssr/Tag";
 import { Trash as PhosphorTrash } from "@phosphor-icons/react/dist/ssr/Trash";
+import { UserCircle as PhosphorUserCircle } from "@phosphor-icons/react/dist/ssr/UserCircle";
 import type { Icon as PhosphorGlyph, IconProps as PhosphorIconProps } from "@phosphor-icons/react";
 
 export const ICON_SIZES = [16, 20, 24, 32] as const;
@@ -58,6 +61,7 @@ function createIcon(glyph: PhosphorGlyph, displayName: string): IconComponent {
   return WrappedIcon;
 }
 
+export const AppWindow = createIcon(PhosphorAppWindow, "AppWindow");
 export const ArrowRight = createIcon(PhosphorArrowRight, "ArrowRight");
 export const BookOpen = createIcon(PhosphorBookOpen, "BookOpen");
 export const CalendarBlank = createIcon(PhosphorCalendarBlank, "CalendarBlank");
@@ -74,6 +78,7 @@ export const Flag = createIcon(PhosphorFlag, "Flag");
 export const Image = createIcon(PhosphorImage, "Image");
 export const LinkSimple = createIcon(PhosphorLinkSimple, "LinkSimple");
 export const List = createIcon(PhosphorList, "List");
+export const LockSimple = createIcon(PhosphorLockSimple, "LockSimple");
 export const Palette = createIcon(PhosphorPalette, "Palette");
 export const PersonArmsSpread = createIcon(PhosphorPersonArmsSpread, "PersonArmsSpread");
 export const PuzzlePiece = createIcon(PhosphorPuzzlePiece, "PuzzlePiece");
@@ -82,3 +87,4 @@ export const SignOut = createIcon(PhosphorSignOut, "SignOut");
 export const Sparkle = createIcon(PhosphorSparkle, "Sparkle");
 export const Tag = createIcon(PhosphorTag, "Tag");
 export const Trash = createIcon(PhosphorTrash, "Trash");
+export const UserCircle = createIcon(PhosphorUserCircle, "UserCircle");

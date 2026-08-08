@@ -1,4 +1,5 @@
 export {
+  AppWindow as AppWindowIcon,
   ArrowRight as ArrowRightIcon,
   BookOpen as BookIcon,
   CalendarBlank as CalendarIcon,
@@ -15,6 +16,7 @@ export {
   Image as ImageIcon,
   LinkSimple as LinkIcon,
   List as MenuIcon,
+  LockSimple as LockIcon,
   Palette as PaletteIcon,
   PersonArmsSpread as AccessibilityIcon,
   PuzzlePiece as PuzzleIcon,
@@ -23,6 +25,7 @@ export {
   Sparkle as SparklesIcon,
   Tag as TagIcon,
   Trash as TrashIcon,
+  UserCircle as UserIcon,
 } from "./Icon";
 
 // Genuine platform and company marks remain custom and inherit currentColor.
