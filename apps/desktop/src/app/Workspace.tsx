@@ -155,14 +155,16 @@ const TITLES: Record<Route, { title: string; description: string }> = {
     description:
       "Capture, annotate, export, and share screenshots without using the audit workflow.",
   },
+  // The captures route normalizes to screenshot; the entry exists only to satisfy Record<Route, …>.
+  captures: {
+    title: "Screenshot tool",
+    description:
+      "Capture, annotate, export, and share screenshots without using the audit workflow.",
+  },
   program: {
     title: "Program trends",
     description:
       "Review recurrence, retest timing, component hotspots, and regressions across owned local audits.",
-  },
-  captures: {
-    title: "Screenshot tool",
-    description: "Capture, annotate, copy, export, and share local screenshots without adding them to an audit or finding.",
   },
   vision: {
     title: "Vision lens",
@@ -296,12 +298,12 @@ function NewAuditSetup({
         ) : (
           <div className="audit-template-file">
             <div>
-              {profile ? <Check size={20} /> : busy ? <Sparkle size={20} /> : <WarningCircle size={20} />}
+              {profile ? <Check size={20} /> : busy ? <span className="loading-state-dots" aria-hidden="true"><i /><i /><i /></span> : <WarningCircle size={20} />}
               <span>
                 <strong>{template.name}</strong>
-                <small>
+                <small role="status">
                   {busy
-                    ? "AI is identifying fields and instructions..."
+                    ? "AI is identifying fields and instructions"
                     : profile
                       ? `${profile.layouts?.length ?? 1} layout${(profile.layouts?.length ?? 1) === 1 ? "" : "s"} · ${(profile.layouts ?? [{ fields: profile.fields }]).reduce((total, layout) => total + layout.fields.length, 0)} mapped fields`
                       : "Review the extracted data, then analyze the structure"}
@@ -350,9 +352,9 @@ function NewAuditSetup({
         <p className="audit-template-privacy">The file type, selected worksheet names, and extracted data you approve above are sent to the AI provider selected in Settings. The file name and original file stay local; after approval, the original is retained for agency-format export.</p>
       </section>
       <div className="new-audit-setup-actions">
-        <span>{template ? "This project will use the analyzed agency format." : "No template selected · standard finding format"}</span>
+        <span>{template ? "This audit will use the analyzed agency format." : "No template selected · standard finding format"}</span>
         <button className="button button-primary" type="submit" disabled={busy || templatePending || Boolean(profileError)}>
-          <Plus size={20} /> Create project
+          <Plus size={20} /> Create audit
         </button>
       </div>
     </form>
@@ -411,7 +413,7 @@ function FirstRunExperience({
               <ArrowRight size={20} />
             </button>
             <button type="button" className="button button-secondary" disabled={busy} onClick={onCreateBlank}>
-              <Plus size={20} /> Create project
+              <Plus size={20} /> Create audit
             </button>
             <button type="button" className="text-action" disabled={busy} onClick={onImport}>
               Import an audit package
@@ -499,7 +501,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
   const [commandOpen, setCommandOpen] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
-  const [notice, showNotice, clearNotice] = useTransientMessage(5000);
+  const [notice, showNotice, clearNotice] = useTransientMessage();
   const [activity, setActivity] = useState<AuditActivity[]>([]);
   const taskContentRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
@@ -510,6 +512,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
   const [newAuditPreviewContent, setNewAuditPreviewContent] = useState("");
   const [newAuditIncludedSheets, setNewAuditIncludedSheets] = useState<string[]>([]);
   const [newAuditTemplateBusy, setNewAuditTemplateBusy] = useState(false);
+  const [creatingAudit, setCreatingAudit] = useState(false);
   const [newAuditTemplateMessage, setNewAuditTemplateMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [archiveConfirm, setArchiveConfirm] = useState(false);
   const [screenshotShareId, setScreenshotShareId] = useState("");
@@ -870,7 +873,10 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
   }
 
   async function createNamedAudit() {
+    if (creatingAudit) return;
     if (newAuditTemplate && !newAuditProfile) return;
+    setCreatingAudit(true);
+    try {
     const hasLoggingProfile = Boolean(newAuditProfile);
     const acceptedProfile = newAuditProfile ? normalizeAuditLoggingProfile(newAuditProfile) : undefined;
     const audit = createAudit(newAuditName, acceptedProfile);
@@ -890,8 +896,11 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
     setSwitcherOpen(false);
     setActive("plan");
     showNotice((hasLoggingProfile
-      ? `${audit.project} created with its agency logging format`
+      ? `${audit.project} created with its agency format`
       : `${audit.project} created`) + attachmentWarning, Boolean(attachmentWarning));
+    } finally {
+      setCreatingAudit(false);
+    }
   }
 
   async function exportAuditPackage() {
@@ -1037,7 +1046,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
           title: source === "demo" ? "Guided sample created" : "Audit package imported",
           detail: source === "demo"
             ? "Bundled local training data. No network content was opened."
-            : `Integrity verified. Exported ${payload.exportedAt}.`,
+            : `Integrity verified. Exported ${new Date(payload.exportedAt).toLocaleString()}.`,
           createdAt: Date.now(),
         },
         ...(normalizedFindings.referenceChanges.length
@@ -1049,7 +1058,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
               detail: [
                 ...normalizedFindings.referenceChanges.slice(0, 12).map(
                   (change) =>
-                    `${change.previousReference} → ${change.assignedReference} (${change.id})`,
+                    `${change.previousReference} to ${change.assignedReference} (${change.id})`,
                 ),
                 ...(normalizedFindings.referenceChanges.length > 12
                   ? [`${normalizedFindings.referenceChanges.length - 12} more changes`]
@@ -1228,15 +1237,15 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
         <Modal
           open={switcherOpen}
           onClose={() => setSwitcherOpen(false)}
-          label="Create project"
+          label="Create audit"
           className="new-audit-dialog"
         >
           <div className="dialog-heading">
-            <div><span>New project</span><h2>Start an accessibility audit</h2></div>
-            <button aria-label="Close project setup" onClick={() => setSwitcherOpen(false)}><X size={20} /></button>
+            <div><span>New audit</span><h2>Start an accessibility audit</h2></div>
+            <IconButton label="Close audit setup" onClick={() => setSwitcherOpen(false)}><X size={20} /></IconButton>
           </div>
           <NewAuditSetup
-            busy={newAuditTemplateBusy}
+            busy={newAuditTemplateBusy || creatingAudit}
             message={newAuditTemplateMessage}
             name={newAuditName}
             profile={newAuditProfile}
@@ -1439,9 +1448,9 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
             aria-current={active === CAPTURE_LIBRARY.id ? "page" : undefined}
             aria-label={CAPTURE_LIBRARY.title}
             title={CAPTURE_LIBRARY.title}
-            onClick={() => navigate(CAPTURE_LIBRARY.id)}
+            onClick={openFindings}
           >
-            <span className="stage-number">—</span>
+            <span className="stage-number" aria-hidden="true">·</span>
             <SquaresFour size={20} weight={active === CAPTURE_LIBRARY.id ? "fill" : "regular"} />
             <span>{CAPTURE_LIBRARY.label}</span>
             <small>{stats.findings} findings · {stats.captures} captures</small>
@@ -1483,7 +1492,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
           {standalone ? (
             <div className="project-switcher standalone-tool-indicator">
               <span className="project-glyph">
-                <Camera size={16} />
+                <Camera size={20} />
               </span>
               <span className="project-name">Independent workspace</span>
             </div>
@@ -1569,6 +1578,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
                 <button
                   className="next-stage"
                   disabled={stageIndex === 0 && !startReadiness?.ready}
+                  title={stageIndex === 0 && !startReadiness?.ready ? "Available once the plan start checklist in the inspector is complete." : undefined}
                   onClick={() => navigate(STAGES[stageIndex + 1].id)}
                 >
                   Next: {STAGES[stageIndex + 1].label}
@@ -1614,7 +1624,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
                   label="Close audit panel"
                   onClick={() => setInspector(false)}
                 >
-                  <SidebarSimple size={16} />
+                  <SidebarSimple size={20} />
                 </IconButton>
               </div>
               <div className="inspector-project">
@@ -1713,34 +1723,42 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
           </button>
           {activityOpen ? (
             <div className="activity-panel">
-              {activity.slice(0, 4).map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() =>
-                    item.url &&
-                    void desktop.invoke("shell:open-external", {
-                      url: item.url,
-                      kind: "audited-page",
-                    })
-                      .catch((error) => showNotice(messageFromError(error, "The audited page could not be opened."), true))
-                  }
-                >
-                  <span>
-                    <strong>{item.title}</strong>
-                    <small>
-                      {item.detail || new Date(item.createdAt).toLocaleString()}
-                    </small>
-                  </span>
-                  <time>
-                    {new Intl.RelativeTimeFormat(undefined, {
-                      numeric: "auto",
-                    }).format(
-                      Math.round((item.createdAt - Date.now()) / 86_400_000),
-                      "day",
-                    )}
-                  </time>
-                </button>
-              ))}
+              {activity.slice(0, 4).map((item) => {
+                const content = (
+                  <>
+                    <span>
+                      <strong>{item.title}</strong>
+                      <small>
+                        {item.detail || new Date(item.createdAt).toLocaleString()}
+                      </small>
+                    </span>
+                    <time>
+                      {new Intl.RelativeTimeFormat(undefined, {
+                        numeric: "auto",
+                      }).format(
+                        Math.round((item.createdAt - Date.now()) / 86_400_000),
+                        "day",
+                      )}
+                    </time>
+                  </>
+                );
+                return item.url ? (
+                  <button
+                    key={item.id}
+                    onClick={() =>
+                      void desktop.invoke("shell:open-external", {
+                        url: item.url,
+                        kind: "audited-page",
+                      })
+                        .catch((error) => showNotice(messageFromError(error, "The audited page could not be opened."), true))
+                    }
+                  >
+                    {content}
+                  </button>
+                ) : (
+                  <div key={item.id} className="activity-static">{content}</div>
+                );
+              })}
               {!activity.length ? <p>No audit activity yet.</p> : null}
               <StatusBadge tone="neutral">v{platform.version}</StatusBadge>
             </div>
@@ -1773,12 +1791,12 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
                 : undefined
             }
           />
-          <button
-            aria-label="Close command palette"
+          <IconButton
+            label="Close command palette"
             onClick={() => setCommandOpen(false)}
           >
             <X size={20} />
-          </button>
+          </IconButton>
         </div>
         <p className="command-group-label">
           {commands.length ? "Destinations" : "No matching commands"}
@@ -1818,14 +1836,14 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
         <div className="dialog-heading">
           <div>
             <span>Audits</span>
-            <h2>Switch workspace</h2>
+            <h2>Switch audit</h2>
           </div>
-          <button
-            aria-label="Close audit switcher"
+          <IconButton
+            label="Close audit switcher"
             onClick={() => setSwitcherOpen(false)}
           >
             <X size={20} />
-          </button>
+          </IconButton>
         </div>
         <div className="audit-list">
           {audits
@@ -1879,7 +1897,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
             ))}
         </div>
         <NewAuditSetup
-          busy={newAuditTemplateBusy}
+          busy={newAuditTemplateBusy || creatingAudit}
           message={newAuditTemplateMessage}
           name={newAuditName}
           profile={newAuditProfile}
@@ -1901,6 +1919,7 @@ export function Workspace({ platform }: { platform: PlatformInfo }) {
           </span>
           <button
             disabled={audits.filter((audit) => !audit.archivedAt).length < 2}
+            title={audits.filter((audit) => !audit.archivedAt).length < 2 ? "Create another audit first. At least one active audit must remain." : undefined}
             onClick={() => {
               setSwitcherOpen(false);
               setArchiveConfirm(true);

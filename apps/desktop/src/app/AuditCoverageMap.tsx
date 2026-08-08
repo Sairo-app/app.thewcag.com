@@ -1,6 +1,5 @@
 import {
   ArrowRight,
-  Camera,
   CheckCircle,
   ClipboardText,
   LinkSimple,
@@ -12,7 +11,7 @@ import { auditTestRunComplete } from "./audit-plan";
 import { Button, StatusBadge } from "./components";
 
 const STATE_LABELS: Record<AuditCoverage["rows"][number]["state"], string> = {
-  complete: "Covered",
+  complete: "Tested",
   "in-progress": "In progress",
   blocked: "Blocked",
   gap: "Trace gap",
@@ -53,9 +52,9 @@ export function AuditCoverageMap({
             and mapped WCAG decisions. This view does not change the audit.
           </p>
         </div>
-        <div className="coverage-score" aria-label={`${coverage.percent}% of sample items covered`}>
+        <div className="coverage-score" aria-label={`${coverage.percent}% of sample items tested`}>
           <strong>{coverage.percent}%</strong>
-          <span>{coverage.complete} of {coverage.rows.length} covered</span>
+          <span>{coverage.complete} of {coverage.rows.length} tested</span>
           <progress value={coverage.complete} max={Math.max(1, coverage.rows.length)}>
             {coverage.percent}%
           </progress>
@@ -63,22 +62,25 @@ export function AuditCoverageMap({
       </div>
 
       <div className="coverage-summary" aria-label="Coverage summary">
-        <span><CheckCircle size={16} weight="fill" /><strong>{coverage.complete}</strong> covered</span>
-        <span><WarningCircle size={16} weight="fill" /><strong>{coverage.gaps}</strong> need attention</span>
-        <span><ClipboardText size={16} /><strong>{coverage.blocked}</strong> blocked</span>
+        <span className="coverage-summary-complete"><CheckCircle size={16} weight="fill" /><strong>{coverage.complete}</strong> tested</span>
+        <span className="coverage-summary-attention"><ClipboardText size={16} /><strong>{coverage.gaps}</strong> need attention</span>
+        <span className="coverage-summary-blocked"><WarningCircle size={16} weight="fill" /><strong>{coverage.blocked}</strong> blocked</span>
       </div>
 
       {coverage.rows.length ? (
         <div className="coverage-table-wrap">
           <div className="coverage-table" role="table" aria-label="Representative sample coverage">
-            <div className="coverage-table-head" role="row">
-              <span role="columnheader">Sample</span>
-              <span role="columnheader">Guided test</span>
-              <span role="columnheader">Finding evidence</span>
-              <span role="columnheader">Findings</span>
-              <span role="columnheader">WCAG</span>
-              <span role="columnheader" className="sr-only">Action</span>
+            <div role="rowgroup">
+              <div className="coverage-table-head" role="row">
+                <span role="columnheader">Sample</span>
+                <span role="columnheader">Guided test</span>
+                <span role="columnheader">Finding evidence</span>
+                <span role="columnheader">Findings</span>
+                <span role="columnheader">WCAG</span>
+                <span role="columnheader" className="sr-only">Action</span>
+              </div>
             </div>
+            <div role="rowgroup">
             {coverage.rows.map((row) => {
               const run =
                 row.testRuns.find((item) => item.status === "in-progress") ??
@@ -98,7 +100,7 @@ export function AuditCoverageMap({
                   </div>
                   <div className="coverage-cell" role="cell" data-label="Guided test">
                     <strong>{row.testRuns.length}</strong>
-                    <span>{row.testRuns.length ? `${row.testRuns.filter(auditTestRunComplete).length} complete` : "None linked"}</span>
+                    <span>{row.testRuns.length ? `${row.testRuns.filter(auditTestRunComplete).length} tested` : "None linked"}</span>
                   </div>
                   <div className="coverage-cell" role="cell" data-label="Evidence">
                     <button
@@ -148,11 +150,12 @@ export function AuditCoverageMap({
                 </div>
               );
             })}
+            </div>
           </div>
         </div>
       ) : (
         <div className="coverage-empty">
-          <ClipboardText size={24} />
+          <ClipboardText size={32} />
           <div>
             <strong>Add a representative sample to build the map</strong>
             <p>Every sample item becomes one traceable coverage row.</p>
@@ -172,7 +175,7 @@ export function AuditCoverageMap({
           </div>
           {coverage.rows[0] ? (
             <Button
-              icon={Camera}
+              icon={LinkSimple}
               onClick={() => onOpenSession({ sampleItemId: coverage.rows[0].sample.id })}
             >
               Link new work

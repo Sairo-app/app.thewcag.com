@@ -1,13 +1,66 @@
 import { join } from "node:path";
+import { readFileSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { BrowserWindow, app, dialog, screen, type Display } from "electron";
 import type { AppView, OverlaySession, ScreenFrame, WorkspaceTool } from "../src/shared/desktop";
 import { hardenWebContents } from "./security";
 
-const WINDOW_BACKGROUND = "#F7F0DF";
+// Pixel equivalents of the design tokens, used before the renderer paints.
+const WINDOW_BACKGROUND = "#F7F0DF"; // --canvas oklch(0.968 0.026 84)
+const DARK_CHROME_BACKGROUND = "#2B2118"; // --ink oklch(0.215 0.034 54)
 
 function preloadPath(): string {
   return join(import.meta.dirname, "../preload/index.js");
+}
+
+type StoredWindowBounds = Record<string, { x: number; y: number; width: number; height: number }>;
+
+function windowBoundsFile(): string {
+  return join(app.getPath("userData"), "window-bounds.json");
+}
+
+function readStoredWindowBounds(): StoredWindowBounds {
+  try {
+    return JSON.parse(readFileSync(windowBoundsFile(), "utf8")) as StoredWindowBounds;
+  } catch {
+    return {};
+  }
+}
+
+function storedWindowBounds(key: string): StoredWindowBounds[string] | null {
+  const bounds = readStoredWindowBounds()[key];
+  if (!bounds || !Number.isFinite(bounds.x) || !Number.isFinite(bounds.width)) return null;
+  const visible = screen.getAllDisplays().some((display) => {
+    const area = display.workArea;
+    return (
+      bounds.x < area.x + area.width &&
+      bounds.x + bounds.width > area.x &&
+      bounds.y < area.y + area.height &&
+      bounds.y + bounds.height > area.y
+    );
+  });
+  return visible ? bounds : null;
+}
+
+function rememberWindowBounds(window: BrowserWindow, key: string): void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const save = () => {
+    if (window.isDestroyed() || window.isMinimized() || window.isFullScreen()) return;
+    const all = readStoredWindowBounds();
+    all[key] = window.getBounds();
+    try {
+      writeFileSync(windowBoundsFile(), JSON.stringify(all));
+    } catch {
+      // Bounds persistence is best effort.
+    }
+  };
+  const schedule = () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(save, 400);
+  };
+  window.on("move", schedule);
+  window.on("resize", schedule);
+  window.on("close", save);
 }
 
 export class WindowManager {
@@ -35,10 +88,12 @@ export class WindowManager {
       return this.main;
     }
     const isMac = process.platform === "darwin";
+    const savedBounds = storedWindowBounds("main");
     const window = new BrowserWindow({
       title: "TheWCAG",
-      width: isMac ? 1240 : 1180,
+      width: 1240,
       height: 800,
+      ...(savedBounds ?? {}),
       minWidth: 640,
       minHeight: 520,
       backgroundColor: WINDOW_BACKGROUND,
@@ -59,8 +114,13 @@ export class WindowManager {
       }
     });
     window.on("closed", () => { if (this.main === window) this.main = null; });
+    rememberWindowBounds(window, "main");
     this.main = window;
     return window;
+  }
+
+  isAnnotateWindow(window: BrowserWindow | null): boolean {
+    return Boolean(window && this.annotate === window && !window.isDestroyed());
   }
 
   showMain(): void {
@@ -87,6 +147,21 @@ export class WindowManager {
       await this.load(window, "overlay", { session: sessionId, display: frame.displayId, mode });
       window.webContents.send("overlay:init", { id: sessionId, mode, display: frame });
       window.showInactive();
+    }
+    // Give keyboard focus to the overlay on the display under the cursor so the
+    // advertised arrow/Enter/Escape controls work without a click first.
+    const cursor = screen.getCursorScreenPoint();
+    const cursorDisplay = screen.getDisplayNearestPoint(cursor);
+    for (const [, overlay] of this.overlays) {
+      const bounds = overlay.getBounds();
+      const matches =
+        cursor.x >= bounds.x && cursor.x < bounds.x + bounds.width &&
+        cursor.y >= bounds.y && cursor.y < bounds.y + bounds.height;
+      if (matches || String(cursorDisplay.id) === String(this.overlaySessions.get(overlay.webContents.id)?.display.displayId ?? "")) {
+        overlay.show();
+        overlay.focus();
+        break;
+      }
     }
   }
 
@@ -128,20 +203,24 @@ export class WindowManager {
   }
 
   private createAnnotate(captureId: string): BrowserWindow {
+    const savedBounds = storedWindowBounds("annotate");
     const window = new BrowserWindow({
       title: "Annotate capture - TheWCAG",
       width: 1240,
       height: 820,
+      ...(savedBounds ?? {}),
       minWidth: 640,
       minHeight: 520,
       backgroundColor: WINDOW_BACKGROUND,
       show: false,
       titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
+      trafficLightPosition: process.platform === "darwin" ? { x: 16, y: 18 } : undefined,
       webPreferences: this.webPreferences(),
     });
     this.secure(window, "annotate");
     void this.load(window, "annotate", { capture: captureId }).catch((error) => this.reportLoadFailure("annotate", error));
     window.once("ready-to-show", () => window.show());
+    rememberWindowBounds(window, "annotate");
     window.on("closed", () => { if (this.annotate === window) this.annotate = null; });
     this.annotate = window;
     return window;
@@ -171,13 +250,15 @@ export class WindowManager {
       this.broadcast("lens:changed", false);
       return false;
     }
+    const savedLensBounds = storedWindowBounds("lens");
     const window = new BrowserWindow({
       title: "Vision lens - TheWCAG",
       width: 560,
       height: 420,
+      ...(savedLensBounds ?? {}),
       minWidth: 360,
       minHeight: 260,
-      backgroundColor: "#FFFDF7",
+      backgroundColor: DARK_CHROME_BACKGROUND,
       show: false,
       alwaysOnTop: true,
       skipTaskbar: true,
@@ -192,6 +273,7 @@ export class WindowManager {
     this.secure(window, "lens");
     void this.load(window, "lens").catch((error) => this.reportLoadFailure("lens", error));
     window.once("ready-to-show", () => window.show());
+    rememberWindowBounds(window, "lens");
     window.on("closed", () => {
       if (this.lens === window) {
         this.lens = null;
@@ -235,7 +317,7 @@ export class WindowManager {
       ...display.bounds,
       frame: false,
       transparent: false,
-      backgroundColor: "#10100F",
+      backgroundColor: DARK_CHROME_BACKGROUND,
       alwaysOnTop: true,
       skipTaskbar: true,
       movable: false,

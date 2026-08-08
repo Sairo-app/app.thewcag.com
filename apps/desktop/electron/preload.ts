@@ -74,6 +74,8 @@ const INVOKE_CHANNELS = new Set<InvokeChannel>([
 
 const EVENT_CHANNELS = new Set<DesktopEvent>([
   "annotate:flush",
+  "annotate:undo",
+  "annotate:redo",
   "overlay:init",
   "overlay:progress",
   "capture:result",

@@ -4,9 +4,9 @@ import {
   type ColorblindType,
 } from "@accessibility-build/a11y-core";
 import {
-  ArrowsOutSimple,
-  Camera,
+  DownloadSimple,
   Eye,
+  MagnifyingGlassPlus,
   SlidersHorizontal,
   X,
 } from "./Icon";
@@ -16,10 +16,10 @@ import { messageFromError } from "./hooks";
 
 const TYPES: { value: ColorblindType | "none"; label: string }[] = [
   { value: "none", label: "Original" },
-  { value: "protanopia", label: "Protan" },
-  { value: "deuteranopia", label: "Deutan" },
-  { value: "tritanopia", label: "Tritan" },
-  { value: "achromatopsia", label: "Mono" },
+  { value: "protanopia", label: "Protanopia" },
+  { value: "deuteranopia", label: "Deuteranopia" },
+  { value: "tritanopia", label: "Tritanopia" },
+  { value: "achromatopsia", label: "Monochromacy" },
 ];
 
 export function LensView() {
@@ -33,6 +33,19 @@ export function LensView() {
   const [lowContrast, setLowContrast] = useState(false);
   const [lastFrame, setLastFrame] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
+  const failureCountRef = useRef(0);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        void desktop.invoke("window:close")
+          .catch((caught) => setError(messageFromError(caught, "The vision lens could not be closed.")));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -41,11 +54,18 @@ export function LensView() {
       try {
         const frame = await desktop.invoke<LensFrame>("lens:frame");
         if (active) {
+          failureCountRef.current = 0;
+          setError("");
           setLastFrame(frame.dataUrl);
           await draw(frame.dataUrl);
         }
-      } catch {
-        // The next frame retries after transient capture errors.
+      } catch (caught) {
+        // Transient capture errors retry; a persistent run means the screen
+        // recording permission is likely missing.
+        failureCountRef.current += 1;
+        if (active && failureCountRef.current === 10) {
+          setError(messageFromError(caught, "The screen behind the lens cannot be captured. Check that TheWCAG has screen recording permission in system settings."));
+        }
       }
       if (active) timer = window.setTimeout(tick, 120);
     }
@@ -115,12 +135,15 @@ export function LensView() {
 
   async function exportFrame() {
     if (!canvasRef.current) return;
+    const label = (TYPES.find((item) => item.value === type)?.label ?? "original").toLowerCase();
     try {
       await desktop.invoke("dialog:save-image", {
-        name: `vision-${type}.png`,
+        name: `vision-${label}.png`,
         pngDataUrl: canvasRef.current.toDataURL("image/png"),
       });
       setError("");
+      setStatus("Vision frame exported.");
+      window.setTimeout(() => setStatus(""), 4000);
     } catch (caught) {
       setError(messageFromError(caught, "The vision frame could not be exported."));
     }
@@ -135,15 +158,15 @@ export function LensView() {
           <span>{TYPES.find((item) => item.value === type)?.label}</span>
         </div>
         <button
-          aria-label="Export current lens frame"
+          aria-label="Export frame"
           title="Export frame"
           onClick={() => void exportFrame()}
         >
-          <Camera size={20} />
+          <DownloadSimple size={20} />
         </button>
         <button
           aria-label="Close vision lens"
-          title="Close"
+          title="Close (Esc)"
           onClick={() => void desktop.invoke("window:close")
             .catch((caught) => setError(messageFromError(caught, "The vision lens could not be closed.")))}
         >
@@ -152,6 +175,7 @@ export function LensView() {
       </header>
       <div className="lens-canvas">
         {error ? <div className="lens-loading" role="alert">{error}</div> : null}
+        {status ? <div className="lens-loading" role="status">{status}</div> : null}
         <canvas ref={canvasRef} aria-label="Live vision simulation" />
         {split ? <span className="split-label original">Original</span> : null}
         {split ? (
@@ -213,7 +237,7 @@ export function LensView() {
           </button>
         </div>
         <label className="lens-zoom" title="Zoom">
-          <ArrowsOutSimple size={16} aria-hidden />
+          <MagnifyingGlassPlus size={16} aria-hidden />
           <input
             aria-label="Lens zoom"
             type="range"

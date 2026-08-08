@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash } from "./Icon";
+import { ConfirmDialog } from "./components";
 import type {
   AuditLoggingField,
   AuditLoggingLayout,
@@ -77,6 +79,39 @@ export function AuditLoggingProfileEditor({
   onChange: (profile: AuditLoggingProfile) => void;
 }) {
   const layouts = auditLoggingLayouts(profile);
+  const [removeLayoutId, setRemoveLayoutId] = useState<string | null>(null);
+  const [patternDrafts, setPatternDrafts] = useState<Record<string, string>>({});
+  const [patternErrors, setPatternErrors] = useState<Record<string, string>>({});
+
+  function clampedNumber(raw: string, min: number, max: number, fallback: number): number {
+    if (!raw.trim()) return fallback;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.min(max, Math.max(min, Math.round(parsed)));
+  }
+
+  function optionalClampedNumber(raw: string, min: number, max: number): number | undefined {
+    if (!raw.trim()) return undefined;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) return undefined;
+    return Math.min(max, Math.max(min, Math.round(parsed)));
+  }
+
+  function patchPattern(layoutId: string, field: AuditLoggingField, raw: string) {
+    setPatternDrafts((current) => ({ ...current, [field.id]: raw }));
+    if (!raw.trim()) {
+      setPatternErrors((current) => ({ ...current, [field.id]: "" }));
+      patchField(layoutId, field.id, { validation: { ...field.validation, pattern: undefined } });
+      return;
+    }
+    try {
+      new RegExp(raw);
+      setPatternErrors((current) => ({ ...current, [field.id]: "" }));
+      patchField(layoutId, field.id, { validation: { ...field.validation, pattern: raw } });
+    } catch {
+      setPatternErrors((current) => ({ ...current, [field.id]: "This is not a valid regular expression, so it has not been applied." }));
+    }
+  }
 
   function replaceLayouts(next: AuditLoggingLayout[]) {
     onChange({ ...profile, layouts: next, sheetName: next[0]?.sheetName, fields: next[0]?.fields ?? [] });
@@ -121,19 +156,19 @@ export function AuditLoggingProfileEditor({
     <div className="logging-profile-review">
       <div className="logging-profile-summary-grid">
         <label><span>AI summary</span><textarea rows={2} value={profile.summary} onChange={(event) => onChange({ ...profile, summary: event.target.value })} /></label>
-        <label><span>Project instructions <small>one per line</small></span><textarea rows={2} value={profile.instructions.join("\n")} onChange={(event) => onChange({ ...profile, instructions: event.target.value.split("\n").map((line) => line.trim()).filter(Boolean) })} /></label>
+        <label><span>Agency format instructions <small>one per line</small></span><textarea rows={2} value={profile.instructions.join("\n")} onChange={(event) => onChange({ ...profile, instructions: event.target.value.split("\n").map((line) => line.trim()).filter(Boolean) })} /></label>
       </div>
       {layouts.map((layout, layoutIndex) => (
         <section className="logging-layout-review" key={layout.id}>
           <div className="logging-layout-heading">
             <div><span>Layout {layoutIndex + 1}</span><strong>{layout.label}</strong></div>
-            {layouts.length > 1 ? <button type="button" onClick={() => replaceLayouts(layouts.filter((candidate) => candidate.id !== layout.id))}><Trash size={16} /> Remove layout</button> : null}
+            {layouts.length > 1 ? <button type="button" onClick={() => setRemoveLayoutId(layout.id)}><Trash size={20} /> Remove layout</button> : null}
           </div>
           <div className="logging-layout-grid">
             <label><span>Layout label</span><input value={layout.label} onChange={(event) => patchLayout(layout.id, { label: event.target.value })} /></label>
             <label><span>Worksheet</span><input value={layout.sheetName} onChange={(event) => patchLayout(layout.id, { sheetName: event.target.value })} /></label>
-            <label><span>Header row</span><input type="number" min={1} value={layout.headerRow} onChange={(event) => patchLayout(layout.id, { headerRow: Number(event.target.value) })} /></label>
-            <label><span>First issue row</span><input type="number" min={1} value={layout.dataStartRow} onChange={(event) => patchLayout(layout.id, { dataStartRow: Number(event.target.value) })} /></label>
+            <label><span>Header row</span><input type="number" min={1} value={layout.headerRow} onChange={(event) => patchLayout(layout.id, { headerRow: clampedNumber(event.target.value, 1, 10000, layout.headerRow) })} /></label>
+            <label><span>First issue row</span><input type="number" min={1} value={layout.dataStartRow} onChange={(event) => patchLayout(layout.id, { dataStartRow: clampedNumber(event.target.value, 1, 10000, layout.dataStartRow) })} /></label>
             <label className="logging-layout-wide"><span>Layout description</span><textarea rows={2} value={layout.description} onChange={(event) => patchLayout(layout.id, { description: event.target.value })} /></label>
             <label className="logging-layout-wide"><span>Use this layout for</span><input value={layout.appliesTo} onChange={(event) => patchLayout(layout.id, { appliesTo: event.target.value })} placeholder="Web findings, mobile findings, retests…" /></label>
           </div>
@@ -145,16 +180,16 @@ export function AuditLoggingProfileEditor({
                 </summary>
                 <div className="logging-field-review-body">
                   <div className="logging-field-toolbar">
-                    <button type="button" aria-label={`Move ${field.label} up`} disabled={fieldIndex === 0} onClick={() => moveField(layout.id, fieldIndex, -1)}><ArrowUp size={16} /></button>
-                    <button type="button" aria-label={`Move ${field.label} down`} disabled={fieldIndex === layout.fields.length - 1} onClick={() => moveField(layout.id, fieldIndex, 1)}><ArrowDown size={16} /></button>
-                    <button type="button" disabled={layout.fields.length === 1} onClick={() => patchLayout(layout.id, { fields: layout.fields.filter((candidate) => candidate.id !== field.id) })}><Trash size={16} /> Remove</button>
+                    <button type="button" aria-label={`Move ${field.label} up`} disabled={fieldIndex === 0} onClick={() => moveField(layout.id, fieldIndex, -1)}><ArrowUp size={20} /></button>
+                    <button type="button" aria-label={`Move ${field.label} down`} disabled={fieldIndex === layout.fields.length - 1} onClick={() => moveField(layout.id, fieldIndex, 1)}><ArrowDown size={20} /></button>
+                    <button type="button" disabled={layout.fields.length === 1} onClick={() => patchLayout(layout.id, { fields: layout.fields.filter((candidate) => candidate.id !== field.id) })}><Trash size={20} /> Remove</button>
                   </div>
                   <div className="logging-field-review-grid">
                     <label><span>Agency label</span><input value={field.label} onChange={(event) => patchField(layout.id, field.id, { label: event.target.value })} /></label>
                     <label><span>Stable field ID <small>used by conditional rules</small></span><input value={field.id} readOnly /></label>
                     <label><span>Map into TheWCAG</span><select value={field.sourceField} onChange={(event) => patchField(layout.id, field.id, { sourceField: event.target.value as AuditLoggingSourceField })}>{SOURCE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
                     <label><span>Control type</span><select value={field.kind} onChange={(event) => patchField(layout.id, field.id, { kind: event.target.value as AuditLoggingField["kind"] })}><option value="text">Short text</option><option value="long-text">Long text</option><option value="select">Select</option><option value="date">Date</option><option value="url">URL</option><option value="number">Number</option></select></label>
-                    <label><span>Worksheet column</span><input type="number" min={1} value={field.columnIndex ?? fieldIndex + 1} onChange={(event) => patchField(layout.id, field.id, { columnIndex: Number(event.target.value) })} /></label>
+                    <label><span>Worksheet column</span><input type="number" min={1} value={field.columnIndex ?? fieldIndex + 1} onChange={(event) => patchField(layout.id, field.id, { columnIndex: clampedNumber(event.target.value, 1, 200, field.columnIndex ?? fieldIndex + 1) })} /></label>
                     <label className="logging-check"><input type="checkbox" checked={field.required} onChange={(event) => patchField(layout.id, field.id, { required: event.target.checked })} /><span>Required for every issue</span></label>
                     <label><span>Default value</span><input value={field.defaultValue ?? ""} onChange={(event) => patchField(layout.id, field.id, { defaultValue: event.target.value || undefined })} /></label>
                     <label><span>Example value</span><input value={field.example ?? ""} onChange={(event) => patchField(layout.id, field.id, { example: event.target.value || undefined })} /></label>
@@ -162,18 +197,29 @@ export function AuditLoggingProfileEditor({
                     <label><span>Allowed values <small>one per line</small></span><textarea rows={3} value={field.options.join("\n")} onChange={(event) => patchField(layout.id, field.id, { options: event.target.value.split("\n").map((line) => line.trim()).filter(Boolean) })} /></label>
                     <label><span>Value mapping <small>Agency = TheWCAG</small></span><textarea rows={3} value={mappingsText(field)} onChange={(event) => patchField(layout.id, field.id, { valueMappings: parseMappings(event.target.value) })} /></label>
                     <label><span>Required when <small>field | operator | value</small></span><textarea rows={3} value={rulesText(field)} onChange={(event) => patchField(layout.id, field.id, { requiredWhen: parseRules(event.target.value) })} /></label>
-                    <label><span>Validation pattern</span><input value={field.validation?.pattern ?? ""} onChange={(event) => patchField(layout.id, field.id, { validation: { ...field.validation, pattern: event.target.value || undefined } })} placeholder="Optional regular expression" /></label>
-                    <label><span>Minimum length</span><input type="number" min={0} max={10000} value={field.validation?.minLength ?? ""} onChange={(event) => patchField(layout.id, field.id, { validation: { ...field.validation, minLength: event.target.value ? Number(event.target.value) : undefined } })} /></label>
-                    <label><span>Maximum length</span><input type="number" min={1} max={10000} value={field.validation?.maxLength ?? ""} onChange={(event) => patchField(layout.id, field.id, { validation: { ...field.validation, maxLength: event.target.value ? Number(event.target.value) : undefined } })} /></label>
+                    <label><span>Validation pattern</span><input value={patternDrafts[field.id] ?? field.validation?.pattern ?? ""} aria-invalid={patternErrors[field.id] ? true : undefined} onChange={(event) => patchPattern(layout.id, field, event.target.value)} placeholder="Optional regular expression" />{patternErrors[field.id] ? <small role="alert">{patternErrors[field.id]}</small> : null}</label>
+                    <label><span>Minimum length</span><input type="number" min={0} max={10000} value={field.validation?.minLength ?? ""} onChange={(event) => patchField(layout.id, field.id, { validation: { ...field.validation, minLength: optionalClampedNumber(event.target.value, 0, 10000) } })} /></label>
+                    <label><span>Maximum length</span><input type="number" min={1} max={10000} value={field.validation?.maxLength ?? ""} onChange={(event) => patchField(layout.id, field.id, { validation: { ...field.validation, maxLength: optionalClampedNumber(event.target.value, 1, 10000) } })} /></label>
                   </div>
                 </div>
               </details>
             ))}
           </div>
-          <button className="logging-add-field" type="button" disabled={layout.fields.length >= 60} onClick={() => patchLayout(layout.id, { fields: [...layout.fields, nextField(layout)] })}><Plus size={16} /> {layout.fields.length >= 60 ? "60-field limit reached" : "Add field"}</button>
+          <button className="logging-add-field" type="button" disabled={layout.fields.length >= 60} onClick={() => patchLayout(layout.id, { fields: [...layout.fields, nextField(layout)] })}><Plus size={20} /> {layout.fields.length >= 60 ? "60-field limit reached" : "Add field"}</button>
         </section>
       ))}
-      <button className="logging-add-layout" type="button" disabled={layouts.length >= 8} onClick={addLayout}><Plus size={16} /> {layouts.length >= 8 ? "8-layout limit reached" : "Add another issue layout"}</button>
+      <button className="logging-add-layout" type="button" disabled={layouts.length >= 8} onClick={addLayout}><Plus size={20} /> {layouts.length >= 8 ? "8-layout limit reached" : "Add another issue layout"}</button>
+      <ConfirmDialog
+        open={removeLayoutId !== null}
+        title="Remove this layout?"
+        description="The layout and every field it contains will be removed from the agency format."
+        confirmLabel="Remove layout"
+        onConfirm={() => {
+          if (removeLayoutId) replaceLayouts(layouts.filter((candidate) => candidate.id !== removeLayoutId));
+          setRemoveLayoutId(null);
+        }}
+        onCancel={() => setRemoveLayoutId(null)}
+      />
     </div>
   );
 }

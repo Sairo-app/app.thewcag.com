@@ -2,7 +2,9 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera,
   CaretDown,
+  ClipboardText,
   Copy,
+  CopySimple,
   FileArrowDown,
   FloppyDisk,
   FrameCorners,
@@ -32,15 +34,7 @@ import type {
 } from "../../shared/desktop";
 import { desktop, getStored, listCaptures, saveStoredFindings, setStored } from "../api";
 import { auditStoreKey, type RecordAuditActivity } from "../audits";
-import {
-  Button,
-  ConfirmDialog,
-  EmptyState,
-  Field,
-  Segmented,
-  StatusBadge,
-  Toast,
-} from "../components";
+import { Button, ConfirmDialog, EmptyState, ErrorState, Field, LoadingState, Segmented, StatusBadge, Toast } from "../components";
 import { messageFromError, useTransientMessage } from "../hooks";
 import {
   STANDALONE_FINDINGS_KEY,
@@ -124,15 +118,26 @@ export function EvidenceView({
   const [findingEvidence, setFindingEvidence] = useState<
     Record<string, EvidencePacketV1 | null>
   >({});
-  const [message, show] = useTransientMessage(5000);
+  const [message, show] = useTransientMessage();
   const [editingFinding, setEditingFinding] = useState<Finding | null | undefined>(undefined);
-  const deletedRef = useRef<{
+  const [deletedUndo, setDeletedUndo] = useState<{
     item: Finding;
     index: number;
     links: string[];
     evidence?: { key: string; value: unknown };
   } | null>(null);
-  const bulkUndoRef = useRef<{ findings: Finding[]; label: string } | null>(null);
+  const [bulkUndo, setBulkUndo] = useState<{ findings: Finding[]; label: string } | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [duplicatingKey, setDuplicatingKey] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const undoTimer = useRef<number | null>(null);
+  function armUndoExpiry() {
+    if (undoTimer.current) window.clearTimeout(undoTimer.current);
+    undoTimer.current = window.setTimeout(() => {
+      setDeletedUndo(null);
+      setBulkUndo(null);
+    }, 30000);
+  }
   const findingsWriteQueue = useRef<Promise<void>>(Promise.resolve());
   const refreshVersion = useRef(0);
   const findingsKey = auditId ? auditStoreKey(auditId, "findings") : STANDALONE_FINDINGS_KEY;
@@ -174,7 +179,7 @@ export function EvidenceView({
 
   useEffect(() => {
     setSelectedFindings(new Set());
-    void refresh().catch((error) => show(messageFromError(error), true));
+    void refresh().then(() => { setLoaded(true); setLoadError(""); }).catch((error) => setLoadError(messageFromError(error)));
     const stopCapture = desktop.on("capture:saved", () => void refresh());
     const stopFindings = desktop.on<{ key: string | null }>("findings:changed", ({ key }) => {
       if (key === null || key === findingsKey) void refresh();
@@ -231,12 +236,10 @@ export function EvidenceView({
     if (!currentFinding) return;
     if (patch.status === "fixed" && !currentFinding.retestNote?.trim()) {
       setEditingFinding(currentFinding);
-      show("Add a retest record before marking this finding verified fixed.", true);
       return;
     }
     if (patch.status === "accepted" && !currentFinding.riskAcceptance?.trim()) {
       setEditingFinding(currentFinding);
-      show("Record the risk acceptance rationale before accepting this finding.", true);
       return;
     }
     const changedAt = Date.now();
@@ -342,7 +345,7 @@ export function EvidenceView({
       }
       show(existing ? "Finding updated" : "Finding created");
     } catch (error) {
-      show(messageFromError(error), true);
+      throw error instanceof Error ? error : new Error(messageFromError(error));
     }
   }
 
@@ -409,14 +412,15 @@ export function EvidenceView({
         ]).catch(() => undefined);
         throw error;
       }
-      deletedRef.current = {
+      setDeletedUndo({
         item: removed,
         index,
         links,
         ...(evidenceKey && evidenceValue !== null
           ? { evidence: { key: evidenceKey, value: evidenceValue } }
           : {}),
-      };
+      });
+      armUndoExpiry();
       show("Finding removed. Use Undo below to restore it.");
     } catch (error) {
       if (checklistKey) {
@@ -427,7 +431,7 @@ export function EvidenceView({
   }
 
   async function undoFinding() {
-    const deleted = deletedRef.current;
+    const deleted = deletedUndo;
     if (!deleted) return;
     const next = [...findings];
     next.splice(deleted.index, 0, deleted.item);
@@ -446,7 +450,7 @@ export function EvidenceView({
           : entry,
       ]),
     );
-    deletedRef.current = null;
+    setDeletedUndo(null);
     const [saved] = await Promise.all([
       persistFindings(next),
       checklistKey ? setStored(checklistKey, nextChecklist) : Promise.resolve(),
@@ -600,6 +604,9 @@ export function EvidenceView({
   }
 
   async function duplicateFinding(item: Finding) {
+    if (duplicatingKey) return;
+    setDuplicatingKey(item.key);
+    try {
     const now = Date.now();
     const duplicate: Finding = {
       ...item,
@@ -642,6 +649,9 @@ export function EvidenceView({
     } catch (error) {
       show(messageFromError(error), true);
     }
+    } finally {
+      setDuplicatingKey(null);
+    }
   }
 
   async function applyBulkPatch(patch: Partial<Finding>, label: string) {
@@ -663,7 +673,8 @@ export function EvidenceView({
     );
     try {
       const saved = await persistFindings(next);
-      bulkUndoRef.current = { findings: previous, label };
+      setBulkUndo({ findings: previous, label });
+      armUndoExpiry();
       setFindings(saved);
       const count = selectedFindings.size;
       setSelectedFindings(new Set());
@@ -679,14 +690,14 @@ export function EvidenceView({
   }
 
   async function undoBulkUpdate() {
-    const undo = bulkUndoRef.current;
+    const undo = bulkUndo;
     if (!undo) return;
     try {
       const undoByKey = new Map(undo.findings.map((finding) => [finding.key, finding]));
       const next = findings.map((finding) => undoByKey.get(finding.key) ?? finding);
       const saved = await persistFindings(next);
       setFindings(saved);
-      bulkUndoRef.current = null;
+      setBulkUndo(null);
       show(`${undo.label} undone`);
     } catch (error) {
       show(messageFromError(error), true);
@@ -760,7 +771,7 @@ export function EvidenceView({
           <p>
             {auditId
               ? "Finding authoring is the fastest way to keep evidence linked. This library remains available for capture-only work and legacy unassigned images."
-              : "Select a region or the current display. Annotate, copy, or export it locally—no audit or finding is created."}
+              : "Select a region or the current display. Annotate, copy, or export it locally. No audit or finding is created."}
           </p>
         </div>
         <div className="capture-actions">
@@ -790,7 +801,7 @@ export function EvidenceView({
             onChange={setTab}
             label="Library type"
             options={[
-              { value: "captures", label: `Captures ${captures.length}` },
+              { value: "captures", label: `Captures (${captures.length})` },
               { value: "findings", label: `Findings ${findings.length}` },
             ]}
           />
@@ -817,7 +828,7 @@ export function EvidenceView({
             <Button icon={Plus} onClick={() => setEditingFinding(null)}>
               Add finding
             </Button>
-            <Button icon={FileArrowDown} onClick={() => void exportMarkdown()}>
+            <Button icon={FileArrowDown} onClick={() => void exportMarkdown().catch((error) => show(messageFromError(error), true))}>
               Export
             </Button>
             <Button
@@ -826,7 +837,7 @@ export function EvidenceView({
               disabled={!findings.length || !captures.length}
               onClick={() => onNavigate?.("share")}
             >
-              Review report
+              Open report draft
             </Button>
           </>
         )}
@@ -970,25 +981,37 @@ export function EvidenceView({
             <input type="date" value={bulkDueDate} onChange={(event) => setBulkDueDate(event.target.value)} />
           </label>
           <Button disabled={!bulkDueDate} onClick={() => void applyBulkPatch({ dueDate: bulkDueDate }, "Target date update")}>Set date</Button>
-          <Button icon={FileArrowDown} onClick={() => void exportMarkdown(selectedVisible)}>Export selected</Button>
+          <Button icon={FileArrowDown} onClick={() => void exportMarkdown(selectedVisible).catch((error) => show(messageFromError(error), true))}>Export selected</Button>
           <button className="text-action" onClick={() => setSelectedFindings(new Set())}>Clear selection</button>
         </div>
       ) : null}
 
-      {deletedRef.current && tab === "findings" ? (
+      {deletedUndo && tab === "findings" ? (
         <div className="undo-strip" role="status">
           <span>A finding was removed.</span>
           <button onClick={() => void undoFinding()}>Undo</button>
+          <button onClick={() => setDeletedUndo(null)} aria-label="Dismiss undo message">Dismiss</button>
         </div>
       ) : null}
-      {bulkUndoRef.current && tab === "findings" ? (
+      {bulkUndo && tab === "findings" ? (
         <div className="undo-strip" role="status">
-          <span>{bulkUndoRef.current.label} was applied.</span>
+          <span>{bulkUndo.label} was applied.</span>
           <button onClick={() => void undoBulkUpdate()}>Undo bulk update</button>
+          <button onClick={() => setBulkUndo(null)} aria-label="Dismiss undo message">Dismiss</button>
         </div>
       ) : null}
 
-      {tab === "findings" ? (
+      {loadError ? (
+        <ErrorState
+          message={loadError}
+          onRetry={() => {
+            setLoadError("");
+            void refresh().then(() => setLoaded(true)).catch((error) => setLoadError(messageFromError(error)));
+          }}
+        />
+      ) : !loaded ? (
+        <LoadingState label="Loading findings and captures" />
+      ) : tab === "findings" ? (
         <section className="finding-table" aria-label="Audit findings">
           {filteredFindings.length ? (
             <>
@@ -1074,7 +1097,7 @@ export function EvidenceView({
                         }}
                       >
                         <code>{compactFindingId(item.id)}</code>
-                        <Copy size={20} />
+                        <CopySimple size={20} />
                       </button>
                       {item.reviewState === "pending" ? (
                         <span className="finding-review-state">Needs review</span>
@@ -1089,7 +1112,7 @@ export function EvidenceView({
                           aria-controls={`finding-detail-${item.key}`}
                           onClick={() => void toggleFinding(item)}
                         >
-                          <Sparkle size={20} />
+                          {item.source === "ai" ? <Sparkle size={20} /> : <NotePencil size={20} />}
                           {item.source === "ai"
                             ? "AI-assisted evidence"
                             : item.source === "manual"
@@ -1130,6 +1153,8 @@ export function EvidenceView({
                     <button
                       className="row-action"
                       aria-label={`Duplicate ${item.reference} ${item.title}`}
+                      title="Duplicate finding"
+                      disabled={duplicatingKey !== null}
                       onClick={() => void duplicateFinding(item)}
                     >
                       <Copy size={20} />
@@ -1137,6 +1162,7 @@ export function EvidenceView({
                     <button
                       className="row-action"
                       aria-label={`Edit ${item.title}`}
+                      title="Edit finding"
                       onClick={() => setEditingFinding(item)}
                     >
                       <PencilSimple size={20} />
@@ -1144,6 +1170,7 @@ export function EvidenceView({
                     <button
                       className="row-action"
                       aria-label={`Delete ${item.title}`}
+                      title="Delete finding"
                       onClick={() => void removeFinding(item.key)}
                     >
                       <Trash size={20} />
@@ -1217,7 +1244,7 @@ export function EvidenceView({
                                 {capture ? (
                                   <img src={capture.thumbnailUrl || capture.assetUrl} alt={`${label} remediation evidence: ${capture.title}`} />
                                 ) : (
-                                  <div className="comparison-missing"><Image size={24} /><span>No {label.toLowerCase()} capture linked</span></div>
+                                  <div className="comparison-missing"><Image size={32} /><span>No {label.toLowerCase()} capture linked</span></div>
                                 )}
                                 <figcaption><strong>{label}</strong><span>{capture?.title || "Not linked"}</span></figcaption>
                               </figure>
@@ -1329,13 +1356,14 @@ export function EvidenceView({
             </>
           ) : (
             <EmptyState
-              icon={WarningCircle}
+              icon={ClipboardText}
               title={query ? "No matching findings" : "No findings yet"}
               body={
                 query
                   ? "Try a broader search."
                   : "Save a contrast result or add issue badges to a capture. Findings will appear here."
               }
+              action={query ? <Button onClick={() => setQuery("")}>Clear search</Button> : undefined}
             />
           )}
         </section>
@@ -1407,7 +1435,9 @@ export function EvidenceView({
                   ? "Try a different title."
                   : "Capture a region of any app, then annotate it in a focused workspace."
               }
-              action={
+              action={query ? (
+                <Button onClick={() => setQuery("")}>Clear search</Button>
+              ) : (
                 <Button
                   variant="primary"
                   icon={FrameCorners}
@@ -1415,7 +1445,7 @@ export function EvidenceView({
                 >
                   Capture a region
                 </Button>
-              }
+              )}
             />
           )}
         </section>
@@ -1436,7 +1466,7 @@ export function EvidenceView({
         auditId={auditId}
         loggingProfile={loggingProfile}
         onClose={() => setEditingFinding(undefined)}
-        onSave={(value) => void saveFinding(value)}
+        onSave={saveFinding}
         onTicketUpdate={saveTicketFinding}
       />
     </div>

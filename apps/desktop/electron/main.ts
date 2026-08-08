@@ -25,7 +25,7 @@ import { CrashReportService } from "./services/crash-reports";
 import type { CrashReportOrigin } from "../src/shared/desktop";
 import { AuditTemplateService } from "./services/audit-template";
 import { WindowManager } from "./windows";
-import { createTray, installApplicationMenu } from "./menu";
+import { createTray, installApplicationMenu, type NativeActions } from "./menu";
 import { registerIpc } from "./ipc";
 import { migrateLegacyDesktopData } from "./migration";
 import { nativeOriginFromArgs, nativePipeNameFromArgs, runNativeHost } from "./native-host";
@@ -150,6 +150,7 @@ async function start(): Promise<void> {
   const auditTemplates = new AuditTemplateService(userData);
   const tickets = new TicketConnectorService(userData);
   const notifyError = (error: unknown) => windows.broadcast("notification", { text: error instanceof Error ? error.message : String(error), error: true });
+  let menuActions: NativeActions | null = null;
   const settings = new SettingsService(store, {
     inspect: () => void captureCoordinator.begin("pair").catch(notifyError),
     capture: () => void captureCoordinator.begin("capture", undefined, {}, true).catch(notifyError),
@@ -158,7 +159,10 @@ async function start(): Promise<void> {
     windows.broadcast("shortcut:failed", { action, accelerator });
     windows.broadcast("notification", { text: `The ${action} shortcut ${accelerator} is already in use`, error: true });
   },
-  (value) => screenCapture.setHighDpi(value.captureHighDpi));
+  (value) => {
+    screenCapture.setHighDpi(value.captureHighDpi);
+    if (menuActions) installApplicationMenu(menuActions, value.shortcuts);
+  });
   const telemetry = new FunnelTelemetryService(settings, store);
   crashReports = new CrashReportService(settings, store, {
     appVersion: app.getVersion(),
@@ -208,9 +212,10 @@ async function start(): Promise<void> {
     }
   });
 
-  await settings.initialize();
+  const initialSettings = await settings.initialize();
   const actions = { windows, captures: captureCoordinator };
-  installApplicationMenu(actions);
+  menuActions = actions;
+  installApplicationMenu(actions, initialSettings.shortcuts);
   tray = createTray(actions);
   const mainWindow = windows.createMain();
   const flushStoreNotifications = () => {

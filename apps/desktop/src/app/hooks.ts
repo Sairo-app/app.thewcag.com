@@ -51,7 +51,7 @@ export function useStoredState<T>(key: string, initial: T) {
 
   return [state.key === key ? state.value : initial, update, state.key === key && state.ready] as const;
 }
-export function useTransientMessage(timeout = 3000) {
+export function useTransientMessage(timeout = 5000) {
   const [message, setMessage] = useState<{
     text: string;
     error: boolean;
@@ -63,10 +63,13 @@ export function useTransientMessage(timeout = 3000) {
     timer.current = null;
     setMessage(null);
   }
-  function show(text: string, error = false, title?: string) {
+  function show(text: string, error = false, title?: string, options?: { sticky?: boolean }) {
     if (timer.current) window.clearTimeout(timer.current);
+    timer.current = null;
     setMessage({ text, error, title });
-    timer.current = window.setTimeout(() => setMessage(null), timeout);
+    if (!options?.sticky) {
+      timer.current = window.setTimeout(() => setMessage(null), timeout);
+    }
   }
   useEffect(() => () => {
     if (timer.current) window.clearTimeout(timer.current);

@@ -13,7 +13,6 @@ import {
 } from "@accessibility-build/audit-contracts";
 import {
   ArrowDownRight,
-  ArrowLeft,
   ArrowUUpLeft,
   ArrowUUpRight,
   Clipboard,
@@ -21,6 +20,8 @@ import {
   Cursor,
   DownloadSimple,
   Eye,
+  EyeSlash,
+  FileText,
   FloppyDisk,
   FrameCorners,
   HighlighterCircle,
@@ -39,7 +40,7 @@ import { Button, Field, StatusBadge, Toast } from "./components";
 import { messageFromError, useTransientMessage } from "./hooks";
 import { PanelResizer } from "./ResizablePanel";
 import { usePersistedPanelSize } from "./usePersistedPanelSize";
-import { hitTest } from "../lib/annotate/geometry";
+import { applyHandle, handlesFor, hitTest, snapAngle } from "../lib/annotate/geometry";
 import {
   emptyDoc,
   ISSUE_TYPES,
@@ -59,22 +60,30 @@ const TOOLS: {
   id: Tool;
   label: string;
   icon: IconComponent;
+  shortcut: string;
 }[] = [
-  { id: "select", label: "Select", icon: Cursor },
-  { id: "crop", label: "Crop", icon: Crop },
-  { id: "badge", label: "Issue badge", icon: HighlighterCircle },
-  { id: "arrow", label: "Arrow", icon: ArrowDownRight },
-  { id: "rect", label: "Rectangle", icon: Selection },
-  { id: "measure", label: "Measure", icon: Ruler },
-  { id: "probe", label: "Contrast probe", icon: Eye },
-  { id: "focus", label: "Focus order", icon: FrameCorners },
-  { id: "text", label: "Text", icon: TextT },
-  { id: "redact", label: "Redact", icon: X },
+  { id: "select", label: "Select", icon: Cursor, shortcut: "v" },
+  { id: "crop", label: "Crop", icon: Crop, shortcut: "c" },
+  { id: "badge", label: "Issue badge", icon: HighlighterCircle, shortcut: "b" },
+  { id: "arrow", label: "Arrow", icon: ArrowDownRight, shortcut: "a" },
+  { id: "rect", label: "Rectangle", icon: Selection, shortcut: "r" },
+  { id: "measure", label: "Measure", icon: Ruler, shortcut: "m" },
+  { id: "probe", label: "Contrast probe", icon: Eye, shortcut: "p" },
+  { id: "focus", label: "Focus order", icon: FrameCorners, shortcut: "f" },
+  { id: "text", label: "Text", icon: TextT, shortcut: "t" },
+  { id: "redact", label: "Redact", icon: EyeSlash, shortcut: "x" },
 ];
+
+const ANNOTATION_PRESET_COLORS = [
+  { label: "Signal orange", value: "#D9480F" },
+  { label: "Functional blue", value: "#2563EB" },
+  { label: "Ink", value: "#1F2933" },
+] as const;
 
 interface Drag {
   start: Point;
   shape?: Shape;
+  handle?: string;
 }
 const DRAW_TOOLS = new Set<Tool>([
   "arrow",
@@ -238,7 +247,35 @@ export function AnnotateView() {
         if (event.shiftKey) redoOnce();
         else undoOnce();
       }
+      if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        void save();
+      }
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "c") {
+        event.preventDefault();
+        void exportPng(true);
+      }
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "e") {
+        event.preventDefault();
+        void exportPng(false);
+      }
+      if (!editable && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        const nextTool = TOOLS.find((item) => item.shortcut === event.key.toLowerCase());
+        if (nextTool) {
+          event.preventDefault();
+          setTool(nextTool.id);
+          setSelected(null);
+        }
+      }
       if (event.key === "Escape") {
+        if (drag?.shape) {
+          const original = drag.shape;
+          setDoc((current) => ({
+            ...current,
+            shapes: current.shapes.map((shape) => shape.id === original.id ? original : shape),
+          }));
+          setDrag(null);
+        }
         setDraft(null);
         setSelected(null);
         setTool("select");
@@ -246,7 +283,16 @@ export function AnnotateView() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selected, undo, redo, doc]);
+  }, [selected, undo, redo, doc, drag]);
+
+  useEffect(() => {
+    const stopUndo = desktop.on("annotate:undo", () => undoOnce());
+    const stopRedo = desktop.on("annotate:redo", () => redoOnce());
+    return () => {
+      stopUndo();
+      stopRedo();
+    };
+  });
 
   function draw(
     forExport = false,
@@ -352,17 +398,31 @@ export function AnnotateView() {
     setRedo((items) => items.slice(0, -1));
   }
 
+  function stepSelection(offset: -1 | 1) {
+    if (!doc.shapes.length) return;
+    const index = doc.shapes.findIndex((shape) => shape.id === selected);
+    const next = doc.shapes[(index + offset + doc.shapes.length) % doc.shapes.length];
+    if (next) setSelected(next.id);
+  }
+
   function pointerDown(event: ReactPointerEvent<HTMLCanvasElement>) {
     if (!image || event.button !== 0) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     const p = point(event);
     if (tool === "select") {
-      const hit = hitTest(
-        doc.shapes,
-        p,
-        (12 * image.naturalWidth) /
-          event.currentTarget.getBoundingClientRect().width,
-      );
+      const tolerance = (12 * image.naturalWidth) /
+        event.currentTarget.getBoundingClientRect().width;
+      const selectedShape = doc.shapes.find((item) => item.id === selected);
+      if (selectedShape) {
+        const handle = handlesFor(selectedShape).find(
+          (item) => Math.hypot(item.x - p.x, item.y - p.y) <= tolerance,
+        );
+        if (handle) {
+          setDrag({ start: p, shape: { ...selectedShape }, handle: handle.key });
+          return;
+        }
+      }
+      const hit = hitTest(doc.shapes, p, tolerance);
       setSelected(hit?.id || null);
       setDrag(hit ? { start: p, shape: { ...hit } } : null);
       return;
@@ -390,7 +450,7 @@ export function AnnotateView() {
         y1: p.y,
         x2: p.x,
         y2: p.y,
-        color: "#3157A4",
+        color: "#2563EB",
       });
       return;
     }
@@ -403,6 +463,9 @@ export function AnnotateView() {
         y2: p.y,
         color: "#D9480F",
         text: "Note",
+      });
+      requestAnimationFrame(() => {
+        document.querySelector<HTMLInputElement>(".shape-editor input:not([type='color'])")?.focus();
       });
       return;
     }
@@ -417,7 +480,7 @@ export function AnnotateView() {
         y2: p.y,
         color:
           tool === "measure"
-            ? "#3157A4"
+            ? "#2563EB"
             : tool === "redact"
               ? "#1F2933"
               : "#D9480F",
@@ -427,6 +490,16 @@ export function AnnotateView() {
   function pointerMove(event: ReactPointerEvent<HTMLCanvasElement>) {
     if (!drag) return;
     const p = point(event);
+    if (tool === "select" && drag.handle && drag.shape) {
+      const resized = applyHandle(drag.shape, drag.handle, p);
+      setDoc((current) => ({
+        ...current,
+        shapes: current.shapes.map((shape) =>
+          shape.id === drag.shape!.id ? resized : shape,
+        ),
+      }));
+      return;
+    }
     if (tool === "select" && drag.shape) {
       const dx = p.x - drag.start.x,
         dy = p.y - drag.start.y;
@@ -446,7 +519,12 @@ export function AnnotateView() {
       }));
       return;
     }
-    if (draft) setDraft({ ...draft, x2: p.x, y2: p.y });
+    if (draft) {
+      const end = event.shiftKey && (draft.kind === "arrow" || draft.kind === "measure")
+        ? snapAngle({ x: draft.x1, y: draft.y1 }, p)
+        : p;
+      setDraft({ ...draft, x2: end.x, y2: end.y });
+    }
   }
   async function pointerUp(event: ReactPointerEvent<HTMLCanvasElement>) {
     if (!drag) return;
@@ -455,16 +533,16 @@ export function AnnotateView() {
     }
     const end = point(event);
     if (tool === "select" && drag.shape) {
-      setUndo((items) => [
-        ...items.slice(-39),
-        {
+      const moved = end.x !== drag.start.x || end.y !== drag.start.y;
+      if (moved) {
+        setUndo((items) => appendUndoSnapshot(items, {
           ...doc,
           shapes: doc.shapes.map((shape) =>
             shape.id === drag.shape!.id ? drag.shape! : shape,
           ),
-        },
-      ]);
-      setRedo([]);
+        }, false));
+        setRedo([]);
+      }
       setDrag(null);
       return;
     }
@@ -501,6 +579,7 @@ export function AnnotateView() {
             silent: true,
           });
           await desktop.invoke("capture:open", { id: cropped.id });
+          show("Cropped copy opened. Annotations stay on the original.");
         } catch (error) {
           show(messageFromError(error), true, "Crop could not be created");
         }
@@ -644,7 +723,7 @@ export function AnnotateView() {
         issue?.sc ? `WCAG ${issue.sc}` : "",
         shape.note || shape.text,
       ].filter(Boolean).join(" · ");
-      return `${index + 1}. **${label}**${details ? ` — ${details}` : ""}`;
+      return `${index + 1}. **${label}**${details ? ` · ${details}` : ""}`;
     });
     return [
       `# ${title.replace(/[\r\n#]+/g, " ").trim()}`,
@@ -774,11 +853,12 @@ export function AnnotateView() {
       <header className="annotate-titlebar">
         <div className="annotate-drag">
           <button
-            aria-label="Close annotation"
+            aria-label="Close annotation window"
+            title="Close annotation window"
             onClick={() => void desktop.invoke("window:close")
               .catch((error) => show(messageFromError(error, "The annotation window could not be closed."), true))}
           >
-            <ArrowLeft size={20} />
+            <X size={20} />
           </button>
           <span>
             <strong>{capture?.title || "Annotation workspace"}</strong>
@@ -790,10 +870,10 @@ export function AnnotateView() {
           </span>
         </div>
         <div className="history-actions">
-          <button disabled={!undo.length} onClick={undoOnce} aria-label="Undo">
+          <button disabled={!undo.length} onClick={undoOnce} aria-label="Undo" title="Undo (Ctrl or Cmd Z)">
             <ArrowUUpLeft size={20} />
           </button>
-          <button disabled={!redo.length} onClick={redoOnce} aria-label="Redo">
+          <button disabled={!redo.length} onClick={redoOnce} aria-label="Redo" title="Redo (Shift Ctrl or Cmd Z)">
             <ArrowUUpRight size={20} />
           </button>
         </div>
@@ -815,22 +895,29 @@ export function AnnotateView() {
           >
             {exporting === "export" ? "Exporting" : "Export"}
           </Button>
+          <details className="annotate-more">
+            <summary aria-label="Markdown actions" title="Markdown actions">
+              <FileText size={20} />
+              <span>Markdown</span>
+            </summary>
+            <div>
+              <button
+                type="button"
+                disabled={saving || Boolean(exporting)}
+                onClick={() => void exportMarkdown(true)}
+              >
+                {exporting === "copy-markdown" ? "Copying" : "Copy Markdown"}
+              </button>
+              <button
+                type="button"
+                disabled={saving || Boolean(exporting)}
+                onClick={() => void exportMarkdown(false)}
+              >
+                {exporting === "export-markdown" ? "Exporting" : "Export Markdown"}
+              </button>
+            </div>
+          </details>
           <Button
-            icon={Clipboard}
-            disabled={saving || Boolean(exporting)}
-            onClick={() => void exportMarkdown(true)}
-          >
-            {exporting === "copy-markdown" ? "Copying" : "Copy Markdown"}
-          </Button>
-          <Button
-            icon={DownloadSimple}
-            disabled={saving || Boolean(exporting)}
-            onClick={() => void exportMarkdown(false)}
-          >
-            {exporting === "export-markdown" ? "Exporting" : "Export Markdown"}
-          </Button>
-          <Button
-            variant="primary"
             icon={FloppyDisk}
             disabled={saving || Boolean(exporting)}
             onClick={() => void save()}
@@ -849,13 +936,12 @@ export function AnnotateView() {
         }
       >
         <aside className="annotation-tools" aria-label="Annotation tools">
-          {TOOLS.map(({ id: value, label, icon: Icon }) => (
+          {TOOLS.map(({ id: value, label, icon: Icon, shortcut }) => (
             <button
               key={value}
               data-active={tool === value}
               aria-pressed={tool === value}
-              aria-label={label}
-              title={label}
+              title={`${label} (${shortcut.toUpperCase()})`}
               onClick={() => {
                 setTool(value);
                 setSelected(null);
@@ -882,7 +968,7 @@ export function AnnotateView() {
             <canvas
               ref={canvasRef}
               tabIndex={0}
-              role="img"
+              role="application"
               aria-label={`Annotation canvas with ${doc.shapes.length} annotations. Select an annotation from the list or use arrow keys to move the selected annotation.`}
               onPointerDown={pointerDown}
               onPointerMove={pointerMove}
@@ -890,7 +976,10 @@ export function AnnotateView() {
                 setDrag(null);
                 show(messageFromError(error), true);
               })}
-              onPointerCancel={() => setDrag(null)}
+              onPointerCancel={() => {
+                setDrag(null);
+                setDraft(null);
+              }}
               data-tool={tool}
             />
           </div>
@@ -901,9 +990,9 @@ export function AnnotateView() {
                 : TOOLS.find((item) => item.id === tool)?.label}
             </span>
             <span>
-              {doc.shapes.length} annotations ·{" "}
+              {doc.shapes.length} {doc.shapes.length === 1 ? "annotation" : "annotations"} ·{" "}
               {doc.shapes.filter((shape) => shape.kind === "badge").length}{" "}
-              issues
+              {doc.shapes.filter((shape) => shape.kind === "badge").length === 1 ? "issue" : "issues"}
             </span>
           </div>
         </main>
@@ -927,9 +1016,33 @@ export function AnnotateView() {
           </div>
           {selectedShape ? (
             <div className="shape-editor">
+              <div className="shape-navigation">
+                <button
+                  type="button"
+                  aria-label="Select previous annotation"
+                  title="Previous annotation"
+                  disabled={doc.shapes.length < 2}
+                  onClick={() => stepSelection(-1)}
+                >
+                  <ArrowUUpLeft size={20} />
+                </button>
+                <span role="status">Annotation {selectedShape.id} of {doc.shapes.length}</span>
+                <button
+                  type="button"
+                  aria-label="Select next annotation"
+                  title="Next annotation"
+                  disabled={doc.shapes.length < 2}
+                  onClick={() => stepSelection(1)}
+                >
+                  <ArrowUUpRight size={20} />
+                </button>
+              </div>
               <div className="shape-kind">
                 <span className="shape-icon">
-                  <NotePencil size={20} />
+                  {(() => {
+                    const ToolIcon = TOOLS.find((item) => item.id === selectedShape.kind)?.icon ?? NotePencil;
+                    return <ToolIcon size={20} />;
+                  })()}
                 </span>
                 <div>
                   <strong>
@@ -938,7 +1051,14 @@ export function AnnotateView() {
                   </strong>
                   <small>Annotation {selectedShape.id}</small>
                 </div>
-                <button aria-label="Delete annotation" onClick={removeSelected}>
+                <button
+                  aria-label="Delete annotation"
+                  title="Delete annotation"
+                  onClick={() => {
+                    removeSelected();
+                    canvasRef.current?.focus();
+                  }}
+                >
                   <Trash size={20} />
                 </button>
               </div>
@@ -949,7 +1069,7 @@ export function AnnotateView() {
                     <code title={selectedShape.findingId}>
                       {selectedShape.findingId
                         ? compactFindingId(selectedShape.findingId)
-                        : "Allocating identity"}
+                        : "Assigning ID"}
                     </code>
                     <button
                       type="button"
@@ -1025,15 +1145,32 @@ export function AnnotateView() {
                 </Field>
               ) : null}
               {selectedShape.kind !== "badge" &&
-              selectedShape.kind !== "redact" ? (
+              selectedShape.kind !== "redact" &&
+              selectedShape.kind !== "measure" &&
+              selectedShape.kind !== "probe" &&
+              selectedShape.kind !== "focus" ? (
                 <Field label="Color">
-                  <input
-                    type="color"
-                    value={selectedShape.color}
-                    onChange={(event) =>
-                      updateSelected({ color: event.target.value })
-                    }
-                  />
+                  <div className="color-input-row">
+                    <input
+                      type="color"
+                      value={selectedShape.color}
+                      onChange={(event) =>
+                        updateSelected({ color: event.target.value })
+                      }
+                    />
+                    {ANNOTATION_PRESET_COLORS.map((preset) => (
+                      <button
+                        key={preset.value}
+                        type="button"
+                        className="color-preset"
+                        aria-label={`Use ${preset.label}`}
+                        title={preset.label}
+                        data-active={selectedShape.color === preset.value}
+                        style={{ backgroundColor: preset.value }}
+                        onClick={() => updateSelected({ color: preset.value })}
+                      />
+                    ))}
+                  </div>
                 </Field>
               ) : null}
               {selectedShape.kind === "redact" ? (
@@ -1106,6 +1243,7 @@ export function AnnotateView() {
                   {doc.shapes.map((shape) => (
                     <button
                       key={shape.id}
+                      aria-current={selected === shape.id ? "true" : undefined}
                       onClick={() => {
                         setSelected(shape.id);
                         setTool("select");

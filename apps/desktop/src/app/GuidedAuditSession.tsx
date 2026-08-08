@@ -238,7 +238,7 @@ export function GuidedAuditSession({
         title: "Guided audit session started",
         detail: `${nextSamples.find((item) => item.id === next.sampleItemId)?.label ?? "Sample"}${next.testRunId ? ` · ${nextRuns.find((item) => item.id === next.testRunId)?.title ?? "Guided run"}` : ""}`,
       });
-      show("Guided session ready");
+      show("Guided session ready.");
     } catch (error) {
       show(messageFromError(error), true);
     }
@@ -367,18 +367,18 @@ export function GuidedAuditSession({
       source: "manual",
     };
     const next = [finding, ...findings];
+    const saved = await persistFindings(next);
+    setFindings(saved);
+    setEditorOpen(false);
     try {
-      const saved = await persistFindings(next);
-      setFindings(saved);
-      setEditorOpen(false);
       await recordActivity({
         kind: "finding",
         title: "Session finding created",
         detail: finding.title,
       });
-      show("Finding linked to this guided session");
+      show("Finding linked to this guided session.");
     } catch (error) {
-      show(messageFromError(error), true);
+      show(`The finding was saved, but its activity entry was not saved: ${messageFromError(error)}`, true);
     }
   }
 
@@ -425,17 +425,17 @@ export function GuidedAuditSession({
       </div>
 
       {!loaded ? (
-        <div className="guided-session-empty"><span>Loading the current audit plan…</span></div>
+        <div className="guided-session-empty" role="status"><span>Loading the current audit plan…</span></div>
       ) : !sampleItems.length ? (
         <div className="guided-session-empty">
-          <WarningCircle size={20} />
+          <WarningCircle size={32} />
           <div><strong>Plan the representative sample first</strong><p>The session uses the exact locations approved in Plan.</p></div>
           <Button icon={ArrowRight} onClick={() => onNavigate("plan")}>Open plan</Button>
         </div>
       ) : !selection || !sample ? (
         <div className="guided-launch">
           <div>
-            {nextSelection ? <ClipboardText size={24} /> : <CheckCircle size={24} weight="fill" />}
+            {nextSelection ? <ClipboardText size={32} /> : <CheckCircle size={32} weight="fill" />}
             <span>
               <strong>{nextSelection ? "Ready for the next planned test" : "All planned testing is complete"}</strong>
               <p>{nextSelection ? "One action will select and start the next available sample and guided run." : "Use the coverage map in Plan to review traceability or reopen a completed test."}</p>
@@ -482,7 +482,7 @@ export function GuidedAuditSession({
                   .map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
               </select>
             </Field>
-            <Button variant="primary" icon={ArrowRight} disabled={!needsActivation} onClick={() => void activateSession(selection)}>
+            <Button icon={ArrowRight} disabled={!needsActivation} onClick={() => void activateSession(selection)}>
               {needsActivation ? "Begin session" : "Session active"}
             </Button>
           </div>
@@ -508,7 +508,7 @@ export function GuidedAuditSession({
                     </div>
                     <StatusBadge tone={statusTone(run.status)}>{RUN_STATUS_LABELS[run.status]}</StatusBadge>
                   </div>
-                  <progress value={completedSteps} max={Math.max(1, run.steps.length)}>{completedSteps} of {run.steps.length}</progress>
+                  <progress aria-label="Step completion" value={completedSteps} max={Math.max(1, run.steps.length)}>{completedSteps} of {run.steps.length}</progress>
                   <ol className="guided-step-list">
                     {run.steps.map((step, index) => (
                       <li key={step.id} data-complete={step.complete && Boolean(step.observation.trim())}>
@@ -522,7 +522,7 @@ export function GuidedAuditSession({
                                 : item),
                             })}
                           />
-                          <span><b>{String(index + 1).padStart(2, "0")}</b>{step.label}</span>
+                          <span><span className="guided-step-number">{String(index + 1).padStart(2, "0")}</span>{step.label}</span>
                         </label>
                         <textarea
                           rows={2}
@@ -552,7 +552,7 @@ export function GuidedAuditSession({
                 </>
               ) : (
                 <div className="guided-no-run">
-                  <ClipboardText size={24} />
+                  <ClipboardText size={32} />
                   <div><strong>Sample-led review</strong><p>Use the inspection tools below, record scope notes here, and attach evidence or findings to this sample.</p></div>
                   <Field label="Sample notes">
                     <textarea rows={4} value={sample.notes} onChange={(event) => patchSample({ notes: event.target.value })} />
@@ -579,20 +579,18 @@ export function GuidedAuditSession({
           </div>
 
           <div className="guided-session-actions">
-            <label>
-              <span>Sample status</span>
+            <Field label="Sample status">
               <select value={sample.status} onChange={(event) => patchSample({ status: event.target.value as AuditSampleItem["status"] })}>
                 {(Object.keys(SAMPLE_STATUS_LABELS) as AuditSampleItem["status"][]).map((value) => (
                   <option key={value} value={value}>{SAMPLE_STATUS_LABELS[value]}</option>
                 ))}
               </select>
-            </label>
-            <span>{run && !runReady ? "Complete every step with an observation before closing this sample." : "The current test record is ready to close."}</span>
+            </Field>
+            <span role="status">{run && !runReady ? "Complete every step with an observation before closing this sample." : "The current test record is ready to close."}</span>
             <Button icon={CheckCircle} disabled={!runReady || sample.status === "complete"} onClick={() => void completeSample()}>
               Mark sample tested
             </Button>
             <Button
-              variant="primary"
               icon={ArrowRight}
               disabled={!nextSelection || (sample.status !== "complete" && sample.status !== "blocked")}
               onClick={() => void activateSession()}
@@ -613,7 +611,7 @@ export function GuidedAuditSession({
         loggingProfile={loggingProfile}
         initialValue={editorSeed}
         onClose={() => setEditorOpen(false)}
-        onSave={(value) => void saveFinding(value)}
+        onSave={saveFinding}
       />
     </section>
   );

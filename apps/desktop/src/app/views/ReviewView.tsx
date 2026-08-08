@@ -27,7 +27,7 @@ import {
   type VpatResponseMap,
 } from "../audit-export";
 import { auditStoreKey, type RecordAuditActivity } from "../audits";
-import { Button, Toast } from "../components";
+import { Button, ErrorState, LoadingState, Toast } from "../components";
 import { messageFromError, useTransientMessage } from "../hooks";
 import { ChecklistView } from "./ChecklistView";
 import { WCAG_CRITERIA } from "../data/wcag";
@@ -61,9 +61,13 @@ export function ReviewView({
   const [vpatResponses, setVpatResponses] = useState<VpatResponseMap>({});
   const [agencyExportBusy, setAgencyExportBusy] = useState(false);
   const [message, show] = useTransientMessage();
+  const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [loadNonce, setLoadNonce] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setLoadError("");
     setFindings([]);
     setChecklist({});
     setCaptures([]);
@@ -100,9 +104,10 @@ export function ReviewView({
             ? nextVpatResponses
             : {},
         );
+        setLoaded(true);
       })
       .catch((error) => {
-        if (!cancelled) show(messageFromError(error), true);
+        if (!cancelled) setLoadError(messageFromError(error));
       });
     const findingsKey = auditStoreKey(audit.id, "findings");
     const stopFindings = desktop.on<{ key: string | null }>("findings:changed", ({ key }) => {
@@ -115,9 +120,21 @@ export function ReviewView({
       cancelled = true;
       stopFindings();
     };
-  }, [audit.id]);
+  }, [audit.id, loadNonce]);
+
+  const [exportBusy, setExportBusy] = useState(false);
 
   async function exportAudit() {
+    if (exportBusy) return;
+    setExportBusy(true);
+    try {
+      await exportAuditInner();
+    } finally {
+      setExportBusy(false);
+    }
+  }
+
+  async function exportAuditInner() {
     try {
       const exportInput = {
         audit,
@@ -263,6 +280,14 @@ export function ReviewView({
     ? findings.filter((finding) => auditFindingLoggingErrors(audit.loggingProfile!, finding).length > 0).length
     : 0, [audit.loggingProfile, findings]);
 
+
+  if (loadError) {
+    return <ErrorState message={loadError} onRetry={() => setLoadNonce((n) => n + 1)} />;
+  }
+  if (!loaded) {
+    return <LoadingState label="Loading the audit" />;
+  }
+
   return (
     <div className="review-view">
       <Toast message={message} />
@@ -302,7 +327,7 @@ export function ReviewView({
               <option value="html">Accessible HTML</option>
               <option value="md">Portable Markdown</option>
             </select>
-            <Button icon={DownloadSimple} onClick={() => void exportAudit()}>
+            <Button icon={DownloadSimple} busy={exportBusy} busyLabel="Exporting" onClick={() => void exportAudit()}>
               Export report
             </Button>
             {audit.loggingProfile ? (

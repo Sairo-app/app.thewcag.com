@@ -115,8 +115,9 @@ export function PanelResizer({
       aria-valuemin={min}
       aria-valuemax={max}
       aria-valuenow={Math.round(size)}
-      aria-valuetext={`${Math.round(size)} pixels. Use arrow keys to resize, Home or End for limits, and Enter to reset.`}
-      title={`${label}. Double-click to reset.`}
+      aria-valuetext={`${Math.round(size)} pixels`}
+      aria-description="Use arrow keys to resize, Home or End for limits, and Enter to reset."
+      title={`${label}. Enter or double-click resets.`}
       onDoubleClick={() => {
         onSize(initial);
         onCommit(initial);

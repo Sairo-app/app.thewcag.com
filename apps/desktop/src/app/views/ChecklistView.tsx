@@ -22,7 +22,7 @@ import {
 } from "../../shared/finding-references";
 import { desktop, getStored, saveStoredFindings } from "../api";
 import { auditStoreKey, type RecordAuditActivity } from "../audits";
-import { Button, Segmented, Toast } from "../components";
+import { Button, EmptyState, Segmented, Toast } from "../components";
 import { CRITERION_GUIDANCE, understandingUrl } from "../data/criterion-guidance";
 import { WCAG_CRITERIA, type CriterionLevel } from "../data/wcag";
 import { messageFromError, useStoredState, useTransientMessage } from "../hooks";
@@ -69,7 +69,12 @@ export function ChecklistView({
   const [shortcuts, setShortcuts] = useState(DEFAULT_DECISION_SHORTCUTS);
   const [message, show] = useTransientMessage();
   const rowRefs = useRef(new Map<string, HTMLElement>());
-  const undoState = useRef<ChecklistState | null>(null);
+  const [undoState, setUndoState] = useState<ChecklistState | null>(null);
+  const undoTimer = useRef<number | null>(null);
+  function armUndoExpiry() {
+    if (undoTimer.current) window.clearTimeout(undoTimer.current);
+    undoTimer.current = window.setTimeout(() => setUndoState(null), 30000);
+  }
   const applicableCriteria = useMemo(
     () => WCAG_CRITERIA.filter(
       (item) => audit.standard === "WCAG 2.2 AA" || item.level === "A",
@@ -126,7 +131,8 @@ export function ChecklistView({
 
   function setResult(sc: string, result: Result) {
     setState((current) => {
-      undoState.current = current;
+      setUndoState(current);
+      armUndoExpiry();
       return {
         ...current,
         [sc]: {
@@ -146,9 +152,9 @@ export function ChecklistView({
   }
 
   function undoDecision() {
-    if (!undoState.current) return;
-    const previous = undoState.current;
-    undoState.current = null;
+    if (!undoState) return;
+    const previous = undoState;
+    setUndoState(null);
     setState(previous);
     show("Checklist decision restored");
   }
@@ -192,7 +198,19 @@ export function ChecklistView({
     }));
   }
 
+  const [creatingFinding, setCreatingFinding] = useState<string | null>(null);
+
   async function createFinding(sc: string) {
+    if (creatingFinding) return;
+    setCreatingFinding(sc);
+    try {
+      await createFindingInner(sc);
+    } finally {
+      setCreatingFinding(null);
+    }
+  }
+
+  async function createFindingInner(sc: string) {
     const criterion = WCAG_CRITERIA.find((item) => item.sc === sc);
     if (!criterion) return;
     const entry = state[sc] || { result: "fail" as Result, note: "" };
@@ -340,7 +358,7 @@ export function ChecklistView({
               ]}
         />
         <label className="search-field">
-          <MagnifyingGlass size={16} />
+          <MagnifyingGlass size={20} />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -363,9 +381,9 @@ export function ChecklistView({
         </select>
         <Button
           icon={DownloadSimple}
-          onClick={() => void exportChecklist("md")}
+          onClick={() => void exportChecklist("md").catch((error) => show(messageFromError(error), true))}
         >
-          Export
+          Export Markdown
         </Button>
       </div>
       <div className="checklist-keyboard-hint" aria-label="Checklist keyboard shortcuts">
@@ -376,10 +394,11 @@ export function ChecklistView({
         <span><kbd>{shortcuts.previous}</kbd><kbd>{shortcuts.next}</kbd> Move</span>
         <span><kbd>{shortcuts.expand}</kbd> Open</span>
       </div>
-      {undoState.current ? (
+      {undoState ? (
         <div className="undo-strip" role="status">
           <span>The last checklist decision changed.</span>
           <button onClick={undoDecision}>Undo</button>
+          <button onClick={() => setUndoState(null)} aria-label="Dismiss undo message">Dismiss</button>
         </div>
       ) : null}
       <div className="criteria-table">
@@ -503,7 +522,9 @@ export function ChecklistView({
                         {entry.result === "fail" ? (
                           <Button
                             icon={entry.findingKey ? ArrowSquareOut : Plus}
-                            onClick={() => void createFinding(item.sc)}
+                            busy={creatingFinding === item.sc}
+                            busyLabel="Creating finding"
+                            onClick={() => void createFinding(item.sc).catch((error) => show(messageFromError(error), true))}
                           >
                             {entry.findingKey ? "Review linked finding" : "Create finding from failure"}
                           </Button>
@@ -516,10 +537,12 @@ export function ChecklistView({
             );
           })
         ) : (
-          <div className="filter-empty">
-            <FunnelSimple size={24} />
-            <p>No criteria match this filter.</p>
-          </div>
+          <EmptyState
+            icon={FunnelSimple}
+            title="No criteria match this filter"
+            body="Adjust the search or result filter to see criteria again."
+            action={<Button onClick={() => { setQuery(""); setResultFilter("all"); }}>Clear filters</Button>}
+          />
         )}
       </div>
     </div>

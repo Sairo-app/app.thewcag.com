@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, FileText, Sparkle, Trash, UploadSimple, WarningCircle } from "./Icon";
 import type { AuditLoggingProfile, AuditProject, AuditTemplateUpload, Finding } from "../shared/desktop";
 import { auditLoggingLayouts, migrateFindingsToAuditLoggingProfile, normalizeAuditLoggingProfile } from "../shared/audit-logging-profile";
@@ -24,6 +24,9 @@ export function AuditTemplateProjectSettings({
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [removeConfirm, setRemoveConfirm] = useState(false);
+  const [discardConfirm, setDiscardConfirm] = useState<null | "upload" | "draft">(null);
+  const [previewEdited, setPreviewEdited] = useState(false);
+  const draftBaselineRef = useRef("");
   const [findingCount, setFindingCount] = useState(0);
   const [message, show] = useTransientMessage(6000);
 
@@ -36,19 +39,25 @@ export function AuditTemplateProjectSettings({
     setPreview("");
     setIncludedSheets([]);
     setDraft(null);
+    setPreviewEdited(false);
   }
 
   async function chooseTemplate() {
+    if (busy) return;
+    setBusy(true);
     try {
       const selected = await desktop.invoke<AuditTemplateUpload | null>("dialog:open-audit-template");
       if (!selected) return;
       setUpload(selected);
       setPreview(selected.content);
       setIncludedSheets(selected.sheetNames);
+      setPreviewEdited(false);
       setDraft(null);
       setEditing(false);
     } catch (error) {
       show(messageFromError(error, "The audit template could not be opened."), true);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -73,6 +82,7 @@ export function AuditTemplateProjectSettings({
         sheetNames: includedSheets,
       });
       setDraft(profile);
+      draftBaselineRef.current = JSON.stringify(profile);
       show("AI mapping ready. Review every layout and field before applying it.");
     } catch (error) {
       show(messageFromError(error, "AI could not analyze this template."), true);
@@ -114,7 +124,7 @@ export function AuditTemplateProjectSettings({
       try {
         await recordActivity({
           kind: "updated",
-          title: audit.loggingProfile ? "Agency logging format updated" : "Agency logging format enabled",
+          title: audit.loggingProfile ? "Agency format updated" : "Agency format enabled",
           detail: `${normalized.layouts?.length ?? 1} layout${(normalized.layouts?.length ?? 1) === 1 ? "" : "s"}, revision ${normalized.revision}`,
         });
       } catch (error) {
@@ -124,7 +134,7 @@ export function AuditTemplateProjectSettings({
       resetUpload();
       show(`${findingCount ? `${findingCount} existing findings migrated. ` : ""}Agency format revision ${normalized.revision} is active.${activityWarning}`, Boolean(activityWarning));
     } catch (error) {
-      show(messageFromError(error, "The agency logging format could not be applied."), true);
+      show(messageFromError(error, "The agency format could not be applied."), true);
     } finally {
       setBusy(false);
     }
@@ -138,14 +148,15 @@ export function AuditTemplateProjectSettings({
       onAuditChange({ loggingProfile: undefined, loggingProfileHistory: history, loggingTemplateAsset: undefined });
       let activityWarning = "";
       try {
-        await recordActivity({ kind: "updated", title: "Agency logging format disabled", detail: "Existing finding values remain preserved." });
+        await recordActivity({ kind: "updated", title: "Agency format disabled", detail: "Existing finding values remain preserved." });
       } catch (error) {
         activityWarning = ` The format was disabled, but its activity entry could not be saved: ${messageFromError(error)}`;
       }
       setRemoveConfirm(false);
       show(`Standard finding authoring is active. Historical agency values were preserved.${activityWarning}`, Boolean(activityWarning));
     } catch (error) {
-      show(messageFromError(error, "The agency logging format could not be removed."), true);
+      setRemoveConfirm(false);
+      show(messageFromError(error, "The agency format could not be removed."), true);
     } finally {
       setBusy(false);
     }
@@ -164,7 +175,7 @@ export function AuditTemplateProjectSettings({
     <section className="settings-section audit-template-project-settings">
       <Toast message={message} />
       <div className="settings-intro">
-        <h2>Agency finding format</h2>
+        <h2>Agency format</h2>
         <p>Add or revise an optional agency workbook. AI proposes the mapping; an auditor approves it before it controls authoring and export.</p>
         {audit.loggingProfile ? (
           <div className="active-template-summary">
@@ -179,8 +190,8 @@ export function AuditTemplateProjectSettings({
         {!upload && !editing ? (
           <div className="audit-template-project-actions">
             <Button icon={UploadSimple} onClick={() => void chooseTemplate()}>{audit.loggingProfile ? "Replace workbook" : "Add agency workbook"}</Button>
-            {audit.loggingProfile ? <Button onClick={() => { setDraft(audit.loggingProfile!); setEditing(true); }}>Edit accepted mapping</Button> : null}
-            {audit.loggingProfile ? <Button icon={Trash} onClick={() => setRemoveConfirm(true)}>Disable format</Button> : null}
+            {audit.loggingProfile ? <Button onClick={() => { setDraft(audit.loggingProfile!); draftBaselineRef.current = JSON.stringify(audit.loggingProfile); setEditing(true); }}>Edit accepted mapping</Button> : null}
+            {audit.loggingProfile ? <Button icon={Trash} onClick={() => setRemoveConfirm(true)}>Disable agency format</Button> : null}
           </div>
         ) : null}
         {!upload && !editing && audit.loggingProfileHistory?.length ? (
@@ -198,25 +209,43 @@ export function AuditTemplateProjectSettings({
         ) : null}
         {upload && !draft ? (
           <div className="audit-template-project-preview">
-            <div className="audit-template-file"><div><FileText size={20} /><span><strong>{upload.name}</strong><small>Review exactly what will be sent to AI.</small></span></div><button type="button" onClick={resetUpload}>Cancel</button></div>
+            <div className="audit-template-file"><div><FileText size={20} /><span><strong>{upload.name}</strong><small>Review exactly what will be sent to AI.</small></span></div><button type="button" onClick={() => { if (previewEdited) { setDiscardConfirm("upload"); } else { resetUpload(); } }}>Cancel</button></div>
             {upload.sheetNames.length > 1 ? <fieldset><legend>Worksheets to analyze</legend><div>{upload.sheetNames.map((name) => <label key={name}><input type="checkbox" checked={includedSheets.includes(name)} onChange={() => toggleSheet(name)} /><span>{name}</span></label>)}</div></fieldset> : null}
-            <label><span>Extracted template data <small>Redact sensitive examples before analysis.</small></span><textarea rows={10} value={preview} onChange={(event) => setPreview(event.target.value)} /></label>
+            <label><span>Extracted template data <small>Redact sensitive examples before analysis.</small></span><textarea rows={10} value={preview} onChange={(event) => { setPreview(event.target.value); setPreviewEdited(true); }} /></label>
             <p className="audit-template-privacy">The file type, selected worksheet names, and this reviewed extraction are sent to the selected AI provider. The file name and source workbook stay local; the source is retained only after you approve the mapping.</p>
             <Button variant="primary" icon={Sparkle} disabled={busy || !preview.trim() || !includedSheets.length} onClick={() => void analyze()}>{busy ? "Analyzing" : "Analyze structure"}</Button>
           </div>
         ) : null}
         {draft ? (
           <div className="audit-template-project-review">
-            <div className="profile-review-warning"><WarningCircle size={20} /><p><strong>Auditor approval required</strong> Confirm every mapping, rule, and worksheet position. {findingCount ? `Applying it will migrate ${findingCount} existing findings without deleting their values.` : ""}</p></div>
+            <div className="profile-review-warning"><WarningCircle size={20} /><p><strong>Auditor approval required.</strong> Confirm every mapping, rule, and worksheet position. {findingCount ? `Applying it will migrate ${findingCount} existing findings without deleting their values.` : ""}</p></div>
             <AuditLoggingProfileEditor profile={draft} onChange={setDraft} />
             {draftError ? <p className="audit-template-message is-error" role="alert">{draftError}</p> : null}
             <div className="audit-template-project-actions">
-              <Button onClick={() => { setDraft(null); setEditing(false); }}>Cancel</Button>
+              <Button onClick={() => { if (draft && JSON.stringify(draft) !== draftBaselineRef.current) { setDiscardConfirm("draft"); } else { setDraft(null); setEditing(false); } }}>Cancel</Button>
               <Button variant="primary" icon={Check} disabled={busy || Boolean(draftError)} onClick={() => void applyProfile(draft, upload?.uploadToken)}>{busy ? "Applying" : "Approve and apply format"}</Button>
             </div>
           </div>
         ) : null}
       </div>
+      <ConfirmDialog
+        open={discardConfirm !== null}
+        title={discardConfirm === "draft" ? "Discard the analyzed draft?" : "Discard the edited extraction?"}
+        description={discardConfirm === "draft"
+          ? "Your mapping edits will be lost. The currently accepted format stays active."
+          : "Your redactions and edits to the extracted template data will be lost."}
+        confirmLabel="Discard"
+        onConfirm={() => {
+          if (discardConfirm === "draft") {
+            setDraft(null);
+            setEditing(false);
+          } else {
+            resetUpload();
+          }
+          setDiscardConfirm(null);
+        }}
+        onCancel={() => setDiscardConfirm(null)}
+      />
       <ConfirmDialog
         open={removeConfirm}
         title="Disable the agency format?"

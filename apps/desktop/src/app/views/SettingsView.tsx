@@ -144,7 +144,7 @@ export function SettingsView({
           configuration.providers.map((provider) => [provider.id, provider.model || current[provider.id]]),
         ) as Record<AiProviderId, string>);
       }),
-    ]).catch((error) => show(messageFromError(error), true));
+    ]).catch((error) => show(messageFromError(error), true, undefined, { sticky: true }));
     const stopUpdate = desktop.on<UpdateState>("update:state", setUpdate);
     const stopAccount = desktop.on(
       "account:changed",
@@ -186,7 +186,7 @@ export function SettingsView({
   async function signIn() {
     try {
       await desktop.invoke("auth:sign-in");
-      show("Complete sign in in your browser");
+      show("Continue in your browser to finish signing in");
     } catch (error) {
       show(messageFromError(error), true);
     }
@@ -400,6 +400,7 @@ export function SettingsView({
             </span>
             <input
               type="checkbox"
+              role="switch"
               checked={settings.shareCrashReports}
               onChange={(event) =>
                 void saveSettings({
@@ -636,7 +637,7 @@ export function SettingsView({
           ] as const).map(([key, label]) => (
             <Field key={key} label={label}>
               <div className="shortcut-input">
-                <Key size={16} />
+                <Key size={20} />
                 <input
                   maxLength={12}
                   value={settings.checklistShortcuts[key]}
@@ -676,7 +677,7 @@ export function SettingsView({
               }
             >
               <div className="shortcut-input">
-                <Key size={16} />
+                <Key size={20} />
                 <input
                   value={settings.shortcuts[key]}
                   onChange={(event) =>
@@ -772,6 +773,7 @@ export function SettingsView({
                   void desktop
                     .invoke("auth:sign-out")
                     .then(() => setAccount({ signedIn: false }))
+                    .catch((error) => show(messageFromError(error, "Sign out did not complete."), true))
                 }
               >
                 Sign out

@@ -13,7 +13,11 @@ const boundary = vi.hoisted(() => ({
   runIssuePicker: vi.fn(),
 }));
 
-vi.mock("./evidence", () => ({ createEvidencePacket: boundary.createEvidencePacket }));
+vi.mock("./evidence", () => ({
+  createEvidencePacket: boundary.createEvidencePacket,
+  ACTION_PIXEL_HEX: "#AF4000",
+  DANGER_PIXEL_HEX: "#AC1A1C",
+}));
 vi.mock("./page-access", () => ({
   isProtectedBrowserPage: boundary.isProtectedBrowserPage,
   pageAccessMessage: boundary.pageAccessMessage,

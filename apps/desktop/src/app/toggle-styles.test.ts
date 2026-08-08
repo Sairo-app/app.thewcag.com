@@ -23,6 +23,6 @@ describe("settings toggle styling", () => {
   });
 
   it("exposes each binary preference as a switch", () => {
-    expect(settingsView.match(/role="switch"/g)).toHaveLength(4);
+    expect(settingsView.match(/role="switch"/g)).toHaveLength(5);
   });
 });

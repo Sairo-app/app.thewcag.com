@@ -23,7 +23,7 @@ import type { AuditLoggingProfile, OverlayResult, WorkspaceStage } from "../../s
 import { desktop } from "../api";
 import type { AuditSessionSelection } from "../audit-coverage";
 import { auditStoreKey, type RecordAuditActivity } from "../audits";
-import { Button, Segmented, StatusBadge, Toast } from "../components";
+import { Button, ConfirmDialog, Segmented, StatusBadge, Toast } from "../components";
 import { GuidedAuditSession } from "../GuidedAuditSession";
 import {
   messageFromError,
@@ -114,7 +114,20 @@ export function InspectView({
     show("Pair added to recent checks");
   }
 
+  const [savingFinding, setSavingFinding] = useState(false);
+  const [clearHistoryConfirm, setClearHistoryConfirm] = useState(false);
+
   async function saveFinding() {
+    if (savingFinding) return;
+    setSavingFinding(true);
+    try {
+      await saveFindingInner();
+    } finally {
+      setSavingFinding(false);
+    }
+  }
+
+  async function saveFindingInner() {
     if (passes) {
       show("This pair passes the selected requirement, so no open finding was created.");
       return;
@@ -197,9 +210,9 @@ export function InspectView({
             People should be able to perceive, understand, and operate every
             essential action.
           </p>
-          <button style={{ backgroundColor: fg, color: bg }}>
+          <span className="button specimen-action" style={{ backgroundColor: fg, color: bg }} aria-hidden="true">
             Primary action <ArrowRight size={20} />
-          </button>
+          </span>
         </div>
         <div className="ratio-badge">
           <span>WCAG contrast</span>
@@ -333,7 +346,7 @@ export function InspectView({
                     SC {check.sc}, minimum {check.target}
                   </small>
                 </span>
-                <b>{check.pass ? "Pass" : "Fail"}</b>
+                <StatusBadge tone={check.pass ? "success" : "danger"}>{check.pass ? "Pass" : "Fail"}</StatusBadge>
               </div>
             ))}
           </div>
@@ -369,6 +382,8 @@ export function InspectView({
         <Button
           variant="primary"
           icon={FloppyDisk}
+          busy={savingFinding}
+          busyLabel="Saving finding"
           onClick={() => void saveFinding()}
         >
           Save finding
@@ -381,14 +396,14 @@ export function InspectView({
           variant="quiet"
           onClick={() => onNavigate("evidence")}
         >
-          Open capture library
+          Open findings
         </Button>
       </div>
       {history.length ? (
         <section className="recent-pairs">
           <div className="section-heading">
             <h2>Recent checks</h2>
-            <button onClick={() => setHistory([])}>Clear</button>
+            <button onClick={() => setClearHistoryConfirm(true)}>Clear</button>
           </div>
           <div className="pair-list">
             {history.slice(0, 5).map((item) => (
@@ -415,6 +430,17 @@ export function InspectView({
           </div>
         </section>
       ) : null}
+      <ConfirmDialog
+        open={clearHistoryConfirm}
+        title="Clear recent checks?"
+        description="The recent contrast checks list will be emptied. Saved findings are not affected."
+        confirmLabel="Clear history"
+        onConfirm={() => {
+          setHistory([]);
+          setClearHistoryConfirm(false);
+        }}
+        onCancel={() => setClearHistoryConfirm(false)}
+      />
     </div>
   );
 }

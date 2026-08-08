@@ -13,6 +13,20 @@ import {
 } from "@accessibility-build/audit-contracts";
 import type { CapturedSelection } from "./shared/messages";
 
+/**
+ * Pixel equivalent of the canonical `--action` token, oklch(0.52 0.18 42),
+ * for surfaces that cannot resolve CSS custom properties (canvas marker
+ * drawing and the toolbar badge). Computed with the CSS Color 4 OKLCH to
+ * sRGB gamut mapping.
+ */
+export const ACTION_PIXEL_HEX = "#AF4000";
+
+/**
+ * Pixel equivalent of the canonical `--danger` token, oklch(0.48 0.18 27),
+ * used for the failure badge color.
+ */
+export const DANGER_PIXEL_HEX = "#AC1A1C";
+
 export interface CropGeometry {
   source: EvidenceRect;
   marker: EvidenceRect;
@@ -230,8 +244,9 @@ export async function createMarkedCrop(
   context.lineWidth = line + 5;
   context.stroke();
 
-  context.strokeStyle = "#D9480F";
-  context.fillStyle = "rgba(217, 72, 15, 0.08)";
+  context.strokeStyle = ACTION_PIXEL_HEX;
+  // ACTION_PIXEL_HEX (#AF4000, the --action token) at 8% opacity.
+  context.fillStyle = "rgba(175, 64, 0, 0.08)";
   context.lineWidth = line;
   context.beginPath();
   context.roundRect(
@@ -267,7 +282,7 @@ export async function createMarkedCrop(
         geometry.outputHeight - labelHeight - 4,
         markerY + markerHeight + 8,
       );
-  context.fillStyle = "#D9480F";
+  context.fillStyle = ACTION_PIXEL_HEX;
   context.beginPath();
   context.roundRect(labelX, Math.max(4, labelY), labelWidth, labelHeight, 8);
   context.fill();

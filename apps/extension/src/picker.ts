@@ -297,28 +297,47 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
     const style = document.createElement("style");
     style.textContent = `
       :host {
+        --action: oklch(0.52 0.18 42);
+        --ink: oklch(0.215 0.034 54);
+        --on-orange: oklch(0.98 0.014 85);
         --elevation-0: none;
         --elevation-1: 0 1px 2px rgb(33 24 14 / 0.08), 0 6px 24px rgb(33 24 14 / 0.10);
         --space-1: 4px;
         --space-2: 8px;
+        --space-4: 16px;
       }
-      .picker-label { box-shadow: var(--elevation-1); }
+      .picker-label, .picker-bar { box-shadow: var(--elevation-1); }
       @media (forced-colors: active) {
-        .picker-label {
+        .picker-label, .picker-bar {
           border: 1px solid CanvasText;
           box-shadow: var(--elevation-0);
+          background: Canvas;
+          color: CanvasText;
         }
       }
     `;
     const outline = document.createElement("div");
     const label = document.createElement("div");
     const veil = document.createElement("div");
-    outline.style.cssText = "position:fixed;display:none;border:3px solid oklch(0.52 0.18 42);border-radius:10px;background:color-mix(in oklch,oklch(0.52 0.18 42) 9%,transparent);box-sizing:border-box;pointer-events:none;";
+    const instructions = document.createElement("div");
+    // The orange stroke carries a 1px ink outer stroke so the highlight stays
+    // visible on warm, orange-adjacent sites.
+    outline.style.cssText = "position:fixed;display:none;border:3px solid var(--action);border-radius:10px;background:color-mix(in oklch,var(--action) 9%,transparent);outline:1px solid var(--ink);outline-offset:0px;box-sizing:border-box;pointer-events:none;";
     label.className = "picker-label";
-    label.style.cssText = "position:fixed;display:none;max-width:280px;padding:var(--space-1) var(--space-2);border-radius:10px;background:oklch(0.215 0.034 54);color:oklch(0.98 0.014 85);font:600 12px/1.35 Manrope,system-ui,sans-serif;pointer-events:none;";
-    veil.style.cssText = "position:fixed;inset:0;background:transparent;pointer-events:none;cursor:crosshair;";
-    shadow.append(style, veil, outline, label);
+    label.style.cssText = "position:fixed;display:none;max-width:280px;padding:var(--space-1) var(--space-2);border-radius:10px;background:var(--ink);color:var(--on-orange);font:600 12px/1.35 \"Source Sans 3\",system-ui,sans-serif;pointer-events:none;";
+    // Events are already intercepted at the capture phase, so the veil may take
+    // pointer events purely to present a consistent crosshair cursor.
+    veil.style.cssText = "position:fixed;inset:0;background:transparent;pointer-events:auto;cursor:crosshair;";
+    instructions.className = "picker-bar";
+    instructions.textContent = mode === "element"
+      ? "Click to select. Tab or arrows to move. Enter to capture. Esc to cancel."
+      : "Drag to select a region. Tab or arrows to move. Enter to capture. Esc to cancel.";
+    instructions.style.cssText = "position:fixed;left:50%;bottom:var(--space-4);transform:translateX(-50%);max-width:calc(100vw - var(--space-4) * 2);padding:var(--space-2) var(--space-4);border-radius:10px;background:var(--ink);color:var(--on-orange);font:600 12px/1.35 \"Source Sans 3\",system-ui,sans-serif;text-align:center;pointer-events:none;";
+    shadow.append(style, veil, outline, label, instructions);
     document.documentElement.append(host);
+    // The documented keys must work even when the capture was started from the
+    // side panel or popup, which otherwise keeps keyboard focus.
+    if (typeof window.focus === "function") window.focus();
 
     const elementAtPoint = (
       root: Document | ShadowRoot,
@@ -342,16 +361,16 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
     const iframeOmission = "Iframe inner content was not inspected; only the iframe element and visible screenshot were captured";
 
     let hovered: Element | null = null;
-    const keyboardCandidates = Array.from(document.querySelectorAll(
+    // Candidates are recomputed on every key press so dynamically added or
+    // removed controls never leave the keyboard cycle stale.
+    const collectKeyboardCandidates = (): Element[] => Array.from(document.querySelectorAll(
       "a[href],button,input:not([type='hidden']),select,textarea,[tabindex]:not([tabindex='-1']),[role]",
     )).filter((element) => {
       const bounds = element.getBoundingClientRect();
       const style = getComputedStyle(element);
       return bounds.width > 0 && bounds.height > 0 && style.display !== "none" && style.visibility !== "hidden";
     });
-    let keyboardIndex = document.activeElement
-      ? keyboardCandidates.indexOf(document.activeElement)
-      : -1;
+    let keyboardCurrent: Element | null = document.activeElement;
     let dragStart: { x: number; y: number } | null = null;
     let dragRect: Rect | null = null;
     let finished = false;
@@ -371,8 +390,33 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
       document.removeEventListener("keydown", onKeyDown, true);
       if (deferActionBlockers) window.setTimeout(removeActionBlockers, 0);
       else removeActionBlockers();
+      if (typeof window.removeEventListener === "function") {
+        window.removeEventListener("pagehide", onPageHide);
+      }
+      if (typeof chrome !== "undefined" && chrome.runtime?.onMessage?.removeListener) {
+        chrome.runtime.onMessage.removeListener(onAbortMessage);
+      }
       document.documentElement.style.cursor = originalCursor;
       host.remove();
+    };
+
+    const cancel = () => {
+      if (finished) return;
+      finished = true;
+      cleanup();
+      resolve(null);
+    };
+
+    const onPageHide = () => cancel();
+
+    const onAbortMessage = (message: unknown) => {
+      if (
+        message &&
+        typeof message === "object" &&
+        (message as { type?: unknown }).type === "thewcag:picker-abort"
+      ) {
+        cancel();
+      }
     };
 
     const placeOutline = (rect: Rect, text: string) => {
@@ -401,9 +445,14 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
     };
 
     const highlightKeyboardCandidate = (direction: 1 | -1) => {
-      if (!keyboardCandidates.length) return;
-      keyboardIndex = (keyboardIndex + direction + keyboardCandidates.length) % keyboardCandidates.length;
-      const element = keyboardCandidates[keyboardIndex];
+      const candidates = collectKeyboardCandidates();
+      if (!candidates.length) return;
+      const currentIndex = keyboardCurrent ? candidates.indexOf(keyboardCurrent) : -1;
+      const nextIndex = currentIndex === -1
+        ? (direction === 1 ? 0 : candidates.length - 1)
+        : (currentIndex + direction + candidates.length) % candidates.length;
+      const element = candidates[nextIndex];
+      keyboardCurrent = element;
       element.scrollIntoView({ block: "center", inline: "nearest" });
       hovered = element;
       requestAnimationFrame(() => {
@@ -460,7 +509,14 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
       if (bounds.width < 8 || bounds.height < 8) {
         dragRect = null;
         outline.style.display = "none";
-        label.style.display = "none";
+        const feedback = "Drag a larger region";
+        label.textContent = feedback;
+        label.style.display = "block";
+        label.style.left = `${Math.max(8, Math.min(innerWidth - 288, event.clientX))}px`;
+        label.style.top = `${Math.min(innerHeight - 34, event.clientY + 12)}px`;
+        window.setTimeout(() => {
+          if (label.textContent === feedback) label.style.display = "none";
+        }, 1_400);
         return;
       }
       const centerX = Math.min(innerWidth - 1, Math.max(0, bounds.x + bounds.width / 2));
@@ -480,8 +536,7 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         blockPageAction(event);
-        cleanup();
-        resolve(null);
+        cancel();
         return;
       }
       if (event.key === "Tab" || event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -505,5 +560,13 @@ export async function runIssuePicker(mode: EvidenceCaptureMode): Promise<Capture
     document.addEventListener("mousedown", onMouseDown, true);
     document.addEventListener("mouseup", onMouseUp, true);
     document.addEventListener("keydown", onKeyDown, true);
+    if (typeof window.addEventListener === "function") {
+      window.addEventListener("pagehide", onPageHide);
+    }
+    // The service worker can abort an in-progress picker; the message type is
+    // inlined because this function is serialized without imports.
+    if (typeof chrome !== "undefined" && chrome.runtime?.onMessage?.addListener) {
+      chrome.runtime.onMessage.addListener(onAbortMessage);
+    }
   });
 }

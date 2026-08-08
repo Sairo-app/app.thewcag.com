@@ -25,7 +25,7 @@ import type {
 import { desktop, getStored, listCaptures, saveStoredFindings, setStored } from "../api";
 import { auditPlanProgress, auditTestRunComplete } from "../audit-plan";
 import { auditStoreKey, type RecordAuditActivity } from "../audits";
-import { Button, Field, StatusBadge, Toast } from "../components";
+import { Button, ErrorState, Field, LoadingState, StatusBadge, Toast } from "../components";
 import { WCAG_CRITERIA } from "../data/wcag";
 import { messageFromError, useTransientMessage } from "../hooks";
 import {
@@ -95,11 +95,15 @@ export function ShareView({
   const [attested, setAttested] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState("");
-  const [message, show] = useTransientMessage(5000);
+  const [message, show] = useTransientMessage();
+  const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [loadNonce, setLoadNonce] = useState(0);
   const reportsKey = auditStoreKey(audit.id, "reports");
 
   useEffect(() => {
     let cancelled = false;
+    setLoadError("");
     setCaptures([]);
     setFindings([]);
     setChecklist({});
@@ -154,9 +158,10 @@ export function ShareView({
           .flatMap(findingEvidenceCaptureIds)
           .find((id) => availableCaptureIds.has(id));
         setCaptureId(linkedCaptureId || nextCaptures[0]?.id || "");
+        setLoaded(true);
       })
       .catch((error) => {
-        if (!cancelled) show(messageFromError(error), true);
+        if (!cancelled) setLoadError(messageFromError(error));
       });
     const stopAccount = desktop.on(
       "account:changed",
@@ -176,7 +181,7 @@ export function ShareView({
       stopAccount();
       stopFindings();
     };
-  }, [audit.id]);
+  }, [audit.id, loadNonce]);
 
   const selectedCapture =
     captures.find((capture) => capture.id === captureId) ?? null;
@@ -297,7 +302,7 @@ export function ShareView({
   async function signIn() {
     try {
       await desktop.invoke("auth:sign-in");
-      show("Complete sign in in your browser");
+      show("Continue in your browser to finish signing in");
     } catch (error) {
       show(messageFromError(error), true);
     }
@@ -400,6 +405,14 @@ export function ShareView({
     }
   }
 
+
+  if (loadError) {
+    return <ErrorState message={loadError} onRetry={() => setLoadNonce((n) => n + 1)} />;
+  }
+  if (!loaded) {
+    return <LoadingState label="Loading the report draft" />;
+  }
+
   return (
     <div className="share-view">
       <Toast message={message} />
@@ -454,7 +467,7 @@ export function ShareView({
               finding. Audit conclusion and export remain available below.
             </p>
           </div>
-          <Button onClick={() => onNavigate("evidence")}>Go to evidence</Button>
+          <Button onClick={() => onNavigate("evidence")}>Go to findings</Button>
         </section>
       ) : null}
 
@@ -717,7 +730,7 @@ export function ShareView({
         <section className="report-draft">
           <div className="report-section-heading">
             <span>
-              <FileText size={20} />
+              <FileText size={24} />
             </span>
             <div>
               <h2>Report draft</h2>
@@ -788,7 +801,7 @@ export function ShareView({
         <aside className="report-preview" aria-label="Report preview">
           <div className="report-section-heading">
             <span>
-              <Eye size={20} />
+              <Eye size={24} />
             </span>
             <div>
               <h2>Included evidence</h2>

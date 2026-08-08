@@ -25,10 +25,21 @@ export function isPanelPortMessage(value: unknown): value is PanelPortMessage {
     : item.type === "evidence-seen" && Number.isInteger(item.tabId) && (item.tabId as number) >= 0;
 }
 
-export type ExtensionRequest = {
-  type: "capture:start";
-  mode: EvidenceCaptureMode;
-};
+export type ExtensionRequest =
+  | {
+      type: "capture:start";
+      mode: EvidenceCaptureMode;
+    }
+  | {
+      type: "capture:cancel";
+    };
+
+/**
+ * Sent from the service worker to a page hosting an in-progress picker. The
+ * picker keeps an inline copy of the literal because it is serialized into the
+ * page without imports.
+ */
+export const PICKER_ABORT_MESSAGE = { type: "thewcag:picker-abort" } as const;
 
 export type ExtensionResponse =
   | {
@@ -44,5 +55,6 @@ export type ExtensionResponse =
 export function isExtensionRequest(value: unknown): value is ExtensionRequest {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const item = value as Record<string, unknown>;
+  if (item.type === "capture:cancel") return true;
   return item.type === "capture:start" && (item.mode === "element" || item.mode === "region");
 }

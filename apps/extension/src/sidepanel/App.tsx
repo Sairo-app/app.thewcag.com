@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   ArrowCounterClockwise,
   ArrowSquareOut,
@@ -145,6 +145,7 @@ function Field({
   label,
   value,
   onChange,
+  onBlur,
   multiline = false,
   rows = 3,
   hint,
@@ -153,23 +154,47 @@ function Field({
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
   multiline?: boolean;
   rows?: number;
   hint?: string;
   maxLength?: number;
 }) {
+  const controlId = useId();
+  const hintId = `${controlId}-hint`;
+  const countId = `${controlId}-count`;
+  const describedBy = [hint ? hintId : null, maxLength ? countId : null].filter(Boolean).join(" ") || undefined;
   return (
-    <label className="field">
-      <span>{label}</span>
+    <div className="field">
+      <label htmlFor={controlId}>{label}</label>
       {multiline ? (
-        <textarea value={value} rows={rows} maxLength={maxLength} onChange={(event) => onChange(event.target.value)} />
+        <textarea
+          id={controlId}
+          value={value}
+          rows={rows}
+          maxLength={maxLength}
+          aria-describedby={describedBy}
+          onChange={(event) => onChange(event.target.value)}
+          onBlur={onBlur}
+        />
       ) : (
-        <input value={value} maxLength={maxLength} onChange={(event) => onChange(event.target.value)} />
+        <input
+          id={controlId}
+          value={value}
+          maxLength={maxLength}
+          aria-describedby={describedBy}
+          onChange={(event) => onChange(event.target.value)}
+          onBlur={onBlur}
+        />
       )}
-      {hint ? <small>{hint}</small> : null}
-      {maxLength ? <small>{value.length}/{maxLength} characters</small> : null}
-    </label>
+      {hint ? <small id={hintId}>{hint}</small> : null}
+      {maxLength ? <small id={countId}>{value.length}/{maxLength} characters</small> : null}
+    </div>
   );
+}
+
+function parseReproductionSteps(value: string): string[] {
+  return value.split("\n").map((step) => step.trim()).filter(Boolean);
 }
 
 export function App({ surface }: { surface: ExtensionSurface }) {
@@ -193,6 +218,10 @@ export function App({ surface }: { surface: ExtensionSurface }) {
   const [includeUrl, setIncludeUrl] = useState(true);
   const [currentWindowId, setCurrentWindowId] = useState<number | null>(null);
   const [capturedTabId, setCapturedTabId] = useState<number | null>(null);
+  const [reproductionStepsText, setReproductionStepsText] = useState("");
+  const [armedConfirm, setArmedConfirm] = useState<"discard-capture" | "discard-draft" | null>(null);
+  const confirmTimerRef = useRef<number | null>(null);
+  const recheckInFlightRef = useRef(false);
   const statusRef = useRef<HTMLDivElement>(null);
   const selectedAuditRef = useRef("");
   const evidenceRef = useRef<EvidencePacketV1 | null>(null);
@@ -383,9 +412,35 @@ export function App({ surface }: { surface: ExtensionSurface }) {
   }, [evidence]);
 
   useEffect(() => {
-    if (!status) return;
+    // Only alert-tone messages move focus; polite statuses rely on the live
+    // region alone so typing and reading are never interrupted.
+    if (status?.tone !== "danger") return;
     statusRef.current?.focus();
   }, [status]);
+
+  useEffect(() => {
+    // The textarea keeps the raw text (including trailing newlines) while the
+    // auditor types; the draft only receives parsed steps on blur or save.
+    setReproductionStepsText(draft ? draft.reproductionSteps.join("\n") : "");
+  }, [draft?.reproductionSteps]);
+
+  useEffect(() => {
+    const recheck = () => {
+      if (document.visibilityState === "visible") void checkDesktop(false);
+    };
+    const onFocus = () => void checkDesktop(false);
+    document.addEventListener("visibilitychange", recheck);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", recheck);
+      window.removeEventListener("focus", onFocus);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => () => {
+    if (confirmTimerRef.current !== null) window.clearTimeout(confirmTimerRef.current);
+  }, []);
 
   useEffect(() => {
     if (!evidence) return;
@@ -438,7 +493,37 @@ export function App({ surface }: { surface: ExtensionSurface }) {
     await chrome.storage.local.remove(DRAFT_STORAGE_KEY);
   }
 
+  function disarmConfirm(): void {
+    if (confirmTimerRef.current !== null) {
+      window.clearTimeout(confirmTimerRef.current);
+      confirmTimerRef.current = null;
+    }
+    setArmedConfirm(null);
+  }
+
+  function armConfirm(key: "discard-capture" | "discard-draft"): void {
+    if (confirmTimerRef.current !== null) window.clearTimeout(confirmTimerRef.current);
+    setArmedConfirm(key);
+    confirmTimerRef.current = window.setTimeout(() => {
+      confirmTimerRef.current = null;
+      setArmedConfirm(null);
+    }, 6_000);
+  }
+
+  async function copyFindingId(findingId: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(findingId);
+      setStatus({ text: "Finding ID copied.", tone: "success" });
+    } catch {
+      setStatus({ text: "The finding ID could not be copied to the clipboard. Try again.", tone: "danger" });
+    }
+  }
+
   async function checkDesktop(requestPermission: boolean, preferredAuditId = selectedAuditRef.current) {
+    // Passive rechecks (visibility or focus) never stack; an explicit connect
+    // request always runs.
+    if (recheckInFlightRef.current && !requestPermission) return;
+    recheckInFlightRef.current = true;
     setDesktopState("checking");
     try {
       const allowed = requestPermission ? await requestDesktopPermission() : await hasDesktopPermission();
@@ -460,6 +545,8 @@ export function App({ surface }: { surface: ExtensionSurface }) {
     } catch (error) {
       setDesktopState("disconnected");
       if (requestPermission) setStatus({ text: displayError(error), tone: "danger" });
+    } finally {
+      recheckInFlightRef.current = false;
     }
   }
 
@@ -472,7 +559,19 @@ export function App({ surface }: { surface: ExtensionSurface }) {
       tone: "neutral",
     });
     try {
-      const response = await chromeMessage<ExtensionResponse>({ type: "capture:start", mode });
+      const responsePromise = chromeMessage<ExtensionResponse>({ type: "capture:start", mode });
+      if (surface === "popup" && currentWindowId !== null) {
+        // The popup closes as soon as the page takes focus, so hand the awaited
+        // flow to the side panel while the user gesture is still valid. The
+        // capture message was already sent, and openReviewPanel swallows
+        // browsers without a panel surface.
+        try {
+          await openReviewPanel(currentWindowId);
+        } catch {
+          // The popup keeps hosting the flow when no panel is available.
+        }
+      }
+      const response = await responsePromise;
       if (!response.ok) {
         if (!response.cancelled) setStatus({ text: response.message, tone: "danger" });
         else setStatus(null);
@@ -578,7 +677,12 @@ export function App({ surface }: { surface: ExtensionSurface }) {
     }
     setSaving(true);
     try {
-      const validated = parseAiFindingDraft(draft);
+      // Commit any reproduction steps still sitting in the textarea before the
+      // draft is validated and saved.
+      const validated = parseAiFindingDraft({
+        ...draft,
+        reproductionSteps: parseReproductionSteps(reproductionStepsText),
+      });
       const scoped = parseEvidencePacket({ ...evidence, auditId: selectedAudit });
       const findingKey = await saveDesktopFinding(selectedAudit, scoped, validated);
       const marker: SavedFindingMarker = {
@@ -710,8 +814,10 @@ export function App({ surface }: { surface: ExtensionSurface }) {
         </div>
         <div className="header-actions">
           <span className={`connection connection-${desktopState}`} role="status" aria-live="polite">
-            <span aria-hidden="true" />
-            {desktopState === "connected" ? "Desktop ready" : desktopState === "checking" ? "Checking" : "Local mode"}
+            <span className="connection-dot" aria-hidden="true" />
+            <span className="connection-label">
+              {desktopState === "connected" ? "Desktop ready" : desktopState === "checking" ? "Checking" : "Local mode"}
+            </span>
           </span>
           {surface === "popup" ? (
             <button className="icon-button" onClick={openWorkspace} aria-label="Open expanded evidence workspace" title="Open expanded workspace">
@@ -722,7 +828,15 @@ export function App({ surface }: { surface: ExtensionSurface }) {
       </header>
 
       {status ? (
-        <div className={`status status-${status.tone}`} role={status.tone === "danger" ? "alert" : "status"} tabIndex={-1} ref={statusRef}>
+        // Danger statuses receive focus, which announces their content, so they
+        // must not also be a live region; polite tones announce via the live
+        // region without moving focus.
+        <div
+          className={`status status-${status.tone}`}
+          role={status.tone === "danger" ? undefined : "status"}
+          tabIndex={-1}
+          ref={statusRef}
+        >
           {status.tone === "danger" ? <Warning size={16} weight="fill" /> : status.tone === "success" ? <CheckCircle size={16} weight="fill" /> : <Eye size={16} />}
           <span>{status.text}</span>
           <button onClick={() => setStatus(null)} aria-label="Dismiss message"><X size={20} /></button>
@@ -730,9 +844,11 @@ export function App({ surface }: { surface: ExtensionSurface }) {
       ) : null}
 
       <main id="extension-main" tabIndex={-1}>
-        {savedFinding && evidence ? (
+        {!storageRestored ? (
+          <p className="loading-view">Restoring the saved capture…</p>
+        ) : savedFinding && evidence ? (
           <section className="queued-view" aria-labelledby="saved-heading">
-            <CheckCircle size={32} weight="fill" aria-hidden="true" />
+            <div className="intro-icon"><CheckCircle size={32} weight="fill" aria-hidden="true" /></div>
             <span className="step">Desktop audit</span>
             <h1 id="saved-heading">Finding saved</h1>
             <p>
@@ -743,10 +859,7 @@ export function App({ surface }: { surface: ExtensionSurface }) {
               type="button"
               className="finding-identity"
               title={savedFinding.findingId}
-              onClick={() => {
-                void navigator.clipboard.writeText(savedFinding.findingId);
-                setStatus({ text: "Finding ID copied.", tone: "success" });
-              }}
+              onClick={() => void copyFindingId(savedFinding.findingId)}
             >
               <span>Immutable finding ID</span>
               <code>{compactFindingId(savedFinding.findingId)}</code>
@@ -760,7 +873,7 @@ export function App({ surface }: { surface: ExtensionSurface }) {
           </section>
         ) : queuedFinding && evidence ? (
           <section className="queued-view" aria-labelledby="queued-heading">
-            <CheckCircle size={32} weight="fill" aria-hidden="true" />
+            <div className="intro-icon"><CheckCircle size={32} weight="fill" aria-hidden="true" /></div>
             <span className="step">Desktop review queue</span>
             <h1 id="queued-heading">Issue sent for review</h1>
             <p>
@@ -789,7 +902,7 @@ export function App({ surface }: { surface: ExtensionSurface }) {
             </div>
             {evidence.image ? (
               <figure className="capture-preview popup-preview">
-                <img src={evidence.image.dataUrl} alt={`Page context showing ${targetLabel} highlighted in orange as issue 1`} />
+                <img src={evidence.image.dataUrl} alt={`Page screenshot with ${targetLabel} marked as issue 1`} />
                 <figcaption>
                   <span><ImageSquare size={16} /> Context screenshot</span>
                   <strong><Crosshair size={16} /> {evidence.captureMode === "element" ? "Control highlighted" : "Region highlighted"}</strong>
@@ -820,20 +933,28 @@ export function App({ surface }: { surface: ExtensionSurface }) {
           </section>
         ) : !evidence ? (
           <section className="start-view" aria-labelledby="start-heading">
-            <div className="intro-icon"><Crosshair size={24} /></div>
+            <div className="intro-icon"><Crosshair size={32} /></div>
             <h1 id="start-heading">Capture the affected component.</h1>
             <p>Select a component or region, describe what happened, and send its screenshot and context to desktop review.</p>
 
             <div className="capture-actions">
-              <button className="capture-card capture-primary" disabled={capturing !== null} onClick={() => void startCapture("element")}>
+              <button
+                className="capture-card capture-primary"
+                disabled={capturing !== null}
+                aria-busy={capturing === "element"}
+                onClick={() => void startCapture("element")}
+              >
                 <span className="capture-card-icon"><MouseSimple size={20} /></span>
                 <span><strong>{capturing === "element" ? "Select on page" : "Component"}</strong><small>Controls, text, or images</small></span>
-                <Crosshair size={20} />
               </button>
-              <button className="capture-card" disabled={capturing !== null} onClick={() => void startCapture("region")}>
+              <button
+                className="capture-card"
+                disabled={capturing !== null}
+                aria-busy={capturing === "region"}
+                onClick={() => void startCapture("region")}
+              >
                 <span className="capture-card-icon"><Selection size={20} /></span>
                 <span><strong>{capturing === "region" ? "Drag on page" : "Region"}</strong><small>Several related elements</small></span>
-                <Selection size={20} />
               </button>
             </div>
 
@@ -858,12 +979,35 @@ export function App({ surface }: { surface: ExtensionSurface }) {
           <section className="evidence-view" aria-labelledby="evidence-heading">
             <div className="section-heading">
               <div><span className="step">Issue capture</span><h1 id="evidence-heading">Describe the issue</h1></div>
-              <button className="icon-button" onClick={() => void reset()} aria-label="Discard capture"><ArrowCounterClockwise size={20} /></button>
+              {armedConfirm === "discard-capture" ? (
+                <>
+                  <button
+                    className="button button-danger"
+                    autoFocus
+                    onClick={() => {
+                      disarmConfirm();
+                      void reset();
+                    }}
+                    onBlur={disarmConfirm}
+                  >
+                    Discard?
+                  </button>
+                  <button className="button button-quiet" onClick={disarmConfirm}>Cancel</button>
+                </>
+              ) : (
+                <button
+                  className="icon-button icon-button-danger"
+                  onClick={() => armConfirm("discard-capture")}
+                  aria-label="Discard capture"
+                >
+                  <Trash size={20} />
+                </button>
+              )}
             </div>
 
             {evidence.image ? (
               <figure className="capture-preview">
-                <img src={evidence.image.dataUrl} alt={`Page context showing ${targetLabel} highlighted in orange as issue 1`} />
+                <img src={evidence.image.dataUrl} alt={`Page screenshot with ${targetLabel} marked as issue 1`} />
                 <figcaption>
                   <span><ImageSquare size={16} /> {evidence.image.width} × {evidence.image.height}</span>
                   <strong><Crosshair size={16} /> {evidence.captureMode === "element" ? "Control highlighted" : "Region highlighted"}</strong>
@@ -946,21 +1090,45 @@ export function App({ surface }: { surface: ExtensionSurface }) {
             <div className="consent-copy"><ShieldCheck size={20} /><p>Nothing is sent until you choose the action below. Desktop drafts stay in Needs review until an auditor confirms them.</p></div>
             {desktopState === "connected" && selectedAudit ? (
               <div className="action-stack compact-actions">
-                <button className="button button-primary button-full" onClick={() => void queueForReview()} disabled={saving}>
+                <button
+                  className="button button-primary button-full"
+                  onClick={() => void queueForReview()}
+                  disabled={saving || generating}
+                  aria-busy={saving}
+                >
                   <Desktop size={20} /> {saving ? "Sending issue" : "Send to desktop review"}
                 </button>
-                <button className="button button-quiet button-full" onClick={() => void generateDraft()} disabled={generating}>
+                <button
+                  className="button button-quiet button-full"
+                  onClick={() => void generateDraft()}
+                  disabled={generating || saving}
+                  aria-busy={generating}
+                >
                   <MagicWand size={20} /> {generating ? "Preparing draft" : "Edit draft here instead"}
                 </button>
               </div>
             ) : (
               <div className="action-stack compact-actions">
-                <button className="button button-primary button-full" onClick={() => void generateDraft()} disabled={generating}>
+                <button
+                  className="button button-primary button-full"
+                  onClick={() => void generateDraft()}
+                  disabled={generating}
+                  aria-busy={generating}
+                >
                   <MagicWand size={20} /> {generating ? "Preparing draft" : "Create local draft"}
                 </button>
-                <button className="button button-quiet button-full" onClick={() => void checkDesktop(true)} disabled={desktopState === "checking"}>
-                  <Desktop size={20} /> Connect desktop
-                </button>
+                {desktopState === "connected" ? (
+                  <>
+                    <p className="helper-note">No audits yet. Create one in the desktop app, then refresh.</p>
+                    <button className="button button-secondary button-full" onClick={() => void checkDesktop(true)}>
+                      <ArrowCounterClockwise size={20} /> Refresh audits
+                    </button>
+                  </>
+                ) : (
+                  <button className="button button-quiet button-full" onClick={() => void checkDesktop(true)} disabled={desktopState === "checking"}>
+                    <Desktop size={20} /> Connect desktop app
+                  </button>
+                )}
               </div>
             )}
           </section>
@@ -980,10 +1148,7 @@ export function App({ surface }: { surface: ExtensionSurface }) {
               type="button"
               className="finding-identity"
               title={evidence.findingId}
-              onClick={() => {
-                void navigator.clipboard.writeText(evidence.findingId);
-                setStatus({ text: "Finding ID copied.", tone: "success" });
-              }}
+              onClick={() => void copyFindingId(evidence.findingId)}
             >
               <span>Immutable finding ID</span>
               <code>{compactFindingId(evidence.findingId)}</code>
@@ -1034,37 +1199,51 @@ export function App({ surface }: { surface: ExtensionSurface }) {
               {draft.wcag.length ? draft.wcag.map((mapping, index) => (
                 <div className="wcag-card" key={index}>
                   <div className="wcag-card-top">
-                    <select aria-label={`WCAG criterion ${index + 1}`} value={mapping.criterion} onChange={(event) => updateWcagCriterion(index, event.target.value)}>
-                      {WCAG_CRITERIA.map((criterion) => (
-                        <option
-                          key={criterion.sc}
-                          value={criterion.sc}
-                          disabled={draft.wcag.some((item, itemIndex) => itemIndex !== index && item.criterion === criterion.sc)}
-                        >
-                          {criterion.sc} {criterion.name} ({criterion.level})
-                        </option>
-                      ))}
-                    </select>
+                    <label className="wcag-field">
+                      <span>WCAG criterion<span className="visually-hidden"> {index + 1}</span></span>
+                      <select value={mapping.criterion} onChange={(event) => updateWcagCriterion(index, event.target.value)}>
+                        {WCAG_CRITERIA.map((criterion) => (
+                          <option
+                            key={criterion.sc}
+                            value={criterion.sc}
+                            disabled={draft.wcag.some((item, itemIndex) => itemIndex !== index && item.criterion === criterion.sc)}
+                          >
+                            {criterion.sc} {criterion.name} ({criterion.level})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                     <ConfidenceBadge value={mapping.confidence} />
-                    <button type="button" className="button button-quiet" aria-label={`Remove WCAG ${mapping.criterion}`} onClick={() => removeWcagMapping(index)}>
+                    <button type="button" className="button button-danger" aria-label={`Remove WCAG ${mapping.criterion}`} onClick={() => removeWcagMapping(index)}>
                       <Trash size={20} /> Remove
                     </button>
                   </div>
                   <strong>{mapping.name} · Level {mapping.level}</strong>
-                  <textarea aria-label={`WCAG rationale ${index + 1}`} rows={3} value={mapping.rationale} onChange={(event) => patchDraft({ wcag: draft.wcag.map((item, itemIndex) => itemIndex === index ? { ...item, rationale: event.target.value } : item) })} />
+                  <label className="wcag-field">
+                    <span>Rationale<span className="visually-hidden"> for criterion {index + 1}</span></span>
+                    <textarea rows={3} value={mapping.rationale} onChange={(event) => patchDraft({ wcag: draft.wcag.map((item, itemIndex) => itemIndex === index ? { ...item, rationale: event.target.value } : item) })} />
+                  </label>
                 </div>
               )) : <div className="quiet-callout"><Warning size={20} /><p>No criterion was assigned. Complete a manual review before saving this finding.</p></div>}
-              <button type="button" className="button button-secondary button-full" disabled={draft.wcag.length >= 8} onClick={addWcagMapping}>
+              <button
+                type="button"
+                className="button button-secondary button-full"
+                disabled={draft.wcag.length >= 8}
+                aria-describedby={draft.wcag.length >= 8 ? "wcag-cap-note" : undefined}
+                onClick={addWcagMapping}
+              >
                 <Plus size={20} /> Add WCAG criterion
               </button>
+              {draft.wcag.length >= 8 ? <p className="helper-note" id="wcag-cap-note">Maximum 8 criteria</p> : null}
             </section>
 
             <Field label="Suggested resolution" value={draft.recommendation} onChange={(recommendation) => patchDraft({ recommendation })} multiline rows={4} />
             <Field label="Example fix (optional)" value={draft.exampleFix} onChange={(exampleFix) => patchDraft({ exampleFix })} multiline rows={4} />
             <Field
               label="Reproduction steps"
-              value={draft.reproductionSteps.join("\n")}
-              onChange={(value) => patchDraft({ reproductionSteps: value.split("\n").map((step) => step.trim()).filter(Boolean) })}
+              value={reproductionStepsText}
+              onChange={setReproductionStepsText}
+              onBlur={() => patchDraft({ reproductionSteps: parseReproductionSteps(reproductionStepsText) })}
               multiline
               rows={4}
               hint="One step per line"
@@ -1077,12 +1256,12 @@ export function App({ surface }: { surface: ExtensionSurface }) {
 
             <div className="action-stack">
               {desktopState === "connected" && selectedAudit ? (
-                <button className="button button-primary button-full" disabled={saving} onClick={() => void saveFinding()}>
+                <button className="button button-primary button-full" disabled={saving} aria-busy={saving} onClick={() => void saveFinding()}>
                   <Check size={20} /> {saving ? "Saving finding" : `Save to ${selectedAuditName || "desktop audit"}`}
                 </button>
               ) : (
-                <button className="button button-secondary button-full" onClick={() => void checkDesktop(true)}>
-                  <Desktop size={20} /> Connect desktop to save
+                <button className="button button-secondary button-full" onClick={() => void checkDesktop(true)} disabled={desktopState === "checking"}>
+                  <Desktop size={20} /> Connect desktop app
                 </button>
               )}
               <button className="button button-secondary button-full" onClick={() => {
@@ -1091,7 +1270,26 @@ export function App({ surface }: { surface: ExtensionSurface }) {
                 setStatus({ text: "Markdown draft exported.", tone: "success" });
               }}><DownloadSimple size={20} /> Export Markdown</button>
               <button className="button button-quiet button-full" onClick={() => void copyFinding()}><Copy size={20} /> Copy finding</button>
-              <button className="button button-quiet button-full" onClick={() => void clearDraft()}><ArrowCounterClockwise size={20} /> Back to evidence</button>
+              {armedConfirm === "discard-draft" ? (
+                <div className="confirm-row">
+                  <button
+                    className="button button-danger"
+                    autoFocus
+                    onClick={() => {
+                      disarmConfirm();
+                      void clearDraft();
+                    }}
+                    onBlur={disarmConfirm}
+                  >
+                    Discard draft?
+                  </button>
+                  <button className="button button-quiet" onClick={disarmConfirm}>Cancel</button>
+                </div>
+              ) : (
+                <button className="button button-danger button-full" onClick={() => armConfirm("discard-draft")}>
+                  <Trash size={20} /> Discard draft
+                </button>
+              )}
             </div>
           </section>
         )}

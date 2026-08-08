@@ -34,7 +34,7 @@ import {
 import { findingStatusHistoryAfterChange } from "../shared/finding-lifecycle";
 import { findingPrimaryEvidenceCaptureIds } from "../shared/finding-evidence";
 import { desktop } from "./api";
-import { Button, Field } from "./components";
+import { Button, ConfirmDialog, Field, IconButton } from "./components";
 import { WCAG_CRITERIA } from "./data/wcag";
 import {
   cancellationMatchesPendingSession,
@@ -283,7 +283,7 @@ export function FindingEditorDialog({
   captures: CaptureEntry[];
   initialValue?: Partial<FindingEditorValue>;
   onClose: () => void;
-  onSave: (value: FindingEditorValue) => void;
+  onSave: (value: FindingEditorValue) => void | Promise<void>;
   onTicketUpdate?: (finding: Finding) => Promise<void> | void;
   auditId?: string;
   sampleItemId?: string;
@@ -305,6 +305,12 @@ export function FindingEditorDialog({
   const [prefillResult, setPrefillResult] = useState<AuditTemplatePrefillResult | null>(null);
   const [pendingCapture, setPendingCapture] = useState<PendingFindingCapture | null>(null);
   const [recentCaptures, setRecentCaptures] = useState<CaptureEntry[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [showValidation, setShowValidation] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [libraryCaptureId, setLibraryCaptureId] = useState("");
+  const initialSnapshotRef = useRef("");
   const credentialRef = useRef<HTMLInputElement>(null);
   const pendingCaptureRef = useRef<PendingFindingCapture | null>(null);
   const captureIntentRoleRef = useRef<FindingCaptureRole | null>(null);
@@ -336,7 +342,14 @@ export function FindingEditorDialog({
 
   useEffect(() => {
     if (open) {
-      setValue(valueWithProfileDefaults(valueFromFinding(finding, initialValue), loggingProfile));
+      const nextValue = valueWithProfileDefaults(valueFromFinding(finding, initialValue), loggingProfile);
+      setValue(nextValue);
+      initialSnapshotRef.current = JSON.stringify(nextValue);
+      setSaving(false);
+      setConfirmDiscard(false);
+      setShowValidation(false);
+      setSaveError("");
+      setLibraryCaptureId("");
       setRecentCaptures([]);
       captureIntentRoleRef.current = null;
       earlyCapturesRef.current.clear();
@@ -400,7 +413,12 @@ export function FindingEditorDialog({
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
+    if (open && !dialog.open) {
+      dialog.showModal();
+      requestAnimationFrame(() => {
+        dialog.querySelector<HTMLElement>("[data-initial-focus]")?.focus();
+      });
+    }
     if (!open && dialog.open) dialog.close();
   }, [open]);
 
@@ -689,44 +707,79 @@ export function FindingEditorDialog({
   const missingRetest = value.status === "fixed" && !value.retestNote.trim();
   const missingRiskAcceptance =
     value.status === "accepted" && !value.riskAcceptance.trim();
+  const missingTitle = !value.title.trim();
   const saveDisabled =
-    !value.title.trim() || missingRetest || missingRiskAcceptance || profileFieldErrors.length > 0;
+    missingTitle || missingRetest || missingRiskAcceptance || profileFieldErrors.length > 0;
+  const closeBlocked = saving || ticketBusy !== null || captureBusy || prefillBusy;
+
+  function requestClose() {
+    if (closeBlocked) return;
+    const dirty = JSON.stringify(value) !== initialSnapshotRef.current;
+    if (dirty || pendingCapture) {
+      setConfirmDiscard(true);
+      return;
+    }
+    onClose();
+  }
+
+  async function submitValue() {
+    if (saving) return;
+    if (saveDisabled) {
+      setShowValidation(true);
+      requestAnimationFrame(() => {
+        const dialog = ref.current;
+        dialog?.querySelector<HTMLElement>("[aria-invalid='true'], input:invalid, textarea:invalid, select:invalid")?.focus();
+      });
+      return;
+    }
+    setSaving(true);
+    setSaveError("");
+    try {
+      await Promise.resolve(onSave(value));
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <dialog
       ref={ref}
       className="modal-dialog finding-editor-dialog"
       aria-labelledby={titleId}
+      aria-describedby={`${titleId}-description`}
       onCancel={(event) => {
         event.preventDefault();
-        onClose();
+        requestClose();
       }}
       onClose={() => {
         if (open) onClose();
       }}
     >
       <form
+        noValidate
         onSubmit={(event) => {
           event.preventDefault();
-          if (!saveDisabled) onSave(value);
+          void submitValue();
         }}
       >
         <header className="finding-editor-heading">
           <div>
             <span>{finding ? "Finding record" : "Manual finding"}</span>
             <h2 id={titleId}>{finding ? "Edit audit finding" : "Document a new barrier"}</h2>
-            <p>Record observable behavior and user impact. Confirm mappings and severity before delivery.</p>
+            <p id={`${titleId}-description`}>Record observable behavior and user impact. Confirm mappings and severity before delivery.</p>
           </div>
-          <button type="button" aria-label="Close finding editor" onClick={onClose}>
+          <IconButton label="Close finding editor" onClick={requestClose}>
             <X size={20} />
-          </button>
+          </IconButton>
         </header>
 
         <div className="finding-editor-body">
           {loggingProfile ? (
             <section className="agency-logging-profile finding-editor-wide" aria-labelledby="agency-logging-profile-title">
               <div className="agency-logging-profile-heading">
-                <span><Sparkle size={20} /></span>
+                <span><Sparkle size={24} /></span>
                 <div>
                   <strong id="agency-logging-profile-title">{loggingProfile.templateName} format</strong>
                   <p>{loggingProfile.summary}</p>
@@ -743,7 +796,7 @@ export function FindingEditorDialog({
               <p className="agency-prefill-privacy">AI fill is optional. It sends this finding draft and the accepted field layout to the selected AI provider; attached capture images are not included.</p>
               {loggingProfile.instructions.length ? (
                 <details>
-                  <summary>Project logging instructions</summary>
+                  <summary>Agency format instructions</summary>
                   <ol>{loggingProfile.instructions.map((instruction) => <li key={instruction}>{instruction}</li>)}</ol>
                 </details>
               ) : null}
@@ -781,8 +834,9 @@ export function FindingEditorDialog({
                     ? prefillResult.values.find((suggestion) => suggestion.fieldId === field.id)
                     : undefined;
                   const fieldId = `agency-field-${activeLoggingLayout?.id}-${field.id}`;
+                  const showFieldError = showValidation && Boolean(fieldError);
                   return (
-                    <div className="agency-field-row" key={field.id} data-missing={(required && !current) || Boolean(validationError)}>
+                    <div className="agency-field-row" key={field.id} data-missing={showFieldError}>
                       <span className="agency-field-number">{index + 1}</span>
                       <div className="agency-field-content">
                         <label htmlFor={fieldId}>
@@ -792,35 +846,61 @@ export function FindingEditorDialog({
                         {field.kind === "long-text" ? (
                           <textarea
                             id={fieldId}
-                            autoFocus={index === 0}
+                            data-initial-focus={index === 0 ? "true" : undefined}
                             rows={3}
                             required={required}
+                            aria-invalid={showFieldError || undefined}
+                            aria-describedby={showFieldError ? `${fieldId}-error` : undefined}
                             minLength={field.validation?.minLength}
                             maxLength={field.validation?.maxLength ?? (field.sourceField === "title" ? 240 : undefined)}
                             value={current}
                             placeholder={field.example ?? field.defaultValue}
                             onChange={(event) => patchAgencyField(field, event.target.value)}
                           />
+                        ) : field.kind === "select" && field.sourceField === "affectedUsers" ? (
+                          <fieldset className="affected-users agency-affected-users" aria-describedby={showFieldError ? `${fieldId}-error` : undefined}>
+                            <legend className="sr-only">{field.label}</legend>
+                            <div>
+                              {field.options.map((option) => {
+                                const selected = current.split("\n").filter(Boolean);
+                                const checked = selected.includes(option);
+                                return (
+                                  <label key={option}>
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      data-initial-focus={index === 0 ? "true" : undefined}
+                                      onChange={() => patchAgencyField(field, (checked
+                                        ? selected.filter((item) => item !== option)
+                                        : [...selected, option]).join("\n"))}
+                                    />
+                                    <span>{option}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </fieldset>
                         ) : field.kind === "select" ? (
                           <select
                             id={fieldId}
-                            autoFocus={index === 0}
+                            data-initial-focus={index === 0 ? "true" : undefined}
                             required={required}
-                            multiple={field.sourceField === "affectedUsers"}
-                            value={field.sourceField === "affectedUsers" ? current.split("\n").filter(Boolean) : current}
-                            onChange={(event) => patchAgencyField(field, field.sourceField === "affectedUsers"
-                              ? [...event.target.selectedOptions].map((option) => option.value).join("\n")
-                              : event.target.value)}
+                            aria-invalid={showFieldError || undefined}
+                            aria-describedby={showFieldError ? `${fieldId}-error` : undefined}
+                            value={current}
+                            onChange={(event) => patchAgencyField(field, event.target.value)}
                           >
-                            {field.sourceField !== "affectedUsers" ? <option value="">Choose {field.label.toLowerCase()}</option> : null}
+                            <option value="">Choose {field.label}</option>
                             {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
                           </select>
                         ) : (
                           <input
                             id={fieldId}
-                            autoFocus={index === 0}
+                            data-initial-focus={index === 0 ? "true" : undefined}
                             type={field.kind === "date" ? "date" : field.kind === "url" ? "url" : field.kind === "number" ? "number" : "text"}
                             required={required}
+                            aria-invalid={showFieldError || undefined}
+                            aria-describedby={showFieldError ? `${fieldId}-error` : undefined}
                             minLength={field.validation?.minLength}
                             maxLength={field.validation?.maxLength ?? (field.sourceField === "title" ? 240 : undefined)}
                             value={current}
@@ -830,19 +910,19 @@ export function FindingEditorDialog({
                         )}
                         {field.sourceField !== "custom" ? <span className="agency-field-mapped is-complete"><Check size={16} /> Synced with {mappedLabel}</span> : null}
                         {aiSuggestion?.value ? <span className="agency-field-ai-note"><Sparkle size={16} /> AI suggestion ({aiSuggestion.confidence}): “{aiSuggestion.value.slice(0, 140)}{aiSuggestion.value.length > 140 ? "…" : ""}”. {aiSuggestion.reason}</span> : null}
-                        {fieldError ? <span className="agency-field-error" role="alert">{fieldError}</span> : null}
+                        {showFieldError ? <span className="agency-field-error" id={`${fieldId}-error`}>{fieldError}</span> : null}
                       </div>
                     </div>
                   );
                 })}
               </div>
               {prefillMessage ? <p className="agency-prefill-message" role="status">{prefillMessage}</p> : null}
-              {profileFieldErrors.length ? <p className="agency-profile-errors" role="alert">Complete {profileFieldErrors.length} required or invalid {profileFieldErrors.length === 1 ? "field" : "fields"} before saving.</p> : null}
+              {showValidation && profileFieldErrors.length ? <p className="agency-profile-errors" role="alert">Complete {profileFieldErrors.length} required or invalid {profileFieldErrors.length === 1 ? "field" : "fields"} before saving.</p> : null}
             </section>
           ) : null}
-          {!mappedProfileSources.has("title") ? <Field label="Issue title" className="finding-editor-wide">
+          {!mappedProfileSources.has("title") ? <Field label="Issue title" hint="Required" className="finding-editor-wide">
             <input
-              autoFocus
+              data-initial-focus="true"
               required
               maxLength={240}
               value={value.title}
@@ -881,7 +961,6 @@ export function FindingEditorDialog({
               </div>
               <Button
                 type="button"
-                variant="primary"
                 icon={Camera}
                 disabled={captureBusy}
                 onClick={() => void captureForFinding("evidence")}
@@ -906,15 +985,28 @@ export function FindingEditorDialog({
             ) : (
               <p className="finding-evidence-empty">No evidence attached yet.</p>
             )}
-            <label className="finding-evidence-existing">
-              <span>Attach from capture library</span>
-              <select value="" onChange={(event) => attachExistingCapture(event.target.value)}>
-                <option value="">Choose an existing capture</option>
-                {availableCaptures
-                  .filter((capture) => !value.evidenceCaptureIds.includes(capture.id))
-                  .map((capture) => <option key={capture.id} value={capture.id}>{capture.title}</option>)}
-              </select>
-            </label>
+            <div className="finding-evidence-existing">
+              <label>
+                <span>Attach from capture library</span>
+                <select value={libraryCaptureId} onChange={(event) => setLibraryCaptureId(event.target.value)}>
+                  <option value="">Choose an existing capture</option>
+                  {availableCaptures
+                    .filter((capture) => !value.evidenceCaptureIds.includes(capture.id))
+                    .map((capture) => <option key={capture.id} value={capture.id}>{capture.title}</option>)}
+                </select>
+              </label>
+              <Button
+                type="button"
+                disabled={!libraryCaptureId}
+                onClick={() => {
+                  if (!libraryCaptureId) return;
+                  attachExistingCapture(libraryCaptureId);
+                  setLibraryCaptureId("");
+                }}
+              >
+                Attach
+              </Button>
+            </div>
             {captureMessage ? <p className="finding-evidence-message" role="status">{captureMessage}</p> : null}
           </section>
           <div className="field">
@@ -925,7 +1017,7 @@ export function FindingEditorDialog({
                 {availableCaptures.map((capture) => <option key={capture.id} value={capture.id}>{capture.title}</option>)}
               </select>
             </label>
-            <button className="field-inline-action" type="button" disabled={captureBusy} onClick={() => void captureForFinding("before")}>Capture before</button>
+            <button className="field-inline-action" type="button" disabled={captureBusy} onClick={() => void captureForFinding("before")}>{pendingCaptureRole === "before" ? "Waiting for capture" : "Capture before"}</button>
           </div>
           <div className="field">
             <label>
@@ -935,7 +1027,7 @@ export function FindingEditorDialog({
                 {availableCaptures.map((capture) => <option key={capture.id} value={capture.id}>{capture.title}</option>)}
               </select>
             </label>
-            <button className="field-inline-action" type="button" disabled={captureBusy} onClick={() => void captureForFinding("after")}>Capture after</button>
+            <button className="field-inline-action" type="button" disabled={captureBusy} onClick={() => void captureForFinding("after")}>{pendingCaptureRole === "after" ? "Waiting for capture" : "Capture after"}</button>
           </div>
           {!mappedProfileSources.has("comparisonNote") ? <Field
             label="Evidence comparison note"
@@ -977,7 +1069,7 @@ export function FindingEditorDialog({
               placeholder="Team or person responsible"
             />
           </Field> : null}
-          {!mappedProfileSources.has("ticket") ? <Field label="Ticket or reference">
+          {!mappedProfileSources.has("ticket") ? <Field label="Ticket or reference" hint={value.ticketLink ? "Managed by the linked ticket" : undefined}>
             <input
               value={value.ticket}
               onChange={(event) => patch("ticket", event.target.value)}
@@ -1003,7 +1095,7 @@ export function FindingEditorDialog({
           {finding ? (
             <section className="finding-ticket-panel finding-editor-wide" aria-labelledby="finding-ticket-heading">
               <div className="finding-ticket-heading">
-                <span aria-hidden="true"><Ticket size={20} /></span>
+                <span aria-hidden="true"><Ticket size={24} /></span>
                 <div>
                   <h3 id="finding-ticket-heading">Create ticket</h3>
                   <p>Send this finding without retyping it. External changes always wait for auditor review.</p>
@@ -1040,7 +1132,7 @@ export function FindingEditorDialog({
                       disabled={ticketBusy !== null}
                       onClick={() => void syncTicket()}
                     >
-                      {ticketBusy === "sync" ? "Checking..." : "Re-sync"}
+                      {ticketBusy === "sync" ? "Checking" : "Re-sync"}
                     </Button>
                   </div>
                 </div>
@@ -1060,12 +1152,11 @@ export function FindingEditorDialog({
                   </Field>
                   <Button
                     type="button"
-                    variant="primary"
                     icon={LinkSimple}
                     disabled={ticketBusy !== null || !connectorDraft?.configured}
                     onClick={() => void createTicket()}
                   >
-                    {ticketBusy === "create" ? "Creating..." : `Create in ${connectorDraft?.label ?? "connector"}`}
+                    {ticketBusy === "create" ? "Creating" : `Create in ${connectorDraft?.label ?? "connector"}`}
                   </Button>
                 </div>
               )}
@@ -1110,7 +1201,7 @@ export function FindingEditorDialog({
               ) : null}
 
               <details className="finding-ticket-settings">
-                <summary><GearSix size={16} /> Connector settings and field mapping</summary>
+                <summary><GearSix size={20} /> Connector settings and field mapping</summary>
                 <div className="finding-ticket-settings-body">
                   <div className="finding-ticket-settings-intro">
                     <Field label="Configure connector">
@@ -1155,18 +1246,20 @@ export function FindingEditorDialog({
                               <input
                                 value={connectorDraft.mapping[field]}
                                 onChange={(event) => patchMapping(field, event.target.value)}
-                                aria-label={`External field for ${TICKET_FIELD_LABELS[field]}`}
                               />
                             </label>
                           ))}
                         </div>
                       </div>
                       <div className="finding-ticket-settings-actions">
+                        {!ticketConfiguration?.secureStorageAvailable ? (
+                          <p className="finding-ticket-storage-note" role="status">Secure credential storage is unavailable on this device, so connector credentials cannot be saved.</p>
+                        ) : null}
                         {connectorDraft.configured ? (
                           <Button type="button" disabled={ticketBusy !== null} onClick={() => void removeConnector()}>Remove credentials</Button>
                         ) : null}
-                        <Button type="button" variant="primary" disabled={ticketBusy !== null || !ticketConfiguration?.secureStorageAvailable} onClick={() => void saveConnector()}>
-                          {ticketBusy === "configure" ? "Saving..." : "Save connector"}
+                        <Button type="button" disabled={ticketBusy !== null || !ticketConfiguration?.secureStorageAvailable} onClick={() => void saveConnector()}>
+                          {ticketBusy === "configure" ? "Saving" : "Save connector"}
                         </Button>
                       </div>
                     </>
@@ -1177,7 +1270,7 @@ export function FindingEditorDialog({
           ) : null}
           {!mappedProfileSources.has("description") ? <Field label="Issue description" className="finding-editor-wide">
             <textarea
-              rows={3}
+              rows={4}
               value={value.description}
               onChange={(event) => patch("description", event.target.value)}
               placeholder="Summarize the accessibility barrier and where it occurs."
@@ -1264,6 +1357,12 @@ export function FindingEditorDialog({
             </p>
             {value.occurrences.length ? (
               <div className="occurrence-editor-list">
+                <div className="occurrence-editor-row occurrence-editor-head" aria-hidden="true">
+                  <span>Location</span>
+                  <span>Capture</span>
+                  <span>Note</span>
+                  <span />
+                </div>
                 {value.occurrences.map((occurrence, index) => (
                   <div className="occurrence-editor-row" key={occurrence.id}>
                     <input
@@ -1362,7 +1461,7 @@ export function FindingEditorDialog({
               placeholder="Optional internal note, ticket reference, or owner."
             />
           </Field> : null}
-          {!mappedProfileSources.has("retestNote") ? <Field label="Retest record" hint="Record the build, date, environment, and outcome when remediation is checked.">
+          {!mappedProfileSources.has("retestNote") ? <Field label="Retest record" hint="Required when status is Verified fixed. Record the build, date, environment, and outcome when remediation is checked.">
             <textarea
               rows={3}
               value={value.retestNote}
@@ -1385,19 +1484,34 @@ export function FindingEditorDialog({
         </div>
 
         <footer className="finding-editor-actions">
-          {missingRetest ? (
+          {saveError ? (
+            <p role="alert">{saveError}</p>
+          ) : showValidation && missingTitle ? (
+            <p role="alert">Add an issue title before saving.</p>
+          ) : showValidation && missingRetest ? (
             <p role="alert">Add a retest record before marking this verified fixed.</p>
-          ) : missingRiskAcceptance ? (
+          ) : showValidation && missingRiskAcceptance ? (
             <p role="alert">Add a rationale before recording accepted risk.</p>
-          ) : profileFieldErrors.length ? (
-            <p role="alert">{profileFieldErrors.map((error) => error.message).join(" ")}</p>
           ) : null}
-          <Button onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="primary" icon={FloppyDisk} disabled={saveDisabled}>
-            {finding ? "Save finding" : "Create finding"}
+          <Button disabled={saving} onClick={requestClose}>Cancel</Button>
+          <Button type="submit" variant="primary" icon={FloppyDisk} disabled={saving}>
+            {saving ? "Saving" : finding ? "Save finding" : "Create finding"}
           </Button>
         </footer>
       </form>
+      <ConfirmDialog
+        open={confirmDiscard}
+        title="Discard changes to this finding?"
+        description={pendingCapture
+          ? "A capture is still in progress and will not attach if you close. Unsaved edits will be lost."
+          : "Unsaved edits to this finding will be lost."}
+        confirmLabel="Discard changes"
+        onConfirm={() => {
+          setConfirmDiscard(false);
+          onClose();
+        }}
+        onCancel={() => setConfirmDiscard(false)}
+      />
     </dialog>
   );
 }

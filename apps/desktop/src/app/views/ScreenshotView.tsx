@@ -17,14 +17,7 @@ import type { Account, CaptureEntry } from "../../shared/desktop";
 import { issueTypeOf, parseDoc } from "../../lib/annotate/model";
 import { desktop, listCaptures } from "../api";
 import { renderCaptureDataUrl } from "../capture-render";
-import {
-  Button,
-  ConfirmDialog,
-  EmptyState,
-  Field,
-  StatusBadge,
-  Toast,
-} from "../components";
+import { Button, ConfirmDialog, EmptyState, ErrorState, Field, LoadingState, StatusBadge, Toast } from "../components";
 import { messageFromError, useTransientMessage } from "../hooks";
 import { LatestRequest } from "../latest-request";
 
@@ -48,6 +41,9 @@ export function ScreenshotView({
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const [working, setWorking] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [loadNonce, setLoadNonce] = useState(0);
   const [deleteTarget, setDeleteTarget] = useState<CaptureEntry | null>(null);
   const [shareTarget, setShareTarget] = useState<CaptureEntry | null>(null);
   const [shareTitle, setShareTitle] = useState("");
@@ -55,9 +51,10 @@ export function ScreenshotView({
   const [shareApproved, setShareApproved] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState("");
   const [account, setAccount] = useState<Account>({ signedIn: false });
-  const [message, show, clearMessage] = useTransientMessage(5000);
+  const [message, show, clearMessage] = useTransientMessage();
   const shareDialog = useRef<HTMLDialogElement>(null);
   const captureLoader = useRef(new LatestRequest<CaptureEntry[]>());
+  const libraryRef = useRef<HTMLElement | null>(null);
 
   async function loadCaptureLibrary(): Promise<CaptureEntry[] | null> {
     return captureLoader.current.run(
@@ -80,9 +77,13 @@ export function ScreenshotView({
   }
 
   useEffect(() => {
+    setLoadError("");
     void Promise.all([loadCaptureLibrary(), desktop.invoke<Account>("auth:account")])
-      .then(([, nextAccount]) => setAccount(nextAccount))
-      .catch(reportLoadFailure);
+      .then(([, nextAccount]) => {
+        setAccount(nextAccount);
+        setLoaded(true);
+      })
+      .catch((error) => setLoadError(messageFromError(error, "The screenshot library could not be loaded.")));
     const offCapture = desktop.on("capture:saved", () => {
       void loadCaptureLibrary().catch(reportLoadFailure);
     });
@@ -96,7 +97,7 @@ export function ScreenshotView({
       offCapture();
       offAccount();
     };
-  }, []);
+  }, [loadNonce]);
 
   useEffect(() => {
     const dialog = shareDialog.current;
@@ -164,6 +165,7 @@ export function ScreenshotView({
       setDeleteTarget(null);
       await refresh();
       show("Screenshot deleted");
+      libraryRef.current?.focus();
     } catch (error) {
       show(messageFromError(error), true);
     } finally {
@@ -201,7 +203,7 @@ export function ScreenshotView({
   async function signIn() {
     try {
       await desktop.invoke("auth:sign-in");
-      show("Complete sign in in your browser");
+      show("Continue in your browser to finish signing in");
     } catch (error) {
       show(messageFromError(error), true);
     }
@@ -255,6 +257,14 @@ export function ScreenshotView({
     }
   }
 
+
+  if (loadError) {
+    return <ErrorState message={loadError} onRetry={() => setLoadNonce((n) => n + 1)} />;
+  }
+  if (!loaded) {
+    return <LoadingState label="Loading the screenshot library" />;
+  }
+
   return (
     <div className="screenshot-view">
       {!shareTarget ? <Toast message={message} /> : null}
@@ -297,7 +307,7 @@ export function ScreenshotView({
           <span>{captures.length} stored locally outside every audit</span>
         </div>
         <label className="search-field">
-          <MagnifyingGlass size={16} />
+          <MagnifyingGlass size={20} />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -310,7 +320,7 @@ export function ScreenshotView({
         </Button>
       </div>
 
-      <section className="capture-library screenshot-library" aria-label="Standalone screenshots">
+      <section ref={libraryRef} tabIndex={-1} className="capture-library screenshot-library" aria-label="Standalone screenshots">
         {filtered.length ? (
           filtered.map((entry) => (
             <article className="capture-card screenshot-card" key={entry.id}>
@@ -338,6 +348,7 @@ export function ScreenshotView({
               </div>
               <div className="screenshot-card-actions" aria-label={`Actions for ${entry.title}`}>
                 <button
+                  disabled={Boolean(working)}
                   onClick={() => openCapture(entry.id)}
                   aria-label={`Annotate ${entry.title}`}
                   title="Annotate"
@@ -355,11 +366,13 @@ export function ScreenshotView({
                   title="Export PNG"
                 ><DownloadSimple size={20} /></button>
                 <button
+                  disabled={Boolean(working)}
                   onClick={() => openShare(entry)}
                   aria-label={`Share ${entry.title}`}
                   title="Create share link"
                 ><ShareNetwork size={20} /></button>
                 <button
+                  disabled={Boolean(working)}
                   onClick={() => setDeleteTarget(entry)}
                   aria-label={`Delete ${entry.title}`}
                   title="Delete"
@@ -377,7 +390,9 @@ export function ScreenshotView({
                 : "Capture any app or screen, annotate it, then copy, export, or share it in your own workflow."
             }
             action={
-              !query ? (
+              query ? (
+                <Button onClick={() => setQuery("")}>Clear search</Button>
+              ) : (
                 <Button
                   variant="primary"
                   icon={FrameCorners}
@@ -385,7 +400,7 @@ export function ScreenshotView({
                 >
                   Capture a region
                 </Button>
-              ) : undefined
+              )
             }
           />
         )}

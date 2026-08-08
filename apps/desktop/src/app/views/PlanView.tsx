@@ -38,7 +38,7 @@ import {
 import { AuditCoverageMap } from "../AuditCoverageMap";
 import { AuditTemplateProjectSettings } from "../AuditTemplateProjectSettings";
 import { auditStoreKey, type RecordAuditActivity } from "../audits";
-import { Button, ConfirmDialog, Field, Toast } from "../components";
+import { Button, ConfirmDialog, EmptyState, ErrorState, Field, LoadingState, Toast } from "../components";
 import { messageFromError, useTransientMessage } from "../hooks";
 import {
   AUDIT_TEST_SCRIPTS,
@@ -101,6 +101,10 @@ export function PlanView({
     checklist: Record<string, AuditChecklistEntry>;
   }>({ captures: [], findings: [], checklist: {} });
   const [loadedAuditId, setLoadedAuditId] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [sampleError, setSampleError] = useState("");
+  const [addingTestRun, setAddingTestRun] = useState(false);
+  const [loadNonce, setLoadNonce] = useState(0);
   const [personalTemplates, setPersonalTemplates] = useState<AuditTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState(BUILT_IN_AUDIT_TEMPLATES[0].id);
   const [templateName, setTemplateName] = useState("");
@@ -168,6 +172,7 @@ export function PlanView({
 
   useEffect(() => {
     let cancelled = false;
+    setLoadError("");
     setLoadedAuditId("");
     setItems([]);
     setTestRuns([]);
@@ -194,12 +199,12 @@ export function PlanView({
         setLoadedAuditId(audit.id);
       })
       .catch((error) => {
-        if (!cancelled) show(messageFromError(error), true);
+        if (!cancelled) setLoadError(messageFromError(error));
       });
     return () => {
       cancelled = true;
     };
-  }, [audit.id, sampleKey, testRunsKey]);
+  }, [audit.id, sampleKey, testRunsKey, loadNonce]);
 
   useEffect(() => {
     setScoperTargetType("auto");
@@ -237,9 +242,10 @@ export function PlanView({
   async function addSample(event: FormEvent) {
     event.preventDefault();
     if (!label.trim()) {
-      show("Add a clear page, flow, component, document, or state name.", true);
+      setSampleError("Add a clear page, flow, component, document, or state name.");
       return;
     }
+    setSampleError("");
     const now = Date.now();
     const item: AuditSampleItem = {
       id: crypto.randomUUID(),
@@ -481,6 +487,16 @@ export function PlanView({
   }
 
   async function addTestScript() {
+    if (addingTestRun) return;
+    setAddingTestRun(true);
+    try {
+      await addTestScriptInner();
+    } finally {
+      setAddingTestRun(false);
+    }
+  }
+
+  async function addTestScriptInner() {
     const script = AUDIT_TEST_SCRIPTS.find(
       (item) => item.id === selectedScriptId,
     );
@@ -587,12 +603,20 @@ export function PlanView({
     }
   }
 
+
+  if (loadError) {
+    return <ErrorState message={loadError} onRetry={() => setLoadNonce((n) => n + 1)} />;
+  }
+  if (loadedAuditId !== audit.id) {
+    return <LoadingState label="Loading the audit plan" />;
+  }
+
   return (
     <div className="audit-plan-view">
       <Toast message={message} />
       <section className="audit-scoper" aria-labelledby="audit-scoper-title">
         <div className="audit-scoper-heading">
-          <div className="audit-scoper-icon"><MagicWand size={20} /></div>
+          <div className="audit-scoper-icon"><MagicWand size={24} /></div>
           <div>
             <span className="section-label">Built-in scoper</span>
             <h2 id="audit-scoper-title">Build an audit-ready scope</h2>
@@ -638,7 +662,7 @@ export function PlanView({
                 disabled={audit.demo || discoveryBusy || !audit.target.trim() || loadedAuditId !== audit.id}
                 onClick={() => void inspectWebsite()}
               >
-                {audit.demo ? "Bundled sample" : discoveryBusy ? "Inspecting public pages…" : discovery ? "Inspect website again" : "Inspect website"}
+                {audit.demo ? "Bundled sample" : discoveryBusy ? "Inspecting public pages" : discovery ? "Inspect website again" : "Inspect website"}
               </Button>
               <small>
                 {audit.demo
@@ -1033,9 +1057,15 @@ export function PlanView({
           <Field label="Sample item">
             <input
               value={label}
-              onChange={(event) => setLabel(event.target.value)}
+              aria-invalid={sampleError ? true : undefined}
+              aria-describedby={sampleError ? "sample-label-error" : undefined}
+              onChange={(event) => {
+                setLabel(event.target.value);
+                if (sampleError) setSampleError("");
+              }}
               placeholder="Checkout payment error"
             />
+            {sampleError ? <span className="field-error" id="sample-label-error" role="alert">{sampleError}</span> : null}
           </Field>
           <Field label="URL or location">
             <input
@@ -1096,13 +1126,11 @@ export function PlanView({
             ))}
           </div>
         ) : (
-          <div className="sample-empty">
-            <WarningCircle size={20} />
-            <div>
-              <strong>No structured sample yet</strong>
-              <p>Add the critical tasks and representative interface types that will be tested.</p>
-            </div>
-          </div>
+          <EmptyState
+            icon={ClipboardText}
+            title="No structured sample yet"
+            body="Add the critical tasks and representative interface types that will be tested."
+          />
         )}
       </section>
 
@@ -1143,7 +1171,7 @@ export function PlanView({
           <p>
             {AUDIT_TEST_SCRIPTS.find((script) => script.id === selectedScriptId)?.description}
           </p>
-          <Button icon={Plus} onClick={() => void addTestScript()}>
+          <Button icon={Plus} busy={addingTestRun} busyLabel="Adding test run" onClick={() => void addTestScript()}>
             Add test run
           </Button>
         </div>
@@ -1182,10 +1210,12 @@ export function PlanView({
                         </select>
                       </Field>
                       <button
-                        className="text-action danger-action"
+                        className="row-action"
+                        aria-label={`Remove test run ${run.title}`}
+                        title="Remove test run"
                         onClick={() => setTestRunToDelete(run)}
                       >
-                        Remove test run
+                        <Trash size={20} />
                       </button>
                     </div>
                     <ol className="test-step-list">
@@ -1240,13 +1270,11 @@ export function PlanView({
             })}
           </div>
         ) : (
-          <div className="sample-empty">
-            <ClipboardText size={20} />
-            <div>
-              <strong>No guided test runs yet</strong>
-              <p>Add the scripts that match the tasks and content in this audit.</p>
-            </div>
-          </div>
+          <EmptyState
+            icon={ClipboardText}
+            title="No guided test runs yet"
+            body="Add the scripts that match the tasks and content in this audit."
+          />
         )}
       </section>
 

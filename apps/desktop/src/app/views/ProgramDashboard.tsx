@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { ChartBarHorizontal, Info, WarningCircle } from "../Icon";
+import { ChartBarHorizontal, ClipboardText, Info, WarningCircle } from "../Icon";
 import type {
   AuditProject,
   AuditSampleItem,
@@ -15,6 +15,7 @@ import {
   type ProgramMetrics,
 } from "../program-metrics";
 import { messageFromError } from "../hooks";
+import { ErrorState } from "../components";
 
 function percentage(value: number | null): string {
   return value === null ? "Unavailable" : `${value.toLocaleString()}%`;
@@ -41,8 +42,8 @@ function MetricCard({
   note: string;
 }) {
   return (
-    <section className="program-metric-card">
-      <span>{label}</span>
+    <section className="program-metric-card" aria-label={label}>
+      <span aria-hidden="true">{label}</span>
       <strong>{value}</strong>
       <p>{detail}</p>
       <small>{note}</small>
@@ -72,7 +73,7 @@ function ChartTablePanel({
           <h2 id={`${chartId}-heading`}>{title}</h2>
           <p>{description}</p>
         </div>
-        <ChartBarHorizontal size={20} aria-hidden="true" />
+        <ChartBarHorizontal size={24} aria-hidden="true" />
       </div>
       <div className="program-chart-table">
         <figure
@@ -100,7 +101,7 @@ export function ProgramDashboardView({ metrics }: { metrics: ProgramMetrics }) {
   return (
     <div className="program-dashboard">
       <section className="program-boundary" aria-labelledby="program-boundary-title">
-        <Info size={20} aria-hidden="true" />
+        <Info size={24} aria-hidden="true" />
         <div>
           <h2 id="program-boundary-title">Operational trends, not conformance</h2>
           <p>
@@ -117,7 +118,7 @@ export function ProgramDashboardView({ metrics }: { metrics: ProgramMetrics }) {
           value={percentage(metrics.recurrence.percent)}
           detail={
             metrics.recurrence.denominator
-              ? `${metrics.recurrence.numerator} of ${metrics.recurrence.denominator} timestamped component–criterion fixes later appeared in another finding.`
+              ? `${metrics.recurrence.numerator} of ${metrics.recurrence.denominator} timestamped component and criterion fixes later appeared in another finding.`
               : "No timestamped component fixes are available yet."
           }
           note={`${metrics.recurrence.notObservedAgain} not observed again; absence is not a pass. ${metrics.recurrence.fixedWithoutTimestamp} verified component finding record${metrics.recurrence.fixedWithoutTimestamp === 1 ? " was" : "s were"} excluded because the fix time is missing.`}
@@ -125,7 +126,7 @@ export function ProgramDashboardView({ metrics }: { metrics: ProgramMetrics }) {
         <MetricCard
           label="Median retest time"
           value={duration(metrics.retestTime.medianMilliseconds)}
-          detail={`${metrics.retestTime.verifiedTransitions} explicit ready-for-retest → verified transition${metrics.retestTime.verifiedTransitions === 1 ? "" : "s"}.`}
+          detail={`${metrics.retestTime.verifiedTransitions} explicit ready-for-retest to verified transition${metrics.retestTime.verifiedTransitions === 1 ? "" : "s"}.`}
           note={`${metrics.retestTime.fixedEventsMissingReadyTimestamp} verified event${metrics.retestTime.fixedEventsMissingReadyTimestamp === 1 ? "" : "s"} excluded because the ready timestamp is missing.`}
         />
         <MetricCard
@@ -152,7 +153,7 @@ export function ProgramDashboardView({ metrics }: { metrics: ProgramMetrics }) {
 
       <section className="program-coverage-context" aria-labelledby="program-coverage-title">
         <div>
-          <span>Coverage context</span>
+          <span className="section-label">Coverage context</span>
           <h2 id="program-coverage-title">Untested work stays visible</h2>
           <p>Raw counts only. They are never folded into an overall percentage.</p>
         </div>
@@ -196,7 +197,7 @@ export function ProgramDashboardView({ metrics }: { metrics: ProgramMetrics }) {
           table={(
             <table id="program-recurrence-table">
               <caption>Table equivalent for previously fixed failures observed again</caption>
-              <thead><tr><th scope="col">Component</th><th scope="col">Previously fixed component–criterion pairs</th><th scope="col">Observed again</th><th scope="col">Not observed again</th></tr></thead>
+              <thead><tr><th scope="col">Component</th><th scope="col">Previously fixed Component / criterion pairs</th><th scope="col">Observed again</th><th scope="col">Not observed again</th></tr></thead>
               <tbody>
                 {metrics.recurrence.byComponent.map((component) => (
                   <tr key={component.component}>
@@ -247,7 +248,7 @@ export function ProgramDashboardView({ metrics }: { metrics: ProgramMetrics }) {
         />
       ) : (
         <section className="program-empty" aria-labelledby="program-empty-title">
-          <WarningCircle size={24} aria-hidden="true" />
+          <ClipboardText size={32} aria-hidden="true" />
           <div>
             <h2 id="program-empty-title">No component history yet</h2>
             <p>Link confirmed findings to representative sample items of type Component to build longitudinal hotspots and recurrence history.</p>
@@ -275,6 +276,7 @@ async function loadProgramAudit(audit: AuditProject): Promise<ProgramAuditInput>
 export function ProgramDashboard({ audits }: { audits: AuditProject[] }) {
   const [metrics, setMetrics] = useState<ProgramMetrics | null>(null);
   const [error, setError] = useState("");
+  const [loadNonce, setLoadNonce] = useState(0);
   const auditIdentity = useMemo(
     () => audits.map((audit) => `${audit.id}:${audit.updatedAt}`).join("|"),
     [audits],
@@ -292,14 +294,14 @@ export function ProgramDashboard({ audits }: { audits: AuditProject[] }) {
         if (active) setError(messageFromError(loadError));
       });
     return () => { active = false; };
-  }, [auditIdentity, audits]);
+  }, [auditIdentity, audits, loadNonce]);
 
   if (error) {
     return (
-      <section className="program-empty" role="alert">
-        <WarningCircle size={24} aria-hidden="true" />
-        <div><h2>Program data could not be loaded</h2><p>{error}</p></div>
-      </section>
+      <ErrorState
+        message={`Program data could not be loaded. ${error}`}
+        onRetry={() => setLoadNonce((n) => n + 1)}
+      />
     );
   }
   if (!metrics) {

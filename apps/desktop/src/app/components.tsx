@@ -46,6 +46,8 @@ export function Button({
   icon: Icon,
   type = "button",
   disabled = false,
+  busy = false,
+  busyLabel,
   className = "",
 }: {
   children: ReactNode;
@@ -55,6 +57,8 @@ export function Button({
   icon?: IconComponent;
   type?: "button" | "submit";
   disabled?: boolean;
+  busy?: boolean;
+  busyLabel?: string;
   className?: string;
 }) {
   return (
@@ -62,12 +66,38 @@ export function Button({
       id={id}
       type={type}
       onClick={onClick}
-      disabled={disabled}
+      disabled={disabled || busy}
+      aria-busy={busy || undefined}
       className={`button button-${variant} ${className}`}
     >
       {Icon ? <Icon size={20} /> : null}
-      {children}
+      {busy && busyLabel ? busyLabel : children}
     </button>
+  );
+}
+
+export function LoadingState({ label = "Loading" }: { label?: string }) {
+  return (
+    <div className="loading-state" role="status">
+      <span className="loading-state-dots" aria-hidden="true"><i /><i /><i /></span>
+      <span>{label}</span>
+    </div>
+  );
+}
+
+export function ErrorState({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry?: () => void;
+}) {
+  return (
+    <div className="error-state" role="alert">
+      <WarningCircle size={20} weight="fill" />
+      <p>{message}</p>
+      {onRetry ? <Button onClick={onRetry}>Try again</Button> : null}
+    </div>
   );
 }
 
@@ -228,6 +258,7 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
   busy = false,
+  busyLabel,
 }: {
   open: boolean;
   title: string;
@@ -236,6 +267,7 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
   busy?: boolean;
+  busyLabel?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -276,7 +308,7 @@ export function ConfirmDialog({
           Cancel
         </Button>
         <Button variant="danger" disabled={busy} onClick={onConfirm}>
-          {busy ? "Working" : confirmLabel}
+          {busy ? busyLabel ?? "Working" : confirmLabel}
         </Button>
       </div>
     </dialog>

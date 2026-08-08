@@ -622,6 +622,8 @@ export interface LensFrame {
 
 export type DesktopEvent =
   | "annotate:flush"
+  | "annotate:undo"
+  | "annotate:redo"
   | "overlay:init"
   | "overlay:progress"
   | "capture:result"

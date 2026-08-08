@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Aperture,
-  ArrowSquareOut,
+  ArrowsOutSimple,
   Eye,
   EyeSlash,
   LockKey,
@@ -103,7 +103,7 @@ export function VisionView() {
               Inspect any visible interface without importing files.
             </small>
           </span>
-          <b>System wide</b>
+          <StatusBadge tone="neutral">System wide</StatusBadge>
         </div>
         <div>
           <SlidersHorizontal size={20} />
@@ -114,7 +114,7 @@ export function VisionView() {
               contrast.
             </small>
           </span>
-          <b>Live controls</b>
+          <StatusBadge tone="neutral">Live controls</StatusBadge>
         </div>
         <div>
           <LockKey size={20} />
@@ -125,12 +125,12 @@ export function VisionView() {
               exclusion.
             </small>
           </span>
-          <b>Capture safe</b>
+          <StatusBadge tone="neutral">Capture safe</StatusBadge>
         </div>
       </section>
 
       <section className="vision-note">
-        <ArrowSquareOut size={20} />
+        <ArrowsOutSimple size={20} />
         <div>
           <strong>Move the lens over the interface you are testing</strong>
           <p>

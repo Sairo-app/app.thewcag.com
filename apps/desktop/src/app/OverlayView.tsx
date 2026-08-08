@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Crosshair, FrameCorners, Ruler, X } from "./Icon";
 import type { OverlayResult, OverlaySession, PickedColor, Point } from "../shared/desktop";
+import { rgbToHex } from "@accessibility-build/a11y-core";
 import { desktop } from "./api";
 import { messageFromError } from "./hooks";
 
-function toHex(r: number, g: number, b: number) { return `#${[r, g, b].map((value) => value.toString(16).padStart(2, "0")).join("")}`.toUpperCase(); }
+const LOUPE_SIZE = 132;
+const LOUPE_TOTAL_W = 146;
+const LOUPE_TOTAL_H = 186;
 
 export function OverlayView() {
   const [session, setSession] = useState<OverlaySession | null>(null);
@@ -47,17 +50,28 @@ export function OverlayView() {
         event.preventDefault(); const step = event.shiftKey ? 10 : 1;
         setCursor((point) => ({ x: Math.max(0, Math.min(innerWidth - 1, point.x + (event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0))), y: Math.max(0, Math.min(innerHeight - 1, point.y + (event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0))) }));
       }
-      if (event.key === "Enter" && session?.mode !== "capture" && session?.mode !== "measure") void pick(cursor).catch(reportOverlayFailure);
+      if (event.key === "Enter") {
+        if (session?.mode === "capture" || session?.mode === "measure") {
+          event.preventDefault();
+          if (!start) {
+            setStart({ ...cursor });
+          } else {
+            void finishRegion({ ...cursor }).catch(reportOverlayFailure);
+          }
+        } else {
+          void pick(cursor).catch(reportOverlayFailure);
+        }
+      }
     };
     window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
-  }, [cursor, session, first]);
+  }, [cursor, session, first, start]);
 
   useEffect(() => {
     if (!canvasRef.current || !loupeRef.current || !image) return;
     const source = canvasRef.current, loupe = loupeRef.current, ctx = loupe.getContext("2d")!;
     const sx = cursor.x / innerWidth * source.width, sy = cursor.y / innerHeight * source.height;
-    ctx.imageSmoothingEnabled = false; ctx.clearRect(0, 0, 132, 132); ctx.drawImage(source, sx - 9, sy - 9, 18, 18, 0, 0, 132, 132);
-    ctx.strokeStyle = "rgba(255,255,255,.95)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(66, 0); ctx.lineTo(66, 132); ctx.moveTo(0, 66); ctx.lineTo(132, 66); ctx.stroke();
+    ctx.imageSmoothingEnabled = false; ctx.clearRect(0, 0, LOUPE_SIZE, LOUPE_SIZE); ctx.drawImage(source, sx - 9, sy - 9, 18, 18, 0, 0, LOUPE_SIZE, LOUPE_SIZE);
+    ctx.strokeStyle = "rgba(255,255,255,.95)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(LOUPE_SIZE / 2, 0); ctx.lineTo(LOUPE_SIZE / 2, LOUPE_SIZE); ctx.moveTo(0, LOUPE_SIZE / 2); ctx.lineTo(LOUPE_SIZE, LOUPE_SIZE / 2); ctx.stroke();
   }, [cursor, image]);
 
   function sampled(point: Point): PickedColor | null {
@@ -65,7 +79,7 @@ export function OverlayView() {
     const px = Math.max(0, Math.min(canvas.width - 1, Math.floor(point.x / innerWidth * canvas.width)));
     const py = Math.max(0, Math.min(canvas.height - 1, Math.floor(point.y / innerHeight * canvas.height)));
     const [r, g, b] = canvas.getContext("2d", { willReadFrequently: true })!.getImageData(px, py, 1, 1).data;
-    return { x: point.x + session.display.bounds.x, y: point.y + session.display.bounds.y, r, g, b, hex: toHex(r, g, b) };
+    return { x: point.x + session.display.bounds.x, y: point.y + session.display.bounds.y, r, g, b, hex: rgbToHex({ r, g, b }).toUpperCase() };
   }
   function reportOverlayFailure(reason: unknown) {
     setError(messageFromError(reason, "Screen inspection could not be completed."));
@@ -89,16 +103,29 @@ export function OverlayView() {
     await desktop.invoke("overlay:complete", { sessionId: session.id, result: { mode: "capture", rect: { x: x + session.display.bounds.x, y: y + session.display.bounds.y, width, height }, pngDataUrl: crop.toDataURL("image/png") } satisfies OverlayResult });
   }
 
-  if (!session) return <div className="overlay-loading">Preparing screen inspection</div>;
+  if (!session) {
+    return (
+      <div className="overlay-loading" role="status" aria-busy={!error}>
+        {error ? (
+          <>
+            <span role="alert">{error}</span>
+            <button type="button" onClick={cancelOverlay}>Close</button>
+          </>
+        ) : (
+          "Preparing screen inspection"
+        )}
+      </div>
+    );
+  }
   const regionMode = session.mode === "capture" || session.mode === "measure";
   const selection = start ? { left: Math.min(start.x, cursor.x), top: Math.min(start.y, cursor.y), width: Math.abs(cursor.x - start.x), height: Math.abs(cursor.y - start.y) } : null;
   const color = sampled(cursor);
-  const title = session.mode === "pair" ? first ? "Pick the background color" : "Pick the foreground color" : session.mode === "foreground" ? "Pick a foreground color" : session.mode === "background" ? "Pick a background color" : session.mode === "measure" ? "Drag across a target" : "Drag to capture an area";
+  const title = session.mode === "pair" ? first ? "Pick the background color" : "Pick the foreground color" : session.mode === "foreground" ? "Pick the foreground color" : session.mode === "background" ? "Pick the background color" : session.mode === "measure" ? "Drag across a target" : "Drag to capture an area";
   return <div className={`overlay-view ${regionMode ? "region-mode" : "picker-mode"}`} onMouseMove={(event) => setCursor({ x: event.clientX, y: event.clientY })} onMouseDown={(event) => { if (regionMode && event.button === 0) { setStart({ x: event.clientX, y: event.clientY }); setDragging(true); } }} onMouseUp={(event) => { if (regionMode && dragging) { setDragging(false); void finishRegion({ x: event.clientX, y: event.clientY }).catch(reportOverlayFailure); } }} onClick={() => { if (!regionMode) void pick(cursor).catch(reportOverlayFailure); }}>
     <canvas ref={canvasRef} className="overlay-frame" />
-    {selection ? <div className="region-selection" style={selection}><span>{Math.round(selection.width)} × {Math.round(selection.height)}</span></div> : null}
-    <div className="overlay-guide"><span className="overlay-mode-icon">{session.mode === "capture" ? <FrameCorners size={20} /> : session.mode === "measure" ? <Ruler size={20} /> : <Crosshair size={20} />}</span><div><strong>{title}</strong><span>{error || (regionMode ? "Press Escape to cancel" : "Click to sample · Arrow keys move precisely · Enter confirms")}</span></div>{first ? <span className="first-pick"><i style={{ backgroundColor: first.hex }} />{first.hex}<ArrowRight size={16} /></span> : null}<button aria-label="Cancel" onClick={(event) => { event.stopPropagation(); cancelOverlay(); }}><X size={20} /></button></div>
-    {!regionMode && color ? <div className="loupe" style={{ left: Math.min(innerWidth - 170, cursor.x + 26), top: Math.max(16, Math.min(innerHeight - 196, cursor.y - 86)) }}><canvas ref={loupeRef} width={132} height={132} /><div><i style={{ backgroundColor: color.hex }} /><strong>{color.hex}</strong><span>RGB {color.r}, {color.g}, {color.b}</span></div></div> : null}
+    {selection ? <div className="region-selection" data-label-inside={selection.top + selection.height > innerHeight - 40 ? "true" : undefined} style={selection}><span>{Math.round(selection.width)} × {Math.round(selection.height)}</span></div> : null}
+    <div className="overlay-guide" onClick={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} onMouseUp={(event) => event.stopPropagation()}><span className="overlay-mode-icon">{session.mode === "capture" ? <FrameCorners size={20} /> : session.mode === "measure" ? <Ruler size={20} /> : <Crosshair size={20} />}</span><div><strong>{title}</strong><span role="status">{error || (regionMode ? "Drag or press Enter to start and finish a region · Esc cancels" : "Click to sample · Arrows move · Enter confirms · Esc cancels")}</span></div>{first ? <span className="first-pick"><i style={{ backgroundColor: first.hex }} />{first.hex}<ArrowRight size={16} /></span> : null}<button aria-label="Cancel" title="Cancel (Esc)" onClick={(event) => { event.stopPropagation(); cancelOverlay(); }}><X size={20} /></button></div>
+    {!regionMode && color ? <div className="loupe" style={{ left: Math.min(innerWidth - LOUPE_TOTAL_W - 16, cursor.x + 26), top: Math.max(16, Math.min(innerHeight - LOUPE_TOTAL_H - 16, cursor.y - LOUPE_SIZE / 2 - 20)) }}><canvas ref={loupeRef} width={LOUPE_SIZE} height={LOUPE_SIZE} /><div><i style={{ backgroundColor: color.hex }} /><strong>{color.hex}</strong><span>RGB {color.r}, {color.g}, {color.b}</span></div></div> : null}
     <div className="screen-crosshair" style={{ left: cursor.x, top: cursor.y }}><span /><span /></div>
   </div>;
 }

@@ -8,7 +8,7 @@ import { ClipboardText, Palette, Plus, Trash, X } from "../Icon";
 import { desktop } from "../api";
 import { auditStoreKey } from "../audits";
 import { Button, EmptyState, Toast } from "../components";
-import { useStoredState, useTransientMessage } from "../hooks";
+import { messageFromError, useStoredState, useTransientMessage } from "../hooks";
 
 const HEX_RE = /#?[0-9a-fA-F]{6}\b|#?[0-9a-fA-F]{3}\b/g;
 
@@ -18,6 +18,7 @@ export function PaletteView({ auditId }: { auditId: string }) {
     ["#1F2933", "#FFF9ED", "#D9480F", "#28745D"],
   );
   const [draft, setDraft] = useState("");
+  const [draftError, setDraftError] = useState("");
   const [failuresOnly, setFailuresOnly] = useState(false);
   const [clearedColors, setClearedColors] = useState<string[] | null>(null);
   const [message, show] = useTransientMessage();
@@ -34,9 +35,10 @@ export function PaletteView({ auditId }: { auditId: string }) {
       .filter(Boolean)
       .map((rgb) => rgbToHex(rgb!));
     if (!next.length) {
-      show("Enter one or more valid hex colors", true);
+      setDraftError("Enter one or more valid hex colors, such as #1A2B3C.");
       return;
     }
+    setDraftError("");
     setColors((current) => [...new Set([...current, ...next])].slice(0, 16));
     setClearedColors(null);
     setDraft("");
@@ -73,10 +75,13 @@ export function PaletteView({ auditId }: { auditId: string }) {
             <span>Hex colors</span>
             <input
               value={draft}
-              onChange={(event) => setDraft(event.target.value)}
+            aria-invalid={draftError ? true : undefined}
+            aria-describedby={draftError ? "palette-draft-error" : undefined}
+              onChange={(event) => { setDraft(event.target.value); if (draftError) setDraftError(""); }}
               placeholder="#1F2933  #FFF9ED  #D9480F"
               spellCheck={false}
             />
+          {draftError ? <span className="field-error" id="palette-draft-error" role="alert">{draftError}</span> : null}
           </label>
           <Button type="submit" variant="primary" icon={Plus}>
             Add colors
@@ -94,8 +99,9 @@ export function PaletteView({ auditId }: { auditId: string }) {
                   setColors((items) => items.filter((item) => item !== color))
                 }
                 aria-label={`Remove ${color}`}
+                title={`Remove ${color}`}
               >
-                <X size={20} />
+                <X size={16} />
               </button>
             </span>
           ))}
@@ -111,7 +117,7 @@ export function PaletteView({ auditId }: { auditId: string }) {
         <Button
           icon={ClipboardText}
           disabled={colors.length < 2}
-          onClick={() => void copyCsv()}
+          onClick={() => void copyCsv().catch((error) => show(messageFromError(error, "The palette CSV could not be copied."), true))}
         >
           Copy CSV
         </Button>

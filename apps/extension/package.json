@@ -11,6 +11,9 @@
   },
   "dependencies": {
     "@accessibility-build/audit-contracts": "workspace:*",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@fontsource/manrope": "^5.3.0",
+    "@fontsource/source-sans-3": "^5.3.0",
     "@phosphor-icons/react": "^2.1.10",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
