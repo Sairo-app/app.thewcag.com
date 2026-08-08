@@ -1,5 +1,18 @@
 # Changelog
 
+## v3.0.10 - 2026-08-08
+
+**Desktop and extension UX overhaul**
+
+- Implemented the full desktop UX audit: removed the blanket 44px control override in favor of real hit areas, defined the missing secondary button style, deleted the legacy tool-rail and vision-hero stylesheets plus about forty superseded duplicate rule blocks, migrated every alias color token to its canonical name, and unified control heights, radii, checkboxes, toolbars, and hover treatments.
+- Bundled Manrope, Source Sans 3, and JetBrains Mono into the desktop app and extension so the brand typography loads instead of silently falling back to system fonts; annotation canvas text and exports now use the same face.
+- Hardened the finding editor: unsaved changes now require confirmation before closing, saves are guarded against double submission, errors surface inside the open dialog, validation runs at submit time instead of flooding alerts on open, and mapped affected-user fields render as checkboxes.
+- Unified view states across the workspace: the Findings navigation item opens the Findings tab, data loads show a shared skeleton, failures show a persistent error with retry, async buttons show busy states, and destructive actions consistently confirm or offer undo.
+- Made capture surfaces keyboard-complete: overlays take focus on open so arrows, Enter, and Escape work immediately, annotation shapes are resizable with Escape cancelling a drag, tools have single-key shortcuts, undo and redo reach the annotate window through the menu, and issue badges encode severity in ring style as well as color.
+- Windows now keep their bounds between launches, every window reports its own title, and application menus follow per-platform conventions with visible shortcut accelerators.
+- Fixed the extension popup widening with blank space (a viewport-unit resize feedback loop), restored Enter in the reproduction-steps field, added visible keyboard focus to the affected-user chips, gave the element picker an on-page instruction bar with keyboard focus handoff and a dual-stroke highlight, and aligned injected toast and marker colors with the canonical palette.
+- Updated the desktop release to `3.0.10`; the exact `v3.0.10` tag runs the complete quality gate and produces the macOS and Windows release artifacts.
+
 ## v3.0.9 - 2026-08-08
 
 **Adaptive audit templates**
