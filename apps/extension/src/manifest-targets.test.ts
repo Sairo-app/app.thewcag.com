@@ -41,9 +41,13 @@ describe("firefoxManifest", () => {
     });
   });
 
-  it("declares the add-on id and a minimum Firefox version", () => {
+  it("declares the add-on id, a minimum Firefox version, and no data collection", () => {
     expect(firefox.browser_specific_settings).toEqual({
-      gecko: { id: DEFAULT_GECKO_ID, strict_min_version: FIREFOX_MINIMUM_VERSION },
+      gecko: {
+        id: DEFAULT_GECKO_ID,
+        strict_min_version: FIREFOX_MINIMUM_VERSION,
+        data_collection_permissions: { required: ["none"] },
+      },
     });
   });
 

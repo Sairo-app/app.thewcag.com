@@ -51,7 +51,13 @@ export function firefoxManifest(
   // 4. An explicit id is required for AMO and to allowlist the extension in the
   //    native messaging host manifest.
   manifest.browser_specific_settings = {
-    gecko: { id: geckoId, strict_min_version: FIREFOX_MINIMUM_VERSION },
+    gecko: {
+      id: geckoId,
+      strict_min_version: FIREFOX_MINIMUM_VERSION,
+      // AMO requires an explicit data-collection declaration; evidence stays
+      // on the auditor's machine, so this extension collects none.
+      data_collection_permissions: { required: ["none"] },
+    },
   };
 
   // Chrome-only key; harmless but rejected by AMO's linter.
